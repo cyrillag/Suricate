@@ -16,6 +16,11 @@ if (!JIRA_TOKEN) console.warn('WARNING: JIRA_SERVICE_TOKEN not set — Jira API 
 const CONFLUENCE_TOKEN = process.env.CONFLUENCE_SERVICE_TOKEN;
 if (!CONFLUENCE_TOKEN) console.warn('WARNING: CONFLUENCE_SERVICE_TOKEN not set — Confluence sync will be unavailable.');
 
+// No fallback: a hardcoded default here would let anyone who reads this (public) source forge
+// session cookies for any deployment that forgot to set the real secret.
+const SESSION_SECRET = process.env.SESSION_SECRET;
+if (!SESSION_SECRET) { console.error('FATAL: SESSION_SECRET not set.'); process.exit(1); }
+
 function slugify(name) {
   return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
@@ -24,6 +29,13 @@ function uniqueSlug(baseName) {
   let slug = base, n = 2;
   while (db.prepare('SELECT 1 FROM projects WHERE slug=?').get(slug)) slug = `${base}-${n++}`;
   return slug;
+}
+
+// Two independently-encoded query params rather than one delimited string — Jira/Confluence
+// error messages routinely contain ':' and ',' (JSON bodies), which previously corrupted a
+// single comma/colon-joined "source:message" param when Express URL-decoded it.
+function warningQuery({ source, message }) {
+  return new URLSearchParams({ syncSource: source, syncMessage: message }).toString();
 }
 
 const upsertWorkstreamFromJira = db.prepare(`
@@ -103,7 +115,7 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(express.json({ limit: '1mb' }));
 app.use(session({
   store: new SQLiteStore({ db: 'sessions.db', dir: DATA_DIR }),
-  secret: process.env.SESSION_SECRET || 'ovhcloud-reports-session-secret',
+  secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: { maxAge: 30 * 24 * 60 * 60 * 1000, httpOnly: true }
@@ -112,9 +124,6 @@ app.use(session({
 function requireAuth(req, res, next) {
   if (!req.session.userId) return res.redirect('/login');
   next();
-}
-function getUser(req) {
-  return db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
 }
 
 // ── LOGIN ─────────────────────────────────────────────────────────
@@ -188,16 +197,16 @@ app.post('/projects', requireAuth, async (req, res) => {
   // Confluence's "Deliverables status" table (when configured) is the workstream source of
   // truth; the raw Jira tree-walk is only used as a fallback for projects without one, since
   // running both would seed two differently-grouped, duplicate workstream lists.
-  const warnings = [];
+  let warning = null;
   if (cSpace && cPage) {
     try { await syncConfluenceProject(projId, cSpace, cPage, null); }
-    catch (err) { warnings.push(`confluence:${encodeURIComponent(err.message)}`); }
+    catch (err) { warning = { source: 'confluence', message: err.message }; }
   } else {
     try { await seedWorkstreamsFromJiraTree(projId, epic); }
-    catch (err) { warnings.push(`jira:${encodeURIComponent(err.message)}`); }
+    catch (err) { warning = { source: 'jira', message: err.message }; }
   }
 
-  res.redirect(`/projects/${slug}${warnings.length ? '?syncWarning=' + warnings.join(',') : ''}`);
+  res.redirect(`/projects/${slug}${warning ? '?' + warningQuery(warning) : ''}`);
 });
 
 app.post('/projects/:slug/delete', requireAuth, (req, res) => {
@@ -214,10 +223,7 @@ app.get('/projects/:slug', requireAuth, (req, res) => {
   const reports  = db.prepare('SELECT year,week FROM reports WHERE project_id=? ORDER BY year DESC,week DESC LIMIT 10').all(proj.id);
   const wsCount  = db.prepare('SELECT COUNT(*) as n FROM workstreams WHERE project_id=?').get(proj.id).n;
   const epicCount= db.prepare('SELECT COUNT(*) as n FROM epics_cache WHERE project_id=?').get(proj.id).n;
-  const syncWarning = (req.query.syncWarning || '').split(',').filter(Boolean).map(w => {
-    const [source, msg] = w.split(':');
-    return { source, message: decodeURIComponent(msg || '') };
-  });
+  const syncWarning = req.query.syncSource ? [{ source: req.query.syncSource, message: req.query.syncMessage || '' }] : [];
   res.render('project-detail', { proj, reports, wsCount, epicCount, syncWarning, userName: req.session.userName, currentWeek: currentWeekStr() });
 });
 
@@ -248,11 +254,16 @@ app.post('/projects/:slug/reports/generate', requireAuth, async (req, res) => {
   const weekStr  = req.body.week || req.query.week || currentWeekStr();
   const [yr, wn] = weekStr.split('-W');
   const year = parseInt(yr), week = parseInt(wn);
-  if (isFutureWeek(year, week)) return res.redirect(`/projects/${proj.slug}?syncWarning=confluence:${encodeURIComponent('Cannot generate a report for a future week.')}`);
+  if (!Number.isInteger(week) || week < 1 || week > 53 || !Number.isInteger(year)) {
+    return res.redirect(`/projects/${proj.slug}?${warningQuery({ source: 'confluence', message: `Invalid week: "${weekStr}".` })}`);
+  }
+  if (isFutureWeek(year, week)) {
+    return res.redirect(`/projects/${proj.slug}?${warningQuery({ source: 'confluence', message: 'Cannot generate a report for a future week.' })}`);
+  }
   try {
     await generateReportRow(proj, year, week);
   } catch (err) {
-    return res.redirect(`/projects/${proj.slug}?syncWarning=confluence:${encodeURIComponent(err.message)}`);
+    return res.redirect(`/projects/${proj.slug}?${warningQuery({ source: 'confluence', message: err.message })}`);
   }
   res.redirect(`/projects/${proj.slug}/${year}-W${String(week).padStart(2,'0')}`);
 });
@@ -271,6 +282,7 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, re
   if (!proj) return res.status(404).send('Project not found.');
   const [yr, wn] = req.params.yearweek.split('-W');
   const year = parseInt(yr), week = parseInt(wn);
+  if (week < 1 || week > 53) return res.redirect(`/projects/${req.params.slug}`);
   // Applies whether or not a row already exists — a future week must never be reachable,
   // even one that got created before this guard existed (e.g. by clicking "next" repeatedly).
   if (isFutureWeek(year, week)) return res.redirect(`/projects/${req.params.slug}`);
@@ -279,7 +291,7 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, re
     // Nothing to edit, so a week with no report yet is generated on the fly from
     // Confluence/Jira the first time its URL is visited (e.g. via the week-nav arrows).
     try { await generateReportRow(proj, year, week); }
-    catch (err) { return res.redirect(`/projects/${req.params.slug}?syncWarning=confluence:${encodeURIComponent(err.message)}`); }
+    catch (err) { return res.redirect(`/projects/${req.params.slug}?${warningQuery({ source: 'confluence', message: err.message })}`); }
     report = db.prepare('SELECT * FROM reports WHERE project_id=? AND year=? AND week=?').get(proj.id, year, week);
   }
 

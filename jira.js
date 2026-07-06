@@ -21,10 +21,10 @@ async function getMe(token) {
 
 async function findUserByEmail(token, email) {
   const results = await api(token, '/user/search', { username: email, maxResults: 5 });
-  // Jira Server returns array; match on emailAddress
-  return results.find(u => (u.emailAddress || '').toLowerCase() === email.toLowerCase())
-      || results[0]
-      || null;
+  // Jira Server's username search is fuzzy — it can return OTHER accounts that merely look
+  // similar to the query. Since login has no password, only an exact emailAddress match may
+  // succeed; falling back to results[0] would log the caller in as an arbitrary matched user.
+  return results.find(u => (u.emailAddress || '').toLowerCase() === email.toLowerCase()) || null;
 }
 
 const TEAM_MAP = {

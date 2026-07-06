@@ -27,7 +27,7 @@
       <button class="btn-ghost btn-sm" id="sync-confluence-btn" data-slug="<%= proj.slug %>">↻ Sync Confluence</button>
       <% } %>
       <form method="POST" action="/projects/<%= proj.slug %>/reports/generate" style="display:flex;gap:6px;align-items:center">
-        <input class="field-input" type="text" name="week" value="<%= currentWeek %>" pattern="\d{4}-W\d{2}" style="width:110px" title="YYYY-Www">
+        <input class="field-input" type="text" name="week" value="<%= currentWeek %>" pattern="\d{4}-W\d{2}" style="width:110px" title="YYYY-Www" aria-label="Week to generate, format YYYY-Www">
         <button type="submit" class="btn-primary">Generate report</button>
       </form>
     </div>

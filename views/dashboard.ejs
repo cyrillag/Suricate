@@ -34,7 +34,7 @@
           <span class="project-epic"><%= p.jira_root_epic %></span>
           <form method="POST" action="/projects/<%= p.slug %>/delete"
                 onsubmit="return confirm('Delete project \'<%= p.name %>\' and all <%= p.report_count %> of its report(s)? This cannot be undone.');">
-            <button type="submit" class="btn-ghost btn-sm btn-danger" title="Delete project">🗑</button>
+            <button type="submit" class="btn-ghost btn-sm btn-danger" title="Delete project" aria-label="Delete project <%= p.name %>">🗑</button>
           </form>
         </div>
       </div>

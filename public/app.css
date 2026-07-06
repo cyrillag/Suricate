@@ -90,41 +90,7 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 
 /* TAGS */
 .tag{font-size:12px;background:var(--gnd);border:1px solid var(--bd2);padding:3px 9px;border-radius:2px;color:var(--tx2);margin-right:5px;display:inline-block}
-.tag-sm{font-size:11px;font-weight:700;letter-spacing:.06em;background:var(--gnd);padding:2px 6px;border-radius:2px;color:var(--tx2)}
-.mono-link{font-family:monospace;font-size:12px;color:var(--cobalt);text-decoration:none}
-.mono-link:hover{text-decoration:underline}
-.no-jira-sm{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#87878C}
-
-/* ABC EDITOR */
-.abc-editor{display:grid;grid-template-columns:repeat(3,1fr);gap:0}
-.abc-col-editor{padding:16px 18px;border-right:1px solid var(--bd2)}
-.abc-col-editor:last-child{border-right:none}
-.abc-col-editor.ach{background:#EBF5DD}.abc-col-editor.blk{background:#FDEEE9}.abc-col-editor.clr{background:#E5EDFF}
-.abc-col-label{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--tx2);margin-bottom:12px}
-.abc-col-editor.ach .abc-col-label{color:#4A7C1C}
-.abc-col-editor.blk .abc-col-label{color:var(--blk)}
-.abc-col-editor.clr .abc-col-label{color:var(--cobalt)}
-.abc-item-row{display:flex;flex-direction:column;gap:4px;margin-bottom:8px;background:#fff;border:1px solid var(--bd2);border-radius:var(--r);padding:9px}
-.abc-item-row .btn-remove{align-self:flex-end}
-.abc-text{border:none;outline:none;font-family:var(--f);font-size:14px;color:var(--tx);resize:vertical;width:100%;min-height:44px;line-height:1.4;background:transparent}
-.abc-jira{border:none;border-top:1px solid var(--bd2);outline:none;font-family:monospace;font-size:12px;color:var(--cobalt);width:100%;padding-top:5px;background:transparent}
-.abc-jira::placeholder{color:var(--bd)}
-
-/* RISK EDITOR */
-.risk-editor-row{display:flex;align-items:flex-start;gap:10px;padding:16px 20px;border-bottom:1px solid var(--bd2)}
-.risk-editor-row:last-child{border-bottom:none}
-.risk-level-sel{border:1px solid var(--bd);border-radius:var(--r);padding:7px 9px;font-size:13px;font-weight:700;font-family:var(--f);color:var(--tx);background:#fff;flex-shrink:0;width:100px}
-.risk-fields{flex:1;display:flex;flex-direction:column}
-
-/* WORKSTREAM TABLE */
-.ws-table{width:100%;border-collapse:collapse;font-size:14px}
-.ws-table th{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tx2);padding:9px 18px;text-align:left;border-bottom:1px solid var(--bd2);background:var(--gnd)}
-.ws-table td{padding:8px 18px;border-bottom:1px solid var(--bd2);vertical-align:middle}
-.ws-del-row td{background:#E5EDFF;color:var(--cobalt);font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:7px 18px}
-.status-sel{border:1px solid var(--bd);border-radius:var(--r);padding:5px 7px;font-size:13px;font-family:var(--f);width:100%;background:#fff}
 
 @media(max-width:700px){
-  .abc-editor{grid-template-columns:1fr}
-  .abc-col-editor{border-right:none;border-bottom:1px solid var(--bd2)}
   .project-grid{grid-template-columns:1fr}
 }

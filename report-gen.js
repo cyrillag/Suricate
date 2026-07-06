@@ -273,7 +273,7 @@ function GANTT_JS(epics) {
     {m:'Sep',y:'26',q:'Q1 FY27'},{m:'Oct',y:'26',q:''},{m:'Nov',y:'26',q:''}
   ];
   var TEAM_BG={NSE:'#0050D5',NSA:'#147DE8',NCC:'#000E9C',CLDAPI:'#4AB0F5',PUBM:'#636369',USRE:'#7BB73C',Manager:'#87878C'};
-  var EPICS=${JSON.stringify(epics)};
+  var EPICS=${JSON.stringify(epics.map(e => ({ ...e, team: esc(e.team), key: esc(e.key), label: esc(e.label) })))};
   MONTHS.forEach(function(m){
     var c=document.createElement('div');c.className='gantt-mcell'+(m.q?' qs':'');
     if(m.q){var q=document.createElement('span');q.className='gantt-mqtr';q.textContent=m.q;c.appendChild(q);}
