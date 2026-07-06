@@ -22,6 +22,7 @@
       </p>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end">
+      <a href="/projects/<%= proj.slug %>/edit" class="btn-ghost btn-sm">✎ Edit</a>
       <button class="btn-ghost btn-sm" id="sync-jira-btn" data-slug="<%= proj.slug %>">↻ Sync Jira</button>
       <% if (proj.confluence_page) { %>
       <button class="btn-ghost btn-sm" id="sync-confluence-btn" data-slug="<%= proj.slug %>">↻ Sync Confluence</button>

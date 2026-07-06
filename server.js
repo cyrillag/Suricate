@@ -233,6 +233,39 @@ app.post('/projects/:slug/delete', requireAuth, (req, res) => {
   res.redirect('/');
 });
 
+function confluenceUrlFor(space, page) {
+  return `${process.env.CONFLUENCE_BASE || 'https://confluence.ovhcloud.tools'}/display/${encodeURIComponent(space)}/${encodeURIComponent(page).replace(/%20/g, '+')}`;
+}
+
+// Renaming a project never changes its slug — the slug is the stable identifier used in URLs
+// and by every other route, so keeping it fixed avoids breaking bookmarks/links on rename.
+app.get('/projects/:slug/edit', requireAuth, (req, res) => {
+  const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
+  if (!proj) return res.status(404).send('Project not found.');
+  res.render('project-edit', { proj, confluenceUrl: confluenceUrlFor(proj.confluence_space, proj.confluence_page), error: null, userName: req.session.userName });
+});
+
+app.post('/projects/:slug/edit', requireAuth, async (req, res) => {
+  const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
+  if (!proj) return res.status(404).send('Project not found.');
+  const { name, jira_root_epic, confluence_url } = req.body;
+  const rerender = error => res.render('project-edit', { proj: { ...proj, name, jira_root_epic }, confluenceUrl: confluence_url, error, userName: req.session.userName });
+
+  if (!name?.trim() || !jira_root_epic?.trim()) return rerender('Project name and root epic are required.');
+  const confluence = parseConfluenceUrl(confluence_url);
+  if (!confluence) return rerender('A valid Confluence page URL is required (e.g. https://confluence.ovhcloud.tools/display/SPACE/Page+Title).');
+
+  const epic = jira_root_epic.trim().toUpperCase();
+  let eta = proj.eta;
+  try { eta = formatDate((await jira.getRootEpicMeta(JIRA_TOKEN, epic)).eta); }
+  catch (err) { console.warn(`Could not read ETA from ${epic}: ${err.message}`); }
+
+  db.prepare('UPDATE projects SET name=?,jira_root_epic=?,eta=?,confluence_space=?,confluence_page=? WHERE id=?')
+    .run(name.trim(), epic, eta, confluence.space, confluence.page, proj.id);
+
+  res.redirect(`/projects/${proj.slug}`);
+});
+
 app.get('/projects/:slug', requireAuth, (req, res) => {
   const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
   if (!proj) return res.status(404).send('Project not found.');
