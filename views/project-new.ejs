@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>New project — OVHcloud Reports</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<%- include('_nav', { userName, active: '' }) %>
+<div class="app-body">
+  <div class="page-header">
+    <div>
+      <a href="/" class="back-link">← Projects</a>
+      <h1 class="page-title">New project</h1>
+    </div>
+  </div>
+  <div class="form-card">
+    <% if (error) { %><div class="auth-error"><%= error %></div><% } %>
+    <form method="POST" action="/projects">
+      <div class="field-group">
+        <label class="field-label" for="name">Project name</label>
+        <input class="field-input" type="text" id="name" name="name" placeholder="Private boot M1" required autofocus>
+      </div>
+      <div class="field-group">
+        <label class="field-label" for="jira_root_epic">Root Jira epic (LVL2)</label>
+        <input class="field-input" type="text" id="jira_root_epic" name="jira_root_epic" placeholder="LVL2-9365" required>
+        <p class="field-hint">The top-level LVL2 epic. Workstreams will be auto-seeded from its child epics.</p>
+      </div>
+      <div class="field-group">
+        <label class="field-label" for="eta">Target ETA <span class="optional">(optional)</span></label>
+        <input class="field-input" type="text" id="eta" name="eta" placeholder="19 Nov 2026">
+      </div>
+      <div class="field-group">
+        <label class="field-label" for="confluence_space">Confluence space key <span class="optional">(optional)</span></label>
+        <input class="field-input" type="text" id="confluence_space" name="confluence_space" placeholder="CPO">
+      </div>
+      <div class="field-group">
+        <label class="field-label" for="confluence_page">Confluence page title <span class="optional">(optional)</span></label>
+        <input class="field-input" type="text" id="confluence_page" name="confluence_page" placeholder="Private boot - M1">
+        <p class="field-hint">Same page format as other projects: sections "4. Deliverables status", "5. Week summary" and "6. Risk matrix" are parsed automatically to seed workstreams and pre-fill each weekly report.</p>
+      </div>
+      <div class="form-actions">
+        <a href="/" class="btn-ghost">Cancel</a>
+        <button type="submit" class="btn-primary">Create &amp; import epics</button>
+      </div>
+    </form>
+    <div class="form-info">
+      <strong>What happens next:</strong> the app connects to Jira to fetch all child epics of the root epic, and — if a Confluence page is set — to that page to seed/refresh the workstream list from its "Deliverables status" table. This takes a few seconds.
+    </div>
+  </div>
+</div>
+</body>
+</html>

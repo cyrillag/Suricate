@@ -1,0 +1,18 @@
+version: '3.8'
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "31621:3000"
+    volumes:
+      - app-data:/data
+    environment:
+      - NODE_ENV=production
+      - DATA_DIR=/data
+      - SESSION_SECRET=${SESSION_SECRET}
+      - JIRA_SERVICE_TOKEN=${JIRA_SERVICE_TOKEN}
+      - CONFLUENCE_SERVICE_TOKEN=${CONFLUENCE_SERVICE_TOKEN}
+      - CONFLUENCE_BASE=${CONFLUENCE_BASE}
+volumes:
+  app-data:
