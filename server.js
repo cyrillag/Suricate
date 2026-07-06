@@ -38,6 +38,21 @@ function warningQuery({ source, message }) {
   return new URLSearchParams({ syncSource: source, syncMessage: message }).toString();
 }
 
+// Confluence's "pretty" page URL is /display/{SPACE}/{Title+With+Plus+For+Spaces}. Accepting a
+// pasted URL (rather than separate space-key/title fields) avoids relying on the user typing an
+// exact, case-correct page title by hand.
+function parseConfluenceUrl(url) {
+  let u;
+  try { u = new URL((url || '').trim()); } catch { return null; }
+  const m = u.pathname.match(/\/display\/([^/]+)\/(.+)$/);
+  if (!m) return null;
+  return { space: decodeURIComponent(m[1]), page: decodeURIComponent(m[2].replace(/\+/g, ' ')) };
+}
+
+function formatDate(iso) {
+  return iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
+}
+
 const upsertWorkstreamFromJira = db.prepare(`
   INSERT INTO workstreams(project_id,deliverable,name,team,jira_key,sort_order) VALUES(?,?,?,?,?,?)
   ON CONFLICT(project_id,deliverable,name) DO UPDATE SET
@@ -175,36 +190,37 @@ app.get('/projects/new', requireAuth, (req, res) => {
 });
 
 app.post('/projects', requireAuth, async (req, res) => {
-  const { name, jira_root_epic, eta, confluence_space, confluence_page } = req.body;
+  const { name, jira_root_epic, confluence_url } = req.body;
   if (!name?.trim() || !jira_root_epic?.trim())
     return res.render('project-new', { error: 'Project name and root epic are required.', userName: req.session.userName });
 
+  // Confluence is mandatory: the "Deliverables status", "Week summary" and "Risk matrix"
+  // sections it supplies aren't derivable from Jira alone.
+  const confluence = parseConfluenceUrl(confluence_url);
+  if (!confluence)
+    return res.render('project-new', { error: 'A valid Confluence page URL is required (e.g. https://confluence.ovhcloud.tools/display/SPACE/Page+Title).', userName: req.session.userName });
+
   const slug = uniqueSlug(name);
   const epic = jira_root_epic.trim().toUpperCase();
-  const cSpace = confluence_space?.trim() || null;
-  const cPage  = confluence_page?.trim() || null;
+
+  // Target ETA is inherited from the root epic's "End date" — not user-entered.
+  let eta = null;
+  try { eta = formatDate((await jira.getRootEpicMeta(JIRA_TOKEN, epic)).eta); }
+  catch (err) { console.warn(`Could not read ETA from ${epic}: ${err.message}`); }
 
   let projId;
   try {
     projId = db.prepare('INSERT INTO projects(user_id,name,slug,jira_root_epic,eta,confluence_space,confluence_page) VALUES(?,?,?,?,?,?,?)')
-      .run(req.session.userId, name.trim(), slug, epic, eta?.trim() || null, cSpace, cPage).lastInsertRowid;
+      .run(req.session.userId, name.trim(), slug, epic, eta, confluence.space, confluence.page).lastInsertRowid;
   } catch (err) {
     return res.render('project-new', { error: `Could not create project: ${err.message}`, userName: req.session.userName });
   }
 
-  // Project row is committed at this point — sync failures are recoverable via the "Sync" buttons
-  // on the project page, so we redirect either way instead of losing the created project.
-  // Confluence's "Deliverables status" table (when configured) is the workstream source of
-  // truth; the raw Jira tree-walk is only used as a fallback for projects without one, since
-  // running both would seed two differently-grouped, duplicate workstream lists.
+  // Project row is committed at this point — a sync failure is recoverable via the "Sync"
+  // buttons on the project page, so we redirect either way instead of losing the created project.
   let warning = null;
-  if (cSpace && cPage) {
-    try { await syncConfluenceProject(projId, cSpace, cPage, null); }
-    catch (err) { warning = { source: 'confluence', message: err.message }; }
-  } else {
-    try { await seedWorkstreamsFromJiraTree(projId, epic); }
-    catch (err) { warning = { source: 'jira', message: err.message }; }
-  }
+  try { await syncConfluenceProject(projId, confluence.space, confluence.page, null); }
+  catch (err) { warning = { source: 'confluence', message: err.message }; }
 
   res.redirect(`/projects/${slug}${warning ? '?' + warningQuery(warning) : ''}`);
 });

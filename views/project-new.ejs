@@ -25,20 +25,13 @@
       <div class="field-group">
         <label class="field-label" for="jira_root_epic">Root Jira epic (LVL2)</label>
         <input class="field-input" type="text" id="jira_root_epic" name="jira_root_epic" placeholder="LVL2-9365" required>
-        <p class="field-hint">The top-level LVL2 epic. Workstreams will be auto-seeded from its child epics.</p>
+        <p class="field-hint">The top-level LVL2 epic. Target ETA is read from its End date field automatically.</p>
       </div>
       <div class="field-group">
-        <label class="field-label" for="eta">Target ETA <span class="optional">(optional)</span></label>
-        <input class="field-input" type="text" id="eta" name="eta" placeholder="19 Nov 2026">
-      </div>
-      <div class="field-group">
-        <label class="field-label" for="confluence_space">Confluence space key <span class="optional">(optional)</span></label>
-        <input class="field-input" type="text" id="confluence_space" name="confluence_space" placeholder="CPO">
-      </div>
-      <div class="field-group">
-        <label class="field-label" for="confluence_page">Confluence page title <span class="optional">(optional)</span></label>
-        <input class="field-input" type="text" id="confluence_page" name="confluence_page" placeholder="Private boot - M1">
-        <p class="field-hint">Same page format as other projects: sections "4. Deliverables status", "5. Week summary" and "6. Risk matrix" are parsed automatically to seed workstreams and pre-fill each weekly report.</p>
+        <label class="field-label" for="confluence_url">Confluence page URL</label>
+        <input class="field-input" type="url" id="confluence_url" name="confluence_url"
+               placeholder="https://confluence.ovhcloud.tools/display/CPO/Private+boot+-+M1" required>
+        <p class="field-hint">Paste the page's URL — space and title are extracted automatically. Not everything lives in Jira: sections "4. Deliverables status", "5. Week summary" and "6. Risk matrix" on this page are parsed to seed workstreams and pre-fill each weekly report.</p>
       </div>
       <div class="form-actions">
         <a href="/" class="btn-ghost">Cancel</a>
@@ -46,7 +39,7 @@
       </div>
     </form>
     <div class="form-info">
-      <strong>What happens next:</strong> the app connects to Jira to fetch all child epics of the root epic, and — if a Confluence page is set — to that page to seed/refresh the workstream list from its "Deliverables status" table. This takes a few seconds.
+      <strong>What happens next:</strong> the app reads the target ETA from the Jira epic, then connects to Confluence to seed the workstream list from the page's "Deliverables status" table. This takes a few seconds.
     </div>
   </div>
 </div>
