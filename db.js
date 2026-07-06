@@ -44,6 +44,7 @@ db.exec(`
     project_id              INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     year                    INTEGER NOT NULL,
     week                    INTEGER NOT NULL,
+    exec_summary            TEXT,
     highlights_json         TEXT    DEFAULT '{"achievements":[],"blockers":[],"clarify":[]}',
     risks_json              TEXT    DEFAULT '[]',
     workstream_statuses_json TEXT   DEFAULT '{}',
@@ -73,6 +74,7 @@ function ensureColumn(table, column, ddl) {
 }
 ensureColumn('projects', 'confluence_space', 'confluence_space TEXT');
 ensureColumn('projects', 'confluence_page', 'confluence_page TEXT');
+ensureColumn('reports', 'exec_summary', 'exec_summary TEXT');
 
 // workstreams had no UNIQUE constraint pre-v2, so every "Sync Jira" click duplicated all rows.
 // Rebuild the table with UNIQUE(project_id,deliverable,name) so syncs upsert instead of duplicating.

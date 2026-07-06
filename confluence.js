@@ -80,6 +80,13 @@ function categoryItems(cellHtml) {
   return [{ text, jira_key: jiraKeyFromCell(cellHtml) }];
 }
 
+// ── Executive summary ────────────────────────────────────────────────
+function parseExecSummary(html) {
+  const section = extractSection(html, 'Executive summary');
+  const text = stripTags(section);
+  return text || null;
+}
+
 // ── Week summary (Achievements / Blockers / Clarify) ────────────────
 function parseWeekSummary(html, week) {
   const section = extractSection(html, 'Week summary');
@@ -173,4 +180,4 @@ async function syncProjectFromConfluence(token, spaceKey, title, week) {
   };
 }
 
-module.exports = { fetchPageBody, parseWeekSummary, parseDeliverables, parseRisks, syncProjectFromConfluence };
+module.exports = { fetchPageBody, parseExecSummary, parseWeekSummary, parseDeliverables, parseRisks, syncProjectFromConfluence };

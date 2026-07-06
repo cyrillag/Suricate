@@ -282,19 +282,22 @@ app.get('/projects/:slug', requireAuth, (req, res) => {
 // or type in by hand. Re-generating an existing week overwrites it with the current page/Jira
 // state, which is the intended way to "correct" a report (fix it at the source, then re-pull).
 async function generateReportRow(proj, year, week) {
+  let execSummary = null;
   let highlights = { achievements: [], blockers: [], clarify: [] };
   let risks = [];
   if (proj.confluence_space && proj.confluence_page && CONFLUENCE_TOKEN) {
     const page = await confluence.fetchPageBody(CONFLUENCE_TOKEN, proj.confluence_space, proj.confluence_page);
+    execSummary = confluence.parseExecSummary(page.html);
     highlights = confluence.parseWeekSummary(page.html, week) || highlights;
     risks = confluence.parseRisks(page.html);
   }
-  db.prepare(`INSERT INTO reports(project_id,year,week,highlights_json,risks_json,workstream_statuses_json,updated_at)
-    VALUES(?,?,?,?,?,'{}',unixepoch())
+  db.prepare(`INSERT INTO reports(project_id,year,week,exec_summary,highlights_json,risks_json,workstream_statuses_json,updated_at)
+    VALUES(?,?,?,?,?,?,'{}',unixepoch())
     ON CONFLICT(project_id,year,week) DO UPDATE SET
+      exec_summary=excluded.exec_summary,
       highlights_json=excluded.highlights_json,
       risks_json=excluded.risks_json,
-      updated_at=unixepoch()`).run(proj.id, year, week, JSON.stringify(highlights), JSON.stringify(risks));
+      updated_at=unixepoch()`).run(proj.id, year, week, execSummary, JSON.stringify(highlights), JSON.stringify(risks));
 }
 
 app.post('/projects/:slug/reports/generate', requireAuth, async (req, res) => {
@@ -363,6 +366,7 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, re
   const html = genReport({
     project: proj, year, week,
     pmName: proj.pm_name,
+    execSummary: report.exec_summary,
     highlights:  JSON.parse(report.highlights_json),
     risks:       JSON.parse(report.risks_json),
     workstreams: resolvedWs,

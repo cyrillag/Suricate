@@ -1,4 +1,4 @@
-function generateReport({ project, year, week, pmName, highlights, risks, workstreams, epics, stats, health }) {
+function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, epics, stats, health }) {
   const weekStr = `W${String(week).padStart(2, '0')}`;
   const dateLabel = isoWeekMonday(year, week);
   const prevW = adjacentWeek(year, week, -1);
@@ -129,6 +129,7 @@ function generateReport({ project, year, week, pmName, highlights, risks, workst
 
   <div class="doc-section">
     <div class="section-label">Project identity</div>
+    ${execSummary ? `<div class="exec-summary">${esc(execSummary)}</div>` : ''}
     <div class="identity-grid">
       <div class="identity-cell"><div class="f-label">Project</div><div class="f-value">${esc(project.name)}</div></div>
       <div class="identity-cell"><div class="f-label">Project Manager</div><div class="f-value">${esc(pmName || '')}</div></div>
@@ -374,6 +375,7 @@ const CSS = `
   .doc-section{background:var(--sur);border:1px solid var(--bd);border-top:3px solid var(--mb);border-radius:var(--r);margin-bottom:16px;overflow:hidden}
   .section-label{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mb);padding:11px 20px 10px;border-bottom:1px solid var(--bd2);background:var(--sur);display:flex;align-items:center;justify-content:space-between}
   .section-label .sl-right{color:var(--tx3);font-weight:400;letter-spacing:.04em}
+  .exec-summary{padding:14px 20px;font-size:13px;color:var(--tx2);line-height:1.5;border-bottom:1px solid var(--bd2);font-style:italic}
   .identity-grid{display:grid;grid-template-columns:repeat(4,1fr)}
   .identity-cell{padding:16px 20px;border-right:1px solid var(--bd2)}
   .identity-cell:last-child{border-right:none}
