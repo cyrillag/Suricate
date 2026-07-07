@@ -38,17 +38,6 @@ function warningQuery({ source, message }) {
   return new URLSearchParams({ syncSource: source, syncMessage: message }).toString();
 }
 
-// Confluence's "pretty" page URL is /display/{SPACE}/{Title+With+Plus+For+Spaces}. Accepting a
-// pasted URL (rather than separate space-key/title fields) avoids relying on the user typing an
-// exact, case-correct page title by hand.
-function parseConfluenceUrl(url) {
-  let u;
-  try { u = new URL((url || '').trim()); } catch { return null; }
-  const m = u.pathname.match(/\/display\/([^/]+)\/(.+)$/);
-  if (!m) return null;
-  return { space: decodeURIComponent(m[1]), page: decodeURIComponent(m[2].replace(/\+/g, ' ')) };
-}
-
 function formatDate(iso) {
   return iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
 }
@@ -88,17 +77,25 @@ async function refreshEpicStatuses(projectId, jiraKeys) {
   return epics.length;
 }
 
-async function syncConfluenceProject(projectId, spaceKey, page, week) {
-  const data = await confluence.syncProjectFromConfluence(CONFLUENCE_TOKEN, spaceKey, page, week);
-  data.workstreams.forEach((ws, i) => {
+async function syncConfluenceProject(projectId, spaceKey, page) {
+  const pageData = await confluence.fetchPageBody(CONFLUENCE_TOKEN, spaceKey, page);
+  const format = confluence.validatePageFormat(pageData.html);
+  if (!format.hasDeliverables) {
+    throw new Error('Confluence page found, but no "Deliverables status" table could be parsed — check the page matches the required format (see the template page linked on the New project form).');
+  }
+  const workstreams = confluence.parseDeliverables(pageData.html);
+  if (!workstreams.length) {
+    throw new Error('The "Deliverables status" table was found but appears empty — add at least one workstream row.');
+  }
+  workstreams.forEach((ws, i) => {
     upsertWorkstreamFromConfluence.run(
       projectId, ws.deliverable, ws.name, ws.team, ws.jira_key,
       ws.manual_status ? jira.mapStatus(ws.manual_status) : null, i
     );
   });
-  try { await refreshEpicStatuses(projectId, data.workstreams.map(w => w.jira_key)); }
+  try { await refreshEpicStatuses(projectId, workstreams.map(w => w.jira_key)); }
   catch (err) { console.warn(`Epic status refresh failed for project ${projectId}: ${err.message}`); }
-  return data;
+  return { version: pageData.version, workstreams };
 }
 
 // ISO week helpers
@@ -196,9 +193,9 @@ app.post('/projects', requireAuth, async (req, res) => {
 
   // Confluence is mandatory: the "Deliverables status", "Week summary" and "Risk matrix"
   // sections it supplies aren't derivable from Jira alone.
-  const confluence = parseConfluenceUrl(confluence_url);
-  if (!confluence)
-    return res.render('project-new', { error: 'A valid Confluence page URL is required (e.g. https://confluence.ovhcloud.tools/display/SPACE/Page+Title).', userName: req.session.userName });
+  const confPage = await confluence.resolvePageUrl(CONFLUENCE_TOKEN, confluence_url);
+  if (!confPage)
+    return res.render('project-new', { error: 'A valid Confluence page URL is required — paste it from your browser\'s address bar while viewing the page (e.g. https://confluence.ovhcloud.tools/display/SPACE/Page+Title, or a pageId= link).', userName: req.session.userName });
 
   const slug = uniqueSlug(name);
   const epic = jira_root_epic.trim().toUpperCase();
@@ -211,7 +208,7 @@ app.post('/projects', requireAuth, async (req, res) => {
   let projId;
   try {
     projId = db.prepare('INSERT INTO projects(user_id,name,slug,jira_root_epic,eta,confluence_space,confluence_page) VALUES(?,?,?,?,?,?,?)')
-      .run(req.session.userId, name.trim(), slug, epic, eta, confluence.space, confluence.page).lastInsertRowid;
+      .run(req.session.userId, name.trim(), slug, epic, eta, confPage.space, confPage.page).lastInsertRowid;
   } catch (err) {
     return res.render('project-new', { error: `Could not create project: ${err.message}`, userName: req.session.userName });
   }
@@ -219,7 +216,7 @@ app.post('/projects', requireAuth, async (req, res) => {
   // Project row is committed at this point — a sync failure is recoverable via the "Sync"
   // buttons on the project page, so we redirect either way instead of losing the created project.
   let warning = null;
-  try { await syncConfluenceProject(projId, confluence.space, confluence.page, null); }
+  try { await syncConfluenceProject(projId, confPage.space, confPage.page); }
   catch (err) { warning = { source: 'confluence', message: err.message }; }
 
   res.redirect(`/projects/${slug}${warning ? '?' + warningQuery(warning) : ''}`);
@@ -252,8 +249,8 @@ app.post('/projects/:slug/edit', requireAuth, async (req, res) => {
   const rerender = error => res.render('project-edit', { proj: { ...proj, name, jira_root_epic }, confluenceUrl: confluence_url, error, userName: req.session.userName });
 
   if (!name?.trim() || !jira_root_epic?.trim()) return rerender('Project name and root epic are required.');
-  const confluence = parseConfluenceUrl(confluence_url);
-  if (!confluence) return rerender('A valid Confluence page URL is required (e.g. https://confluence.ovhcloud.tools/display/SPACE/Page+Title).');
+  const confPage = await confluence.resolvePageUrl(CONFLUENCE_TOKEN, confluence_url);
+  if (!confPage) return rerender('A valid Confluence page URL is required — paste it from your browser\'s address bar while viewing the page (e.g. https://confluence.ovhcloud.tools/display/SPACE/Page+Title, or a pageId= link).');
 
   const epic = jira_root_epic.trim().toUpperCase();
   let eta = proj.eta;
@@ -261,7 +258,7 @@ app.post('/projects/:slug/edit', requireAuth, async (req, res) => {
   catch (err) { console.warn(`Could not read ETA from ${epic}: ${err.message}`); }
 
   db.prepare('UPDATE projects SET name=?,jira_root_epic=?,eta=?,confluence_space=?,confluence_page=? WHERE id=?')
-    .run(name.trim(), epic, eta, confluence.space, confluence.page, proj.id);
+    .run(name.trim(), epic, eta, confPage.space, confPage.page, proj.id);
 
   res.redirect(`/projects/${proj.slug}`);
 });
@@ -287,6 +284,11 @@ async function generateReportRow(proj, year, week) {
   let risks = [];
   if (proj.confluence_space && proj.confluence_page && CONFLUENCE_TOKEN) {
     const page = await confluence.fetchPageBody(CONFLUENCE_TOKEN, proj.confluence_space, proj.confluence_page);
+    // Missing table entirely = format problem, worth failing loudly on. No row for THIS week yet
+    // is normal/expected (e.g. before the PM has updated the page for the week) — stay silent.
+    if (!confluence.validatePageFormat(page.html).hasWeekSummaryTable) {
+      throw new Error('No "Week summary" table could be found on the Confluence page — check it matches the required format (see the template page linked on the New project form).');
+    }
     execSummary = confluence.parseExecSummary(page.html);
     highlights = confluence.parseWeekSummary(page.html, week) || highlights;
     risks = confluence.parseRisks(page.html);
@@ -405,7 +407,7 @@ app.post('/api/projects/:slug/sync-confluence', requireAuth, async (req, res) =>
   if (!proj) return res.status(404).json({ error: 'Not found' });
   if (!proj.confluence_space || !proj.confluence_page) return res.status(400).json({ error: 'No Confluence page configured for this project.' });
   try {
-    const data = await syncConfluenceProject(proj.id, proj.confluence_space, proj.confluence_page, null);
+    const data = await syncConfluenceProject(proj.id, proj.confluence_space, proj.confluence_page);
     res.json({ ok: true, count: data.workstreams.length, pageVersion: data.version });
   } catch (err) {
     res.status(500).json({ error: err.message });

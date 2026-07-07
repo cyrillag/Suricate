@@ -11,6 +11,46 @@ async function fetchPageBody(token, spaceKey, title) {
   return { id: page.id, version: page.version?.number, html: page.body?.storage?.value || '' };
 }
 
+async function fetchContentById(token, id) {
+  const res = await fetch(`${BASE}/rest/api/content/${id}?expand=space`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, timeout: 15000
+  });
+  if (!res.ok) throw new Error(`Confluence ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
+  const data = await res.json();
+  return { space: data.space.key, title: data.title };
+}
+
+// Confluence shows PMs several different URL shapes depending on how they navigate/share a page
+// (the pretty "/display/SPACE/Title", or "/pages/viewpage.action?pageId=N" straight from the API
+// or a "Copy link" action). Accepting all of them removes a common onboarding stumbling block.
+async function resolvePageUrl(token, url) {
+  let u;
+  try { u = new URL((url || '').trim()); } catch { return null; }
+
+  const displayMatch = u.pathname.match(/\/display\/([^/]+)\/(.+)$/);
+  if (displayMatch) {
+    return { space: decodeURIComponent(displayMatch[1]), page: decodeURIComponent(displayMatch[2].replace(/\+/g, ' ')) };
+  }
+
+  const pageId = u.searchParams.get('pageId') || (u.pathname.match(/\/pages\/(\d+)/) || [])[1];
+  if (pageId) {
+    try { const { space, title } = await fetchContentById(token, pageId); return { space, page: title }; }
+    catch { return null; }
+  }
+
+  return null;
+}
+
+// Structural check independent of any single week's content — used to tell "page doesn't match
+// the required format" apart from "format is fine, just nothing to report yet this week".
+function validatePageFormat(html) {
+  return {
+    hasDeliverables:     extractTables(extractSection(html, 'Deliverables status')).length > 0,
+    hasWeekSummaryTable: extractTables(extractSection(html, 'Week summary')).length > 0,
+    hasRiskTable:        extractTables(extractSection(html, 'Risk matrix')).some(t => /R[ée]f[ée]rence/i.test(t))
+  };
+}
+
 function stripTags(html) {
   return String(html || '')
     .replace(/<ac:parameter[^>]*ac:name="title">([^<]*)<\/ac:parameter>/gi, ' $1 ') // keep status-macro titles (e.g. HIGH)
@@ -180,4 +220,7 @@ async function syncProjectFromConfluence(token, spaceKey, title, week) {
   };
 }
 
-module.exports = { fetchPageBody, parseExecSummary, parseWeekSummary, parseDeliverables, parseRisks, syncProjectFromConfluence };
+module.exports = {
+  fetchPageBody, fetchContentById, resolvePageUrl, validatePageFormat,
+  parseExecSummary, parseWeekSummary, parseDeliverables, parseRisks, syncProjectFromConfluence
+};
