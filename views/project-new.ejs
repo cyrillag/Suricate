@@ -19,16 +19,16 @@
     <% if (error) { %><div class="auth-error"><%= error %></div><% } %>
     <form method="POST" action="/projects">
       <div class="field-group">
-        <label class="field-label" for="name">Project name</label>
+        <label class="field-step" for="name"><span class="step-num">1.</span> Give your project a name <span class="optional">(you'll be able to rename it later on)</span></label>
         <input class="field-input" type="text" id="name" name="name" placeholder="Private boot M1" required autofocus>
       </div>
       <div class="field-group">
-        <label class="field-label" for="jira_root_epic">Root Jira epic (LVL2)</label>
+        <label class="field-step" for="jira_root_epic"><span class="step-num">2.</span> Fill in the master epic (LVL2) <span class="optional">(also editable later)</span></label>
         <input class="field-input" type="text" id="jira_root_epic" name="jira_root_epic" placeholder="LVL2-9365" required>
-        <p class="field-hint">The top-level LVL2 epic. Target ETA is read from its End date field automatically.</p>
+        <p class="field-hint">This is the top-level epic your project rolls up to in Jira. Its "End date" field is read automatically to set the Target ETA — you don't fill that in yourself.</p>
       </div>
       <div class="field-group">
-        <label class="field-label" for="confluence_url">Confluence page URL</label>
+        <label class="field-step" for="confluence_url"><span class="step-num">3.</span> Paste the URL of your project's Confluence page</label>
         <div class="format-callout">
           ⚠ This only works if your page follows a specific structure — it is <strong>not</strong> free-form.
           <a href="https://confluence.ovhcloud.tools/pages/viewpage.action?pageId=994384126" target="_blank" rel="noopener">Start from the template page →</a>
@@ -37,14 +37,15 @@
                placeholder="https://confluence.ovhcloud.tools/display/CPO/Private+boot+-+M1" required>
         <p class="field-hint">Paste the page's URL from your browser's address bar (any link format works, including a plain "pageId=" link) — space and title are extracted automatically. Not everything lives in Jira: sections "Deliverables status", "Week summary" and "Risk matrix" on this page are parsed to seed workstreams and pre-fill each weekly report.</p>
       </div>
+      <div class="field-group">
+        <label class="field-step"><span class="step-num">4.</span> Click "Create" below</label>
+        <p class="field-hint">The app will fetch the epic's ETA from Jira, then import your workstreams from the Confluence page. You'll land on your project page a few seconds later — with a clear error message instead of an empty project if something doesn't match the expected format.</p>
+      </div>
       <div class="form-actions">
         <a href="/" class="btn-ghost">Cancel</a>
         <button type="submit" class="btn-primary">Create &amp; import epics</button>
       </div>
     </form>
-    <div class="form-info">
-      <strong>What happens next:</strong> the app reads the target ETA from the Jira epic, then connects to Confluence to seed the workstream list from the page's "Deliverables status" table. This takes a few seconds. If the page doesn't match the required format, you'll get a specific error explaining what's missing instead of an empty report.
-    </div>
   </div>
 </div>
 </body>

@@ -52,6 +52,8 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 /* FORMS */
 .field-group{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
 .field-label{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tx2)}
+.field-step{display:block;font-size:15px;font-weight:700;color:var(--tx)}
+.field-step .step-num{color:var(--cobalt)}
 .field-input{border:1px solid var(--bd);border-radius:var(--r);padding:9px 11px;font-size:15px;font-family:var(--f);color:var(--tx);outline:none;transition:border-color .15s;background:#fff}
 .field-input:focus{border-color:var(--cobalt);box-shadow:0 0 0 2px rgba(0,80,213,.12)}
 .field-hint{font-size:13px;color:var(--tx2);line-height:1.4}
