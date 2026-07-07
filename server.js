@@ -5,6 +5,7 @@ const db         = require('./db');
 const jira       = require('./jira');
 const confluence = require('./confluence');
 const genReport  = require('./report-gen');
+const { translate, pluralize } = require('./i18n');
 
 const SQLiteStore = require('connect-sqlite3')(session);
 const app  = express();
@@ -138,6 +139,24 @@ function requireAuth(req, res, next) {
   next();
 }
 
+// ── LANGUAGE (FR default) ────────────────────────────────────────
+// Plain cookie, no cookie-parser dependency needed just for one value.
+function getLang(req) {
+  const m = (req.headers.cookie || '').match(/(?:^|;\s*)lang=(fr|en)/);
+  return m ? m[1] : 'fr';
+}
+app.use((req, res, next) => {
+  req.lang = getLang(req);
+  res.locals.lang = req.lang;
+  res.locals.t = (key, vars) => translate(req.lang, key, vars);
+  res.locals.tPlural = (count, oneKey, otherKey) => pluralize(req.lang, count, oneKey, otherKey);
+  next();
+});
+app.get('/lang/:code', (req, res) => {
+  res.cookie('lang', req.params.code === 'en' ? 'en' : 'fr', { maxAge: 365 * 24 * 60 * 60 * 1000 });
+  res.redirect(req.get('Referer') || '/');
+});
+
 // ── LOGIN ─────────────────────────────────────────────────────────
 app.get('/login', (req, res) => {
   if (req.session.userId) return res.redirect('/');
@@ -146,10 +165,10 @@ app.get('/login', (req, res) => {
 
 app.post('/login', async (req, res) => {
   const email = (req.body.email || '').trim().toLowerCase();
-  if (!email || !email.includes('@')) return res.render('login', { error: 'Adresse email requise.' });
+  if (!email || !email.includes('@')) return res.render('login', { error: res.locals.t('login.err_email_required') });
   try {
     const me = await jira.findUserByEmail(JIRA_TOKEN, email);
-    if (!me) return res.render('login', { error: 'Email non trouvé dans Jira OVHcloud.' });
+    if (!me) return res.render('login', { error: res.locals.t('login.err_not_found') });
     const accountId   = me.key || me.name;
     const displayName = me.displayName || me.name || email;
     const existing = db.prepare('SELECT id FROM users WHERE jira_account_id=?').get(accountId);
@@ -165,7 +184,7 @@ app.post('/login', async (req, res) => {
     req.session.userName = displayName;
     req.session.save(() => res.redirect('/'));
   } catch (err) {
-    res.render('login', { error: 'Erreur de connexion Jira : ' + err.message });
+    res.render('login', { error: res.locals.t('login.err_generic') + err.message });
   }
 });
 
@@ -189,13 +208,13 @@ app.get('/projects/new', requireAuth, (req, res) => {
 app.post('/projects', requireAuth, async (req, res) => {
   const { name, jira_root_epic, confluence_url } = req.body;
   if (!name?.trim() || !jira_root_epic?.trim())
-    return res.render('project-new', { error: 'Project name and root epic are required.', userName: req.session.userName });
+    return res.render('project-new', { error: res.locals.t('newProject.err_required'), userName: req.session.userName });
 
   // Confluence is mandatory: the "Deliverables status", "Week summary" and "Risk matrix"
   // sections it supplies aren't derivable from Jira alone.
   const confPage = await confluence.resolvePageUrl(CONFLUENCE_TOKEN, confluence_url);
   if (!confPage)
-    return res.render('project-new', { error: 'A valid Confluence page URL is required — paste it from your browser\'s address bar while viewing the page (e.g. https://confluence.ovhcloud.tools/display/SPACE/Page+Title, or a pageId= link).', userName: req.session.userName });
+    return res.render('project-new', { error: res.locals.t('newProject.err_confluence_url'), userName: req.session.userName });
 
   const slug = uniqueSlug(name);
   const epic = jira_root_epic.trim().toUpperCase();
@@ -248,9 +267,9 @@ app.post('/projects/:slug/edit', requireAuth, async (req, res) => {
   const { name, jira_root_epic, confluence_url } = req.body;
   const rerender = error => res.render('project-edit', { proj: { ...proj, name, jira_root_epic }, confluenceUrl: confluence_url, error, userName: req.session.userName });
 
-  if (!name?.trim() || !jira_root_epic?.trim()) return rerender('Project name and root epic are required.');
+  if (!name?.trim() || !jira_root_epic?.trim()) return rerender(res.locals.t('editProject.err_required'));
   const confPage = await confluence.resolvePageUrl(CONFLUENCE_TOKEN, confluence_url);
-  if (!confPage) return rerender('A valid Confluence page URL is required — paste it from your browser\'s address bar while viewing the page (e.g. https://confluence.ovhcloud.tools/display/SPACE/Page+Title, or a pageId= link).');
+  if (!confPage) return rerender(res.locals.t('editProject.err_confluence_url'));
 
   const epic = jira_root_epic.trim().toUpperCase();
   let eta = proj.eta;

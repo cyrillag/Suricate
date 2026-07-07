@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="<%= lang %>">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,7 +11,7 @@
 <div class="app-body">
   <div class="page-header">
     <div>
-      <a href="/" class="back-link">← Projects</a>
+      <a href="/" class="back-link"><%= t('newProject.back') %></a>
       <h1 class="page-title"><%= proj.name %></h1>
       <p class="page-sub">
         <span class="tag"><%= proj.jira_root_epic %></span>
@@ -22,49 +22,49 @@
       </p>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end">
-      <a href="/projects/<%= proj.slug %>/edit" class="btn-ghost btn-sm">✎ Edit</a>
-      <button class="btn-ghost btn-sm" id="sync-jira-btn" data-slug="<%= proj.slug %>">↻ Sync Jira</button>
+      <a href="/projects/<%= proj.slug %>/edit" class="btn-ghost btn-sm"><%= t('detail.edit') %></a>
+      <button class="btn-ghost btn-sm" id="sync-jira-btn" data-slug="<%= proj.slug %>"><%= t('detail.sync_jira') %></button>
       <% if (proj.confluence_page) { %>
-      <button class="btn-ghost btn-sm" id="sync-confluence-btn" data-slug="<%= proj.slug %>">↻ Sync Confluence</button>
+      <button class="btn-ghost btn-sm" id="sync-confluence-btn" data-slug="<%= proj.slug %>"><%= t('detail.sync_confluence') %></button>
       <% } %>
       <form method="POST" action="/projects/<%= proj.slug %>/reports/generate" style="display:flex;gap:6px;align-items:center">
-        <input class="field-input" type="text" name="week" value="<%= currentWeek %>" pattern="\d{4}-W\d{2}" style="width:110px" title="YYYY-Www" aria-label="Week to generate, format YYYY-Www">
-        <button type="submit" class="btn-primary">Generate report</button>
+        <input class="field-input" type="text" name="week" value="<%= currentWeek %>" pattern="\d{4}-W\d{2}" style="width:110px" title="<%= t('detail.week_input_title') %>" aria-label="<%= t('detail.week_input_aria') %>">
+        <button type="submit" class="btn-primary"><%= t('detail.generate_report') %></button>
       </form>
     </div>
   </div>
 
   <p class="page-sub" style="margin-top:-8px;margin-bottom:16px">
-    Reports are generated automatically from <%= proj.confluence_page ? 'the Confluence page' : 'Jira' %> and Jira epic statuses — there is nothing to type in here. To correct a report, fix it at the source (Confluence page or Jira) then regenerate.
+    <%= t('detail.auto_note', { source: proj.confluence_page ? t('detail.auto_note_confluence') : t('detail.auto_note_jira') }) %>
   </p>
 
   <% if (syncWarning && syncWarning.length) { %>
   <div class="auth-error">
     <% syncWarning.forEach(w => { %>
-      <div>⚠ <%= w.source === 'jira' ? 'Jira' : 'Confluence' %> sync failed: <%= w.message %> — retry with the buttons above.</div>
+      <div>⚠ <%= t('detail.sync_failed', { source: w.source === 'jira' ? t('detail.source_jira') : t('detail.source_confluence'), message: w.message }).replace(/^⚠\s*/, '') %></div>
     <% }) %>
   </div>
   <% } %>
 
   <div class="section-card">
-    <div class="section-card-header">Past reports</div>
+    <div class="section-card-header"><%= t('detail.past_reports') %></div>
     <% if (reports.length === 0) { %>
-    <div class="empty-state-inline">No reports yet. Generate <%= currentWeek %> above to create the first one.</div>
+    <div class="empty-state-inline"><%= t('detail.no_reports', { week: currentWeek }) %></div>
     <% } else { %>
     <table class="simple-table">
-      <thead><tr><th>Week</th><th></th></tr></thead>
+      <thead><tr><th><%= t('detail.week_col') %></th><th></th></tr></thead>
       <tbody>
       <% reports.forEach(r => { const ws = `${r.year}-W${String(r.week).padStart(2,'0')}`; %>
       <tr>
         <td><strong><%= ws %></strong></td>
         <td class="td-actions">
-          <a href="/projects/<%= proj.slug %>/<%= ws %>" class="btn-ghost btn-sm">View</a>
+          <a href="/projects/<%= proj.slug %>/<%= ws %>" class="btn-ghost btn-sm"><%= t('detail.view') %></a>
           <form method="POST" action="/projects/<%= proj.slug %>/reports/generate" style="display:inline">
             <input type="hidden" name="week" value="<%= ws %>">
-            <button type="submit" class="btn-ghost btn-sm">↻ Regenerate</button>
+            <button type="submit" class="btn-ghost btn-sm"><%= t('detail.regenerate') %></button>
           </form>
-          <form method="POST" action="/projects/<%= proj.slug %>/reports/<%= ws %>/delete" style="display:inline" onsubmit="return confirm('Delete the <%= ws %> report? This cannot be undone.');">
-            <button type="submit" class="btn-ghost btn-sm btn-danger">🗑 Delete</button>
+          <form method="POST" action="/projects/<%= proj.slug %>/reports/<%= ws %>/delete" style="display:inline" onsubmit="return confirm(<%= JSON.stringify(t('detail.delete_confirm', { week: ws })) %>);">
+            <button type="submit" class="btn-ghost btn-sm btn-danger"><%= t('detail.delete') %></button>
           </form>
         </td>
       </tr>
@@ -75,20 +75,28 @@
   </div>
 </div>
 <script>
+var I18N = {
+  syncing: <%= JSON.stringify(t('detail.syncing')) %>,
+  error: <%= JSON.stringify(t('detail.error')) %>,
+  syncJira: <%= JSON.stringify(t('detail.sync_jira')) %>,
+  syncConfluence: <%= JSON.stringify(t('detail.sync_confluence')) %>,
+  syncedEpics: <%= JSON.stringify(t('detail.synced_epics', { count: '__N__' })) %>,
+  syncedWorkstreams: <%= JSON.stringify(t('detail.synced_workstreams', { count: '__N__' })) %>
+};
 document.getElementById('sync-jira-btn').addEventListener('click', async function() {
-  this.textContent = 'Syncing…'; this.disabled = true;
+  this.textContent = I18N.syncing; this.disabled = true;
   const r = await fetch('/api/projects/<%= proj.slug %>/sync-epics', { method:'POST' });
   const d = await r.json();
-  this.textContent = r.ok ? `✓ ${d.count} epics synced` : ('✗ ' + (d.error || 'Error'));
-  setTimeout(() => { this.textContent='↻ Sync Jira'; this.disabled=false; }, 3000);
+  this.textContent = r.ok ? I18N.syncedEpics.replace('__N__', d.count) : ('✗ ' + (d.error || I18N.error));
+  setTimeout(() => { this.textContent = I18N.syncJira; this.disabled = false; }, 3000);
 });
 var syncConfBtn = document.getElementById('sync-confluence-btn');
 if (syncConfBtn) syncConfBtn.addEventListener('click', async function() {
-  this.textContent = 'Syncing…'; this.disabled = true;
+  this.textContent = I18N.syncing; this.disabled = true;
   const r = await fetch('/api/projects/<%= proj.slug %>/sync-confluence', { method:'POST' });
   const d = await r.json();
-  this.textContent = r.ok ? `✓ ${d.count} workstreams synced` : ('✗ ' + (d.error || 'Error'));
-  setTimeout(() => { this.textContent='↻ Sync Confluence'; this.disabled=false; }, 3000);
+  this.textContent = r.ok ? I18N.syncedWorkstreams.replace('__N__', d.count) : ('✗ ' + (d.error || I18N.error));
+  setTimeout(() => { this.textContent = I18N.syncConfluence; this.disabled = false; }, 3000);
 });
 </script>
 </body>

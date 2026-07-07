@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="<%= lang %>">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,18 +11,18 @@
 <div class="app-body">
   <div class="page-header">
     <div>
-      <h1 class="page-title">My projects</h1>
-      <p class="page-sub">Weekly status reports for your OVHcloud projects</p>
+      <h1 class="page-title"><%= t('dashboard.title') %></h1>
+      <p class="page-sub"><%= t('dashboard.subtitle') %></p>
     </div>
-    <a href="/projects/new" class="btn-primary">+ New project</a>
+    <a href="/projects/new" class="btn-primary"><%= t('dashboard.new_project') %></a>
   </div>
 
   <% if (projects.length === 0) { %>
   <div class="empty-state">
     <div class="empty-icon">📋</div>
-    <h2>No projects yet</h2>
-    <p>Create your first project to start generating weekly reports.</p>
-    <a href="/projects/new" class="btn-primary">Create a project</a>
+    <h2><%= t('dashboard.empty_title') %></h2>
+    <p><%= t('dashboard.empty_text') %></p>
+    <a href="/projects/new" class="btn-primary"><%= t('dashboard.empty_cta') %></a>
   </div>
   <% } else { %>
   <div class="project-grid">
@@ -33,22 +33,22 @@
         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
           <span class="project-epic"><%= p.jira_root_epic %></span>
           <form method="POST" action="/projects/<%= p.slug %>/delete"
-                onsubmit="return confirm('Delete project \'<%= p.name %>\' and all <%= p.report_count %> of its report(s)? This cannot be undone.');">
-            <button type="submit" class="btn-ghost btn-sm btn-danger" title="Delete project" aria-label="Delete project <%= p.name %>">🗑</button>
+                onsubmit="return confirm(<%= JSON.stringify(t('dashboard.delete_confirm', {name: p.name, count: p.report_count})) %>);">
+            <button type="submit" class="btn-ghost btn-sm btn-danger" title="<%= t('dashboard.delete_title') %>" aria-label="<%= t('dashboard.delete_title') %> <%= p.name %>">🗑</button>
           </form>
         </div>
       </div>
       <div class="project-card-meta">
-        <%= p.report_count %> report<%= p.report_count !== 1 ? 's' : '' %>
-        <% if (p.last_report) { %> · Last: <strong><%= p.last_report %></strong><% } %>
-        <% if (p.eta) { %> · ETA <strong><%= p.eta %></strong><% } %>
+        <%= p.report_count %> <%= tPlural(p.report_count, 'dashboard.report_one', 'dashboard.report_other') %>
+        <% if (p.last_report) { %> · <%= t('dashboard.last') %> <strong><%= p.last_report %></strong><% } %>
+        <% if (p.eta) { %> · <%= t('dashboard.eta') %> <strong><%= p.eta %></strong><% } %>
       </div>
       <div class="project-card-actions">
         <form method="POST" action="/projects/<%= p.slug %>/reports/generate" style="display:inline">
           <input type="hidden" name="week" value="<%= currentWeek %>">
-          <button type="submit" class="btn-primary btn-sm">Generate <%= currentWeek %></button>
+          <button type="submit" class="btn-primary btn-sm"><%= t('dashboard.generate', {week: currentWeek}) %></button>
         </form>
-        <a href="/projects/<%= p.slug %>" class="btn-ghost btn-sm">View reports</a>
+        <a href="/projects/<%= p.slug %>" class="btn-ghost btn-sm"><%= t('dashboard.view_reports') %></a>
       </div>
     </div>
     <% }) %>

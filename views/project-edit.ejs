@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="<%= lang %>">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Edit <%= proj.name %> — OVHcloud Reports</title>
+<title><%= t('editProject.title') %> — <%= proj.name %> — OVHcloud Reports</title>
 <link rel="stylesheet" href="/app.css">
 </head>
 <body>
@@ -12,36 +12,36 @@
   <div class="page-header">
     <div>
       <a href="/projects/<%= proj.slug %>" class="back-link">← <%= proj.name %></a>
-      <h1 class="page-title">Edit project</h1>
+      <h1 class="page-title"><%= t('editProject.title') %></h1>
     </div>
   </div>
   <div class="form-card">
     <% if (error) { %><div class="auth-error"><%= error %></div><% } %>
     <form method="POST" action="/projects/<%= proj.slug %>/edit">
       <div class="field-group">
-        <label class="field-label" for="name">Project name</label>
+        <label class="field-label" for="name"><%= t('editProject.name_label') %></label>
         <input class="field-input" type="text" id="name" name="name" value="<%= proj.name %>" required autofocus>
       </div>
       <div class="field-group">
-        <label class="field-label" for="jira_root_epic">Root Jira epic (LVL2)</label>
+        <label class="field-label" for="jira_root_epic"><%= t('editProject.epic_label') %></label>
         <input class="field-input" type="text" id="jira_root_epic" name="jira_root_epic" value="<%= proj.jira_root_epic %>" required>
-        <p class="field-hint">Target ETA is re-read from its End date field when you save.</p>
+        <p class="field-hint"><%= t('editProject.epic_hint') %></p>
       </div>
       <div class="field-group">
-        <label class="field-label" for="confluence_url">Confluence page URL</label>
+        <label class="field-label" for="confluence_url"><%= t('editProject.confluence_label') %></label>
         <div class="format-callout">
-          ⚠ Must follow the required structure.
-          <a href="https://confluence.ovhcloud.tools/pages/viewpage.action?pageId=994384126" target="_blank" rel="noopener">See the template page →</a>
+          <%- t('editProject.callout') %>
+          <a href="https://confluence.ovhcloud.tools/pages/viewpage.action?pageId=994384126" target="_blank" rel="noopener"><%= t('editProject.callout_link') %></a>
         </div>
         <input class="field-input" type="url" id="confluence_url" name="confluence_url" value="<%= confluenceUrl %>" required>
       </div>
       <div class="form-actions">
-        <a href="/projects/<%= proj.slug %>" class="btn-ghost">Cancel</a>
-        <button type="submit" class="btn-primary">Save changes</button>
+        <a href="/projects/<%= proj.slug %>" class="btn-ghost"><%= t('editProject.cancel') %></a>
+        <button type="submit" class="btn-primary"><%= t('editProject.submit') %></button>
       </div>
     </form>
     <div class="form-info">
-      <strong>Note:</strong> saving only updates the project's name, epic and Confluence page reference — it does not re-sync workstreams. If you changed the epic or page, use "↻ Sync Jira" / "↻ Sync Confluence" on the project page afterwards.
+      <%- t('editProject.note') %>
     </div>
   </div>
 </div>
