@@ -45,7 +45,8 @@ const DICT = {
     cancel: { fr: 'Annuler',                      en: 'Cancel' },
     submit: { fr: 'Créer et importer les epics',  en: 'Create & import epics' },
     err_required: { fr: 'Le nom du projet et l’epic racine sont obligatoires.', en: 'Project name and root epic are required.' },
-    err_confluence_url: { fr: 'Une URL de page Confluence valide est requise — colle-la depuis la barre d’adresse de ton navigateur en visitant la page (ex : https://confluence.ovhcloud.tools/display/SPACE/Titre, ou un lien avec pageId=).', en: 'A valid Confluence page URL is required — paste it from your browser’s address bar while viewing the page (e.g. https://confluence.ovhcloud.tools/display/SPACE/Page+Title, or a pageId= link).' }
+    err_confluence_url: { fr: 'Une URL de page Confluence valide est requise — colle-la depuis la barre d’adresse de ton navigateur en visitant la page (ex : https://confluence.ovhcloud.tools/display/SPACE/Titre, ou un lien avec pageId=).', en: 'A valid Confluence page URL is required — paste it from your browser’s address bar while viewing the page (e.g. https://confluence.ovhcloud.tools/display/SPACE/Page+Title, or a pageId= link).' },
+    err_create_failed: { fr: 'La création du projet a échoué suite à une erreur interne. Réessaie, et contacte un administrateur si le problème persiste.', en: 'Project creation failed due to an internal error. Try again, and contact an administrator if this persists.' }
   },
   editProject: {
     title:  { fr: 'Modifier le projet',           en: 'Edit project' },
@@ -84,7 +85,25 @@ const DICT = {
     syncing:  { fr: 'Synchronisation…',           en: 'Syncing…' },
     synced_epics: { fr: '✓ {{count}} epics synchronisés', en: '✓ {{count}} epics synced' },
     synced_workstreams: { fr: '✓ {{count}} workstreams synchronisés', en: '✓ {{count}} workstreams synced' },
-    error:    { fr: '✗ Erreur',                   en: '✗ Error' }
+    error:    { fr: '✗ Erreur',                   en: '✗ Error' },
+
+    // Human-readable translations of every classified sync/integration failure (see errors.js
+    // AppError codes) — a PM must never see a raw HTTP status or JSON API payload in the UI.
+    err_confluence_not_found: { fr: 'La page Confluence est introuvable ou n’est plus accessible à cette adresse. Vérifie l’URL du projet (✎ Modifier) ou tes droits d’accès à la page.', en: 'The Confluence page could not be found at this address, or is no longer accessible. Check the project’s Confluence URL (✎ Edit) or your access rights to the page.' },
+    err_confluence_forbidden: { fr: 'Accès refusé à la page Confluence : droits insuffisants ou token de service expiré. Contacte un administrateur si le problème persiste.', en: 'Access to the Confluence page was denied: insufficient rights or an expired service token. Contact an administrator if this persists.' },
+    err_confluence_unavailable: { fr: 'Confluence est temporairement indisponible ou injoignable. Réessaie dans quelques instants.', en: 'Confluence is temporarily unavailable or unreachable. Try again in a moment.' },
+    err_confluence_http_error: { fr: 'Confluence a renvoyé une erreur inattendue pendant la synchronisation. Réessaie, et contacte un administrateur si le problème persiste.', en: 'Confluence returned an unexpected error during sync. Try again, and contact an administrator if this persists.' },
+    err_confluence_no_deliverables_table: { fr: 'La page Confluence a été trouvée, mais aucun tableau «Deliverables status» n’a pu être lu — vérifie que la page suit le format requis (voir le modèle lié sur le formulaire de création de projet).', en: 'The Confluence page was found, but no "Deliverables status" table could be read — check that the page follows the required format (see the template page linked on the New project form).' },
+    err_confluence_empty_deliverables: { fr: 'Le tableau «Deliverables status» a été trouvé mais semble vide — ajoute au moins une ligne de workstream.', en: 'The "Deliverables status" table was found but appears empty — add at least one workstream row.' },
+    err_confluence_no_week_summary_table: { fr: 'Aucun tableau «Week summary» n’a été trouvé sur la page Confluence — vérifie que la page suit le format requis (voir le modèle lié sur le formulaire de création de projet).', en: 'No "Week summary" table could be found on the Confluence page — check that it follows the required format (see the template page linked on the New project form).' },
+    err_no_confluence_configured: { fr: 'Aucune page Confluence n’est configurée pour ce projet.', en: 'No Confluence page is configured for this project.' },
+    err_invalid_week: { fr: 'Semaine invalide : « {{week}} ».', en: 'Invalid week: "{{week}}".' },
+    err_future_week: { fr: 'Impossible de générer un rapport pour une semaine future.', en: 'Cannot generate a report for a future week.' },
+    err_jira_not_found: { fr: 'L’epic ou le ticket Jira demandé est introuvable — vérifie la référence de l’epic racine (✎ Modifier).', en: 'The requested Jira epic or ticket could not be found — check the root epic reference (✎ Edit).' },
+    err_jira_forbidden: { fr: 'Accès refusé à Jira : droits insuffisants ou token de service expiré. Contacte un administrateur si le problème persiste.', en: 'Access to Jira was denied: insufficient rights or an expired service token. Contact an administrator if this persists.' },
+    err_jira_unavailable: { fr: 'Jira est temporairement indisponible ou injoignable. Réessaie dans quelques instants.', en: 'Jira is temporarily unavailable or unreachable. Try again in a moment.' },
+    err_jira_http_error: { fr: 'Jira a renvoyé une erreur inattendue pendant la synchronisation. Réessaie, et contacte un administrateur si le problème persiste.', en: 'Jira returned an unexpected error during sync. Try again, and contact an administrator if this persists.' },
+    err_generic: { fr: 'Une erreur inattendue est survenue pendant la synchronisation. Réessaie, et contacte un administrateur si le problème persiste.', en: 'An unexpected error occurred during sync. Try again, and contact an administrator if this persists.' }
   }
 };
 

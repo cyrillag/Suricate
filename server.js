@@ -6,6 +6,7 @@ const jira       = require('./jira');
 const confluence = require('./confluence');
 const genReport  = require('./report-gen');
 const { translate, pluralize } = require('./i18n');
+const { AppError } = require('./errors');
 
 const SQLiteStore = require('connect-sqlite3')(session);
 const app  = express();
@@ -37,6 +38,19 @@ function uniqueSlug(baseName) {
 // single comma/colon-joined "source:message" param when Express URL-decoded it.
 function warningQuery({ source, message }) {
   return new URLSearchParams({ syncSource: source, syncMessage: message }).toString();
+}
+
+// Translates any caught error into a human sentence a PM can act on — never the raw
+// HTTP status/JSON body a failed Jira/Confluence call throws. AppErrors carry a stable
+// `code` (see errors.js) that maps 1:1 to a `detail.err_*` dictionary key; anything else
+// (a bug, an unclassified exception) falls back to a generic apologetic message instead
+// of leaking a stack trace or API payload into the UI. The raw error is always logged
+// server-side so it stays debuggable.
+function friendlyError(t, err) {
+  console.error(err);
+  const code = err instanceof AppError ? err.code : 'generic';
+  const translated = t(`detail.err_${code}`, err.vars);
+  return translated === `detail.err_${code}` ? t('detail.err_generic') : translated;
 }
 
 function formatDate(iso) {
@@ -82,11 +96,11 @@ async function syncConfluenceProject(projectId, spaceKey, page) {
   const pageData = await confluence.fetchPageBody(CONFLUENCE_TOKEN, spaceKey, page);
   const format = confluence.validatePageFormat(pageData.html);
   if (!format.hasDeliverables) {
-    throw new Error('Confluence page found, but no "Deliverables status" table could be parsed — check the page matches the required format (see the template page linked on the New project form).');
+    throw new AppError('confluence_no_deliverables_table', 'Confluence page found, but no "Deliverables status" table could be parsed.');
   }
   const workstreams = confluence.parseDeliverables(pageData.html);
   if (!workstreams.length) {
-    throw new Error('The "Deliverables status" table was found but appears empty — add at least one workstream row.');
+    throw new AppError('confluence_empty_deliverables', 'The "Deliverables status" table was found but appears empty.');
   }
   workstreams.forEach((ws, i) => {
     upsertWorkstreamFromConfluence.run(
@@ -184,7 +198,7 @@ app.post('/login', async (req, res) => {
     req.session.userName = displayName;
     req.session.save(() => res.redirect('/'));
   } catch (err) {
-    res.render('login', { error: res.locals.t('login.err_generic') + err.message });
+    res.render('login', { error: res.locals.t('login.err_generic') + friendlyError(res.locals.t, err) });
   }
 });
 
@@ -229,14 +243,15 @@ app.post('/projects', requireAuth, async (req, res) => {
     projId = db.prepare('INSERT INTO projects(user_id,name,slug,jira_root_epic,eta,confluence_space,confluence_page) VALUES(?,?,?,?,?,?,?)')
       .run(req.session.userId, name.trim(), slug, epic, eta, confPage.space, confPage.page).lastInsertRowid;
   } catch (err) {
-    return res.render('project-new', { error: `Could not create project: ${err.message}`, userName: req.session.userName });
+    console.error(err);
+    return res.render('project-new', { error: res.locals.t('newProject.err_create_failed'), userName: req.session.userName });
   }
 
   // Project row is committed at this point — a sync failure is recoverable via the "Sync"
   // buttons on the project page, so we redirect either way instead of losing the created project.
   let warning = null;
   try { await syncConfluenceProject(projId, confPage.space, confPage.page); }
-  catch (err) { warning = { source: 'confluence', message: err.message }; }
+  catch (err) { warning = { source: 'confluence', message: friendlyError(res.locals.t, err) }; }
 
   res.redirect(`/projects/${slug}${warning ? '?' + warningQuery(warning) : ''}`);
 });
@@ -306,7 +321,7 @@ async function generateReportRow(proj, year, week) {
     // Missing table entirely = format problem, worth failing loudly on. No row for THIS week yet
     // is normal/expected (e.g. before the PM has updated the page for the week) — stay silent.
     if (!confluence.validatePageFormat(page.html).hasWeekSummaryTable) {
-      throw new Error('No "Week summary" table could be found on the Confluence page — check it matches the required format (see the template page linked on the New project form).');
+      throw new AppError('confluence_no_week_summary_table', 'No "Week summary" table could be found on the Confluence page.');
     }
     execSummary = confluence.parseExecSummary(page.html);
     highlights = confluence.parseWeekSummary(page.html, week) || highlights;
@@ -328,15 +343,15 @@ app.post('/projects/:slug/reports/generate', requireAuth, async (req, res) => {
   const [yr, wn] = weekStr.split('-W');
   const year = parseInt(yr), week = parseInt(wn);
   if (!Number.isInteger(week) || week < 1 || week > 53 || !Number.isInteger(year)) {
-    return res.redirect(`/projects/${proj.slug}?${warningQuery({ source: 'confluence', message: `Invalid week: "${weekStr}".` })}`);
+    return res.redirect(`/projects/${proj.slug}?${warningQuery({ source: 'confluence', message: res.locals.t('detail.err_invalid_week', { week: weekStr }) })}`);
   }
   if (isFutureWeek(year, week)) {
-    return res.redirect(`/projects/${proj.slug}?${warningQuery({ source: 'confluence', message: 'Cannot generate a report for a future week.' })}`);
+    return res.redirect(`/projects/${proj.slug}?${warningQuery({ source: 'confluence', message: res.locals.t('detail.err_future_week') })}`);
   }
   try {
     await generateReportRow(proj, year, week);
   } catch (err) {
-    return res.redirect(`/projects/${proj.slug}?${warningQuery({ source: 'confluence', message: err.message })}`);
+    return res.redirect(`/projects/${proj.slug}?${warningQuery({ source: 'confluence', message: friendlyError(res.locals.t, err) })}`);
   }
   res.redirect(`/projects/${proj.slug}/${year}-W${String(week).padStart(2,'0')}`);
 });
@@ -364,7 +379,7 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, re
     // Nothing to edit, so a week with no report yet is generated on the fly from
     // Confluence/Jira the first time its URL is visited (e.g. via the week-nav arrows).
     try { await generateReportRow(proj, year, week); }
-    catch (err) { return res.redirect(`/projects/${req.params.slug}?${warningQuery({ source: 'confluence', message: err.message })}`); }
+    catch (err) { return res.redirect(`/projects/${req.params.slug}?${warningQuery({ source: 'confluence', message: friendlyError(res.locals.t, err) })}`); }
     report = db.prepare('SELECT * FROM reports WHERE project_id=? AND year=? AND week=?').get(proj.id, year, week);
   }
 
@@ -417,19 +432,19 @@ app.post('/api/projects/:slug/sync-epics', requireAuth, async (req, res) => {
     }
     res.json({ ok: true, count });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: friendlyError(res.locals.t, err) });
   }
 });
 
 app.post('/api/projects/:slug/sync-confluence', requireAuth, async (req, res) => {
   const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
   if (!proj) return res.status(404).json({ error: 'Not found' });
-  if (!proj.confluence_space || !proj.confluence_page) return res.status(400).json({ error: 'No Confluence page configured for this project.' });
+  if (!proj.confluence_space || !proj.confluence_page) return res.status(400).json({ error: res.locals.t('detail.err_no_confluence_configured') });
   try {
     const data = await syncConfluenceProject(proj.id, proj.confluence_space, proj.confluence_page);
     res.json({ ok: true, count: data.workstreams.length, pageVersion: data.version });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: friendlyError(res.locals.t, err) });
   }
 });
 

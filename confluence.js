@@ -1,23 +1,32 @@
 const fetch = require('node-fetch');
+const { AppError, httpErrorCode } = require('./errors');
 const BASE = process.env.CONFLUENCE_BASE || 'https://confluence.ovhcloud.tools';
+
+async function confluenceFetch(url, token) {
+  let res;
+  try {
+    res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, timeout: 15000 });
+  } catch (err) {
+    throw new AppError('confluence_unavailable', `Confluence unreachable: ${err.message}`);
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new AppError(httpErrorCode('confluence', res.status), `Confluence ${res.status}: ${body.slice(0, 200)}`);
+  }
+  return res.json();
+}
 
 async function fetchPageBody(token, spaceKey, title) {
   const url = `${BASE}/rest/api/content?spaceKey=${encodeURIComponent(spaceKey)}&title=${encodeURIComponent(title)}&expand=body.storage,version`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, timeout: 15000 });
-  if (!res.ok) throw new Error(`Confluence ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
-  const data = await res.json();
-  if (!data.results?.length) throw new Error(`Confluence page not found: ${spaceKey} / "${title}"`);
+  const data = await confluenceFetch(url, token);
+  if (!data.results?.length) throw new AppError('confluence_not_found', `Confluence page not found: ${spaceKey} / "${title}"`);
   const page = data.results[0];
   return { id: page.id, version: page.version?.number, html: page.body?.storage?.value || '' };
 }
 
 async function fetchContentById(token, id) {
-  const res = await fetch(`${BASE}/rest/api/content/${id}?expand=space`, {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, timeout: 15000
-  });
-  if (!res.ok) throw new Error(`Confluence ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
-  const data = await res.json();
-  return { space: data.space.key, title: data.title };
+  const data = await confluenceFetch(`${BASE}/rest/api/content/${id}?expand=space`, token);
+  return { space: data.space?.key || null, title: data.title || null };
 }
 
 // Confluence shows PMs several different URL shapes depending on how they navigate/share a page
@@ -29,13 +38,20 @@ async function resolvePageUrl(token, url) {
 
   const displayMatch = u.pathname.match(/\/display\/([^/]+)\/(.+)$/);
   if (displayMatch) {
-    return { space: decodeURIComponent(displayMatch[1]), page: decodeURIComponent(displayMatch[2].replace(/\+/g, ' ')) };
+    const space = decodeURIComponent(displayMatch[1]);
+    const page = decodeURIComponent(displayMatch[2].replace(/\+/g, ' '));
+    return (space && page) ? { space, page } : null;
   }
 
   const pageId = u.searchParams.get('pageId') || (u.pathname.match(/\/pages\/(\d+)/) || [])[1];
   if (pageId) {
-    try { const { space, title } = await fetchContentById(token, pageId); return { space, page: title }; }
-    catch { return null; }
+    try {
+      const { space, title } = await fetchContentById(token, pageId);
+      // Confluence can 200 on a content lookup while still omitting `space` (e.g. permission
+      // edge cases) — treat that the same as "couldn't resolve" rather than storing a broken
+      // half-populated reference that only surfaces as a cryptic API error on the next sync.
+      return (space && title) ? { space, page: title } : null;
+    } catch { return null; }
   }
 
   return null;

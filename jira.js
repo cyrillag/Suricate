@@ -1,16 +1,22 @@
 const fetch = require('node-fetch');
+const { AppError, httpErrorCode } = require('./errors');
 const BASE = 'https://jira.ovhcloud.tools';
 
 async function api(token, path, params = {}) {
   const url = new URL(BASE + '/rest/api/2' + path);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  const res = await fetch(url.toString(), {
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    timeout: 15000
-  });
+  let res;
+  try {
+    res = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      timeout: 15000
+    });
+  } catch (err) {
+    throw new AppError('jira_unavailable', `Jira unreachable: ${err.message}`);
+  }
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(`Jira ${res.status}: ${body.slice(0, 200)}`);
+    throw new AppError(httpErrorCode('jira', res.status), `Jira ${res.status}: ${body.slice(0, 200)}`);
   }
   return res.json();
 }
