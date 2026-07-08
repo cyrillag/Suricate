@@ -458,7 +458,10 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, re
     highlights:  JSON.parse(report.highlights_json),
     risks,
     workstreams: resolvedWs,
-    epics: epics.filter(e => e.start_date && e.end_date).map(e => ({
+    // No date filter here: an epic with no Start/End date still belongs in Planning (see
+    // FUNCTIONAL_RULES.md) — it's report-gen's job to list it without drawing a bar it has no
+    // dates for, rather than this route silently dropping it from the section altogether.
+    epics: epics.map(e => ({
       key: e.jira_key, label: e.summary, team: e.team,
       status: jira.mapStatus(e.status), start: e.start_date, end: e.end_date
     })),

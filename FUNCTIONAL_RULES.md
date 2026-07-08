@@ -24,7 +24,13 @@ When a new functional rule is agreed with the user, add it here in the same chan
   hierarchy link back to this project's root epic.
 - If an epic has no Start/End date filled in (Jira "Start date"/"End date" fields), it is left
   with no date — never a fabricated fallback (no fallback to duedate, created, resolutiondate, or
-  baseline dates). An epic with no date simply doesn't appear on the Gantt timeline.
+  baseline dates). It still gets a row in Planning (name, team, status) so it stays visible and
+  "exhaustive" holds — it just has no bar drawn on the Gantt timeline, since there's nothing to
+  plot without real dates.
+- A sync (Confluence or Jira) must reconcile the workstream/epic list, not just add/update: any
+  row the current parse/query no longer produces is deleted. An upsert-only sync would let stale
+  rows outlive whatever created them (e.g. a since-fixed parser bug, or an epic removed from a
+  team's plan) and silently reappear or linger in the matrix/Planning.
 
 ## Risks
 

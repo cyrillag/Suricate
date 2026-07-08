@@ -67,9 +67,10 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
       </div>`).join('')
     : '<div style="padding:14px 20px;font-size:13px;color:#636369">No risks recorded this week.</div>';
 
-  // Gantt data
-  const ganttEpics = epics.filter(e => e.start && e.end && e.status !== 'cancel');
-  const ganttJSON = JSON.stringify(ganttEpics);
+  // Gantt data — an epic with no Start/End date still gets listed (name/team/status), it just
+  // has no bar to draw; excluding it from the section entirely would make it invisible instead
+  // of just dateless (see FUNCTIONAL_RULES.md).
+  const ganttEpics = epics.filter(e => e.status !== 'cancel');
 
   // Donut data
   const donutJSON = JSON.stringify([
@@ -254,7 +255,8 @@ ${ganttEpics.length ? GANTT_JS(ganttEpics) : ''}
 }
 
 function GANTT_JS(epics) {
-  const TSTART_DATE = epics.reduce((m, e) => e.start < m ? e.start : m, epics[0].start);
+  const datedStarts = epics.map(e => e.start).filter(Boolean);
+  const TSTART_DATE = datedStarts.length ? datedStarts.reduce((m, s) => s < m ? s : m) : '2025-09-01';
   const tstart = new Date(Math.min(new Date(TSTART_DATE), new Date('2025-09-01')));
   const tend   = new Date('2026-11-30');
   const ts = tstart.toISOString().slice(0, 10);
@@ -298,12 +300,18 @@ function GANTT_JS(epics) {
       +'<span class="g-name" title="'+e.label+'">'+e.label+'</span>';
     lcol.appendChild(lr);
     var row=document.createElement('div');row.className='gantt-row';
-    var l=pct(e.start),w=Math.max(0.5,pct(e.end)-pct(e.start));
-    var bar=document.createElement('div');
-    bar.className='gantt-bar '+e.status;
-    bar.style.left=l.toFixed(2)+'%';bar.style.width=w.toFixed(2)+'%';
-    bar.title=e.key+' — '+e.label+'\\n'+e.start+' → '+e.end;
-    row.appendChild(bar);body.appendChild(row);
+    if(e.start&&e.end){
+      var l=pct(e.start),w=Math.max(0.5,pct(e.end)-pct(e.start));
+      var bar=document.createElement('div');
+      bar.className='gantt-bar '+e.status;
+      bar.style.left=l.toFixed(2)+'%';bar.style.width=w.toFixed(2)+'%';
+      bar.title=e.key+' — '+e.label+'\\n'+e.start+' → '+e.end;
+      row.appendChild(bar);
+    }else{
+      var nd=document.createElement('span');nd.className='gantt-nodates';nd.textContent='No dates yet';
+      row.appendChild(nd);
+    }
+    body.appendChild(row);
   });
 })();`;
 }
@@ -463,6 +471,7 @@ const CSS = `
   .gantt-bar{position:absolute;top:4px;height:16px;border-radius:2px;min-width:2px;cursor:default}
   .gantt-bar:hover{filter:brightness(1.15);z-index:4}
   .gantt-bar.done{background:var(--done-s)}.gantt-bar.prog{background:var(--cobalt)}.gantt-bar.ts{background:var(--sgr);border:1px dashed var(--bd)}
+  .gantt-nodates{position:absolute;left:8px;top:0;bottom:0;display:flex;align-items:center;font-size:10px;font-style:italic;color:var(--tx3)}
   .gantt-vline{position:absolute;top:0;bottom:0;width:1px;pointer-events:none;z-index:2}
   .gantt-vline.qtr{background:var(--bd2);z-index:1}
   .gantt-vline.vtoday{background:var(--orange);z-index:3;width:2px}
