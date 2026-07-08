@@ -7,6 +7,20 @@ below is a real bug even if the code is internally consistent by its own logic.
 
 When a new functional rule is agreed with the user, add it here in the same change.
 
+## Inherited from project-report (legacy static app)
+
+project-reports-app is a full rewrite (dynamic multi-project app vs. a hand-maintained static
+`index.html`) — there is no git history to merge, so rules already settled on project-report had
+to be re-applied here by hand rather than resolved by merging code:
+
+- No "no jira" badge/indicator next to a workstream's status. project-report dropped this
+  between its early iterations and its current state; the matrix shows the status alone.
+- Report typography follows project-report's sizes, not whatever project-reports-app started
+  with — project-report's font-sizes were a deliberate, later adjustment (mostly a size increase
+  over the initial pass) and are the reference. Elements that only exist in project-reports-app
+  (e.g. the in-report back-link/week-nav header, the "No dates yet" Planning label) have no
+  project-report equivalent to match and keep their own sizing.
+
 ## Data sources — matrix vs. Planning
 
 - The **Deliverable matrix** comes exclusively from the project's Confluence page, "Deliverables

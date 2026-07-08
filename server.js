@@ -464,8 +464,7 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, re
 
   const resolvedWs = workstreams.map(ws => ({
     ...ws,
-    status:  wsStatuses[ws.id] || (ws.jira_key ? (aggregateEpicStatus(ws.jira_key, epicsByKey) || 'ts') : (ws.default_status || 'ts')),
-    no_jira: !ws.jira_key
+    status: wsStatuses[ws.id] || (ws.jira_key ? (aggregateEpicStatus(ws.jira_key, epicsByKey) || 'ts') : (ws.default_status || 'ts'))
   }));
 
   const stats = { done:0, prog:0, blk:0, ts:0, total: resolvedWs.length };
