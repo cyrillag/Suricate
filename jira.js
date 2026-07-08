@@ -105,6 +105,29 @@ async function getChildEpics(token, rootEpic) {
   return results;
 }
 
+// Exhaustive epic set for the Planning/Gantt section. portfolioChildrenOf walks the full
+// Advanced Roadmaps/BigPicture portfolio hierarchy at any depth, unlike getChildEpics' manual
+// cf[16100] walk above (kept as-is for matrix generation on Confluence-less projects) which only
+// ever looks 2 levels down. extraKeys are epics/features pinned in even though they sit under a
+// completely different LVL2 root with no hierarchy link to derive them from automatically —
+// callers are responsible for validating each key against /^[A-Z][A-Z0-9]*-\d+$/ before it
+// reaches this JQL string.
+async function getPortfolioEpics(token, rootEpic, extraKeys = []) {
+  const EPIC_FIELDS = 'summary,status,customfield_10110,customfield_10111,issuetype';
+  let jql = `(issuekey in (${rootEpic}) OR issueFunction in portfolioChildrenOf("issuekey in (${rootEpic})")) and issuetype = Epic`;
+  if (extraKeys.length) jql = `(${jql} OR issuekey in (${extraKeys.join(',')}))`;
+  jql += ' and status != Cancelled';
+  const data = await api(token, '/search', { jql, fields: EPIC_FIELDS, maxResults: 300 });
+  return data.issues.map(i => ({
+    key:     i.key,
+    summary: i.fields.summary,
+    team:    extractTeam(i.key),
+    status:  i.fields.status?.name || 'To Do',
+    start:   i.fields.customfield_10110 || null,
+    end:     i.fields.customfield_10111 || null
+  }));
+}
+
 async function getRootEpicMeta(token, epicKey) {
   const data = await api(token, `/issue/${epicKey}`, { fields: 'summary,customfield_10110,customfield_10111,status' });
   return {
@@ -145,4 +168,4 @@ async function getEpicsByKeys(token, keys) {
   return results;
 }
 
-module.exports = { getMe, findUserByEmail, getChildEpics, getEpicsByKeys, getRootEpicMeta, mapStatus };
+module.exports = { getMe, findUserByEmail, getChildEpics, getPortfolioEpics, getEpicsByKeys, getRootEpicMeta, mapStatus };

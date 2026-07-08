@@ -75,6 +75,10 @@ function ensureColumn(table, column, ddl) {
 ensureColumn('projects', 'confluence_space', 'confluence_space TEXT');
 ensureColumn('projects', 'confluence_page', 'confluence_page TEXT');
 ensureColumn('reports', 'exec_summary', 'exec_summary TEXT');
+// Space/comma-separated Jira keys pinned to Planning regardless of the automatic portfolio
+// walk from jira_root_epic — for epics/features that live under a different LVL2 root entirely
+// and so have no hierarchy link to derive them from automatically.
+ensureColumn('projects', 'extra_epics', 'extra_epics TEXT');
 
 // workstreams had no UNIQUE constraint pre-v2, so every "Sync Jira" click duplicated all rows.
 // Rebuild the table with UNIQUE(project_id,deliverable,name) so syncs upsert instead of duplicating.

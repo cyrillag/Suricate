@@ -23,6 +23,16 @@ if (!CONFLUENCE_TOKEN) console.warn('WARNING: CONFLUENCE_SERVICE_TOKEN not set �
 const SESSION_SECRET = process.env.SESSION_SECRET;
 if (!SESSION_SECRET) { console.error('FATAL: SESSION_SECRET not set.'); process.exit(1); }
 
+// The raw value reaches a JQL string built server-side (jira.getPortfolioEpics) — only
+// well-formed Jira keys pass through, both for correctness and so a project owner can't smuggle
+// arbitrary JQL into a query run with the shared service token.
+function parseExtraEpics(raw) {
+  return (raw || '')
+    .split(/[\s,]+/)
+    .map(k => k.trim().toUpperCase())
+    .filter(k => /^[A-Z][A-Z0-9]*-\d+$/.test(k));
+}
+
 function slugify(name) {
   return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
@@ -97,8 +107,8 @@ async function refreshEpicStatuses(projectId, jiraKeys) {
 // has (yet) added to the Confluence "Deliverables status" table. This walks the full Jira tree
 // and writes epics_cache only, never touching workstreams, so it's safe to run alongside a
 // Confluence-backed project without duplicating or overriding the matrix.
-async function refreshFullEpicTree(projectId, rootEpic) {
-  const epics = await jira.getChildEpics(JIRA_TOKEN, rootEpic);
+async function refreshFullEpicTree(projectId, rootEpic, extraKeys = []) {
+  const epics = await jira.getPortfolioEpics(JIRA_TOKEN, rootEpic, extraKeys);
   epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end));
   return epics.length;
 }
@@ -296,8 +306,8 @@ app.get('/projects/:slug/edit', requireAuth, (req, res) => {
 app.post('/projects/:slug/edit', requireAuth, async (req, res) => {
   const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
   if (!proj) return res.status(404).send('Project not found.');
-  const { name, jira_root_epic, confluence_url } = req.body;
-  const rerender = error => res.render('project-edit', { proj: { ...proj, name, jira_root_epic }, confluenceUrl: confluence_url, error, userName: req.session.userName });
+  const { name, jira_root_epic, confluence_url, extra_epics } = req.body;
+  const rerender = error => res.render('project-edit', { proj: { ...proj, name, jira_root_epic, extra_epics }, confluenceUrl: confluence_url, error, userName: req.session.userName });
 
   if (!name?.trim() || !jira_root_epic?.trim()) return rerender(res.locals.t('editProject.err_required'));
   const confPage = await confluence.resolvePageUrl(CONFLUENCE_TOKEN, confluence_url);
@@ -308,8 +318,13 @@ app.post('/projects/:slug/edit', requireAuth, async (req, res) => {
   try { eta = formatDate((await jira.getRootEpicMeta(JIRA_TOKEN, epic)).eta); }
   catch (err) { console.warn(`Could not read ETA from ${epic}: ${err.message}`); }
 
-  db.prepare('UPDATE projects SET name=?,jira_root_epic=?,eta=?,confluence_space=?,confluence_page=? WHERE id=?')
-    .run(name.trim(), epic, eta, confPage.space, confPage.page, proj.id);
+  // Silently drops anything that isn't a well-formed Jira key rather than rejecting the whole
+  // save — this is a convenience field (paste a few keys, possibly with typos or stray text),
+  // not a validated form input.
+  const cleanExtraEpics = parseExtraEpics(extra_epics).join(', ');
+
+  db.prepare('UPDATE projects SET name=?,jira_root_epic=?,eta=?,confluence_space=?,confluence_page=?,extra_epics=? WHERE id=?')
+    .run(name.trim(), epic, eta, confPage.space, confPage.page, cleanExtraEpics || null, proj.id);
 
   res.redirect(`/projects/${proj.slug}`);
 });
@@ -450,7 +465,7 @@ app.post('/api/projects/:slug/sync-epics', requireAuth, async (req, res) => {
       // every epic under the root, not just the ones a PM happened to list in the matrix, so this
       // also walks the full Jira tree (refreshFullEpicTree) alongside the known matrix keys.
       const keys = db.prepare('SELECT jira_key FROM workstreams WHERE project_id=? AND jira_key IS NOT NULL').all(proj.id).map(r => r.jira_key);
-      await Promise.all([refreshEpicStatuses(proj.id, keys), refreshFullEpicTree(proj.id, proj.jira_root_epic)]);
+      await Promise.all([refreshEpicStatuses(proj.id, keys), refreshFullEpicTree(proj.id, proj.jira_root_epic, parseExtraEpics(proj.extra_epics))]);
       count = db.prepare('SELECT COUNT(*) as n FROM epics_cache WHERE project_id=?').get(proj.id).n;
     } else {
       count = await seedWorkstreamsFromJiraTree(proj.id, proj.jira_root_epic);
