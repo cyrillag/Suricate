@@ -1,6 +1,6 @@
 const DICT = {
   nav: {
-    brand:   { fr: 'Rapports hebdo',              en: 'Weekly Reports' },
+    brand:   { fr: 'OVHcloud project reports',    en: 'OVHcloud project reports' },
     projects:{ fr: 'Projets',                     en: 'Projects' },
     logout:  { fr: 'Déconnexion',                 en: 'Logout' }
   },
