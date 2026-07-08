@@ -44,8 +44,6 @@ function extractTeam(key) {
   return TEAM_MAP[proj] || proj;
 }
 
-function dateOnly(iso) { return iso ? iso.slice(0, 10) : null; }
-
 function mapStatus(jiraStatus) {
   if (!jiraStatus) return 'ts';
   const s = jiraStatus.toLowerCase();
@@ -57,8 +55,7 @@ function mapStatus(jiraStatus) {
 
 async function getChildEpics(token, rootEpic) {
   // customfield_10110/10111 = "Start date"/"End date" (BigPicture Gantt fields, authoritative).
-  // customfield_10107/10108 = "Baseline start/end date" (fallback only, plan not live tracking).
-  const EPIC_FIELDS = 'summary,status,customfield_10110,customfield_10111,customfield_10107,customfield_10108,duedate,created,resolutiondate,issuetype';
+  const EPIC_FIELDS = 'summary,status,customfield_10110,customfield_10111,issuetype';
 
   const notCancelled = i => {
     const s = (i.fields.status?.name || '').toLowerCase();
@@ -70,10 +67,11 @@ async function getChildEpics(token, rootEpic) {
     team:       extractTeam(i.key),
     deliverable,
     status:     i.fields.status?.name || 'To Do',
-    // Fall back to created/resolutiondate when neither Jira Gantt field nor duedate is set —
-    // otherwise items like a Done ticket with no explicit dates never appear on the Gantt at all.
-    start:      i.fields.customfield_10110 || i.fields.customfield_10107 || dateOnly(i.fields.created),
-    end:        i.fields.customfield_10111 || i.fields.duedate || i.fields.customfield_10108 || dateOnly(i.fields.resolutiondate)
+    // No fallback to duedate/created/resolutiondate: an epic with no Start/End date filled in
+    // on its Gantt fields is left with no date at all rather than an invented one — the
+    // report simply omits it from the Planning timeline (see report-gen's epics filter).
+    start:      i.fields.customfield_10110 || null,
+    end:        i.fields.customfield_10111 || null
   });
 
   // Level 1: direct children (any type)
@@ -124,7 +122,7 @@ async function getRootEpicMeta(token, epicKey) {
 async function getEpicsByKeys(token, keys) {
   const uniqueKeys = [...new Set(keys.filter(Boolean))];
   if (!uniqueKeys.length) return [];
-  const EPIC_FIELDS = 'summary,status,customfield_10110,customfield_10111,customfield_10107,customfield_10108,duedate,created,resolutiondate,issuetype';
+  const EPIC_FIELDS = 'summary,status,customfield_10110,customfield_10111,issuetype';
   const results = [];
   // Jira JQL "in" clauses have a practical size limit — chunk to be safe.
   for (let i = 0; i < uniqueKeys.length; i += 50) {
@@ -139,8 +137,9 @@ async function getEpicsByKeys(token, keys) {
       summary: i.fields.summary,
       team:    extractTeam(i.key),
       status:  i.fields.status?.name || 'To Do',
-      start:   i.fields.customfield_10110 || i.fields.customfield_10107 || dateOnly(i.fields.created),
-      end:     i.fields.customfield_10111 || i.fields.duedate || i.fields.customfield_10108 || dateOnly(i.fields.resolutiondate)
+      // Same "no invented dates" rule as getChildEpics — leave blank if unset.
+      start:   i.fields.customfield_10110 || null,
+      end:     i.fields.customfield_10111 || null
     }));
   }
   return results;

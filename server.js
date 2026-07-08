@@ -92,6 +92,17 @@ async function refreshEpicStatuses(projectId, jiraKeys) {
   return epics.length;
 }
 
+// The Deliverable matrix stays Confluence-only by design (see syncConfluenceProject), but the
+// Planning/Gantt section is meant to show every epic under the root LVL2 — including ones no PM
+// has (yet) added to the Confluence "Deliverables status" table. This walks the full Jira tree
+// and writes epics_cache only, never touching workstreams, so it's safe to run alongside a
+// Confluence-backed project without duplicating or overriding the matrix.
+async function refreshFullEpicTree(projectId, rootEpic) {
+  const epics = await jira.getChildEpics(JIRA_TOKEN, rootEpic);
+  epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end));
+  return epics.length;
+}
+
 async function syncConfluenceProject(projectId, spaceKey, page) {
   const pageData = await confluence.fetchPageBody(CONFLUENCE_TOKEN, spaceKey, page);
   const format = confluence.validatePageFormat(pageData.html);
@@ -252,6 +263,12 @@ app.post('/projects', requireAuth, async (req, res) => {
   let warning = null;
   try { await syncConfluenceProject(projId, confPage.space, confPage.page); }
   catch (err) { warning = { source: 'confluence', message: friendlyError(res.locals.t, err) }; }
+
+  // Best-effort: the Planning/Gantt section is independent of the Confluence matrix, so a
+  // Jira hiccup here shouldn't block creation or override the (more actionable) Confluence
+  // warning above — it's silently recoverable later via the "Sync Jira" button.
+  try { await refreshFullEpicTree(projId, epic); }
+  catch (err) { console.warn(`Could not sync full epic tree for ${epic}: ${err.message}`); }
 
   res.redirect(`/projects/${slug}${warning ? '?' + warningQuery(warning) : ''}`);
 });
@@ -429,9 +446,12 @@ app.post('/api/projects/:slug/sync-epics', requireAuth, async (req, res) => {
   try {
     let count;
     if (proj.confluence_space && proj.confluence_page) {
-      // Workstream list comes from Confluence — just refresh status/dates for known keys.
+      // Workstream list comes from Confluence and stays untouched here — but Planning must show
+      // every epic under the root, not just the ones a PM happened to list in the matrix, so this
+      // also walks the full Jira tree (refreshFullEpicTree) alongside the known matrix keys.
       const keys = db.prepare('SELECT jira_key FROM workstreams WHERE project_id=? AND jira_key IS NOT NULL').all(proj.id).map(r => r.jira_key);
-      count = await refreshEpicStatuses(proj.id, keys);
+      await Promise.all([refreshEpicStatuses(proj.id, keys), refreshFullEpicTree(proj.id, proj.jira_root_epic)]);
+      count = db.prepare('SELECT COUNT(*) as n FROM epics_cache WHERE project_id=?').get(proj.id).n;
     } else {
       count = await seedWorkstreamsFromJiraTree(proj.id, proj.jira_root_epic);
     }
