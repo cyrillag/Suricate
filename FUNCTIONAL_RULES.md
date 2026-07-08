@@ -12,9 +12,12 @@ When a new functional rule is agreed with the user, add it here in the same chan
 - The **Deliverable matrix** comes exclusively from the project's Confluence page, "Deliverables
   status" section. It must stay strictly 1:1 with that table's rows — never split or duplicate a
   row (e.g. because a cell references more than one Jira epic).
-- If a workstream's "Jira" cell embeds more than one `{jira}` macro, only the *first* referenced
-  epic drives the status shown in the matrix. The other epic(s) are not lost — they still surface
-  in Planning (below) — but they never create an extra matrix row.
+- If a workstream's "Jira" cell embeds more than one `{jira}` macro (a workstream backed by
+  several epics), every one of them drives that single row's status — never just the first, and
+  never split into extra rows. The roll-up uses the same precedence as the deliverable-level
+  roll-up: Done only if *all* its epics are Done, otherwise Blocked if any is Blocked, otherwise
+  In Progress if any is In Progress, otherwise To Start. Example: 4 epics Done + 1 In Progress ⇒
+  the workstream shows In Progress, not Done.
 - The **Planning / Gantt** section must show the exhaustive set of **epics** (never tasks) under
   the project's root LVL2 epic, whether or not each one is listed on the Confluence page. This is
   computed via a recursive portfolio JQL (`portfolioChildrenOf`) that walks the Advanced
@@ -31,6 +34,10 @@ When a new functional rule is agreed with the user, add it here in the same chan
   row the current parse/query no longer produces is deleted. An upsert-only sync would let stale
   rows outlive whatever created them (e.g. a since-fixed parser bug, or an epic removed from a
   team's plan) and silently reappear or linger in the matrix/Planning.
+- Planning epics are grouped by team, then ordered chronologically by end date within each team
+  (ascending); epics with no end date sort last within their team rather than breaking up the
+  timeline flow. Never alphabetical/key order — a timeline view must read top-to-bottom as
+  earliest-to-latest.
 
 ## Risks
 

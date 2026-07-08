@@ -67,6 +67,28 @@ function formatDate(iso) {
   return iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
 }
 
+// workstreams.jira_key holds one or more comma-joined keys (a workstream can be backed by
+// several epics — see aggregateEpicStatus).
+function splitJiraKeys(raw) {
+  return (raw || '').split(',').map(k => k.trim()).filter(Boolean);
+}
+
+// A workstream's status is the roll-up of every epic behind it, same precedence as the
+// deliverable-level roll-up in report-gen: Done only if ALL its epics are done, otherwise
+// Blocked if any is blocked, otherwise In Progress if any is in progress, otherwise To Start.
+// Returns null (caller decides the default) if jira_key is empty or none of its keys are cached
+// yet.
+function aggregateEpicStatus(jiraKeyField, epicsByKey) {
+  const keys = splitJiraKeys(jiraKeyField);
+  if (!keys.length) return null;
+  const statuses = keys.map(k => epicsByKey.get(k)).filter(Boolean).map(e => jira.mapStatus(e.status));
+  if (!statuses.length) return null;
+  if (statuses.every(s => s === 'done')) return 'done';
+  if (statuses.some(s => s === 'blk')) return 'blk';
+  if (statuses.some(s => s === 'prog')) return 'prog';
+  return 'ts';
+}
+
 const upsertWorkstreamFromJira = db.prepare(`
   INSERT INTO workstreams(project_id,deliverable,name,team,jira_key,sort_order) VALUES(?,?,?,?,?,?)
   ON CONFLICT(project_id,deliverable,name) DO UPDATE SET
@@ -97,8 +119,11 @@ async function seedWorkstreamsFromJiraTree(projectId, rootEpic) {
 // Refresh status/dates only, for a known set of Jira keys — does not touch the workstream
 // list itself. Used for the "Sync Jira" button on Confluence-backed projects, and internally
 // after every Confluence sync to keep epics_cache in step with whatever keys it references.
-async function refreshEpicStatuses(projectId, jiraKeys) {
-  const epics = await jira.getEpicsByKeys(JIRA_TOKEN, jiraKeys);
+// jiraKeyFields are workstreams.jira_key values, each possibly comma-joined (see
+// aggregateEpicStatus) — flattened here into individual keys before hitting Jira.
+async function refreshEpicStatuses(projectId, jiraKeyFields) {
+  const keys = [...new Set(jiraKeyFields.flatMap(splitJiraKeys))];
+  const epics = await jira.getEpicsByKeys(JIRA_TOKEN, keys);
   epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end));
   return epics.length;
 }
@@ -430,15 +455,17 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, re
     report = db.prepare('SELECT * FROM reports WHERE project_id=? AND year=? AND week=?').get(proj.id, year, week);
   }
 
-  const workstreams = db.prepare(`SELECT w.*,e.status as jira_status FROM workstreams w
-    LEFT JOIN epics_cache e ON e.jira_key=w.jira_key AND e.project_id=w.project_id
-    WHERE w.project_id=? ORDER BY w.sort_order`).all(proj.id);
-  const epics      = db.prepare('SELECT * FROM epics_cache WHERE project_id=? ORDER BY team,jira_key').all(proj.id);
+  const workstreams = db.prepare('SELECT * FROM workstreams WHERE project_id=? ORDER BY sort_order').all(proj.id);
+  // Grouped by team (keeps each team's rows together, matching their Gantt color), then
+  // chronologically by end date within a team — dateless epics (see the no-fabricated-dates
+  // rule) sort last within their team rather than breaking up the timeline order.
+  const epics      = db.prepare('SELECT * FROM epics_cache WHERE project_id=? ORDER BY team, (end_date IS NULL), end_date').all(proj.id);
+  const epicsByKey = new Map(epics.map(e => [e.jira_key, e]));
   const wsStatuses = JSON.parse(report.workstream_statuses_json);
 
   const resolvedWs = workstreams.map(ws => ({
     ...ws,
-    status:  wsStatuses[ws.id] || (ws.jira_key ? jira.mapStatus(ws.jira_status) : (ws.default_status || 'ts')),
+    status:  wsStatuses[ws.id] || (ws.jira_key ? (aggregateEpicStatus(ws.jira_key, epicsByKey) || 'ts') : (ws.default_status || 'ts')),
     no_jira: !ws.jira_key
   }));
 

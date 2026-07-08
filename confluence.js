@@ -116,6 +116,16 @@ function jiraKeyFromCell(html) {
   return m ? m[1] : null;
 }
 
+// A single "Jira" column cell can embed more than one {jira} macro (e.g. a workstream backed by
+// several epics). All of them drive the workstream's status — see parseDeliverables.
+function jiraKeysFromCell(html) {
+  const re = /ac:name="key">([A-Z][A-Z0-9]*-\d+)</gi;
+  const keys = [];
+  let m;
+  while ((m = re.exec(html))) keys.push(m[1]);
+  return keys;
+}
+
 function liItems(html) {
   const items = [];
   const re = /<li[^>]*>([\s\S]*?)<\/li>/gi;
@@ -187,19 +197,19 @@ function parseDeliverables(html) {
     const wsName = (cells[idx] ? stripTags(cells[idx].html) : null) || (deliverableJustSet ? currentDeliverable : null);
     const team   = cells[idx + 1] ? stripTags(cells[idx + 1].html) : null;
     const jiraCellHtml = cells[idx + 2] ? cells[idx + 2].html : '';
-    // The matrix must mirror the Confluence table exactly — one row in, one row out. A cell
-    // that embeds more than one {jira} macro only lends its status to the first key; the rest
-    // still get tracked, just via the Planning section's full Jira-tree sync, not by fanning
-    // this single workstream out into several matrix rows.
-    const jiraKey = jiraKeyFromCell(jiraCellHtml);
+    // The matrix must mirror the Confluence table exactly — one row in, one row out — but a cell
+    // embedding more than one {jira} macro (a workstream backed by several epics) still needs
+    // every one of them to drive the row's status, not just the first. jira_key stores all keys
+    // comma-joined; the caller aggregates their statuses (done only if ALL are done, etc.).
+    const jiraKeys = jiraKeysFromCell(jiraCellHtml);
     const plainStatusText = stripTags(jiraCellHtml); // e.g. "Done" when no jira macro is used
     if (!wsName) continue;
     workstreams.push({
       deliverable: currentDeliverable,
       name: wsName,
       team: team || null,
-      jira_key: jiraKey,
-      manual_status: !jiraKey && plainStatusText ? plainStatusText : null,
+      jira_key: jiraKeys.length ? jiraKeys.join(',') : null,
+      manual_status: !jiraKeys.length && plainStatusText ? plainStatusText : null,
       sort_order: sortOrder++
     });
   }
