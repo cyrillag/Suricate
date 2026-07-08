@@ -34,10 +34,9 @@ When a new functional rule is agreed with the user, add it here in the same chan
   row the current parse/query no longer produces is deleted. An upsert-only sync would let stale
   rows outlive whatever created them (e.g. a since-fixed parser bug, or an epic removed from a
   team's plan) and silently reappear or linger in the matrix/Planning.
-- Planning epics are grouped by team, then ordered chronologically by end date within each team
-  (ascending); epics with no end date sort last within their team rather than breaking up the
-  timeline flow. Never alphabetical/key order — a timeline view must read top-to-bottom as
-  earliest-to-latest.
+- Planning epics are ordered purely chronologically by end date (ascending), across all teams —
+  never grouped by team first, never alphabetical/key order. Epics with no end date sort last.
+  A timeline view must read top-to-bottom as earliest-to-latest.
 
 ## Risks
 

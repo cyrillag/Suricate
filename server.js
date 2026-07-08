@@ -456,10 +456,9 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, re
   }
 
   const workstreams = db.prepare('SELECT * FROM workstreams WHERE project_id=? ORDER BY sort_order').all(proj.id);
-  // Grouped by team (keeps each team's rows together, matching their Gantt color), then
-  // chronologically by end date within a team — dateless epics (see the no-fabricated-dates
-  // rule) sort last within their team rather than breaking up the timeline order.
-  const epics      = db.prepare('SELECT * FROM epics_cache WHERE project_id=? ORDER BY team, (end_date IS NULL), end_date').all(proj.id);
+  // Purely chronological by end date, across all teams — not grouped by team first. Dateless
+  // epics (see the no-fabricated-dates rule) sort last rather than breaking up the timeline order.
+  const epics      = db.prepare('SELECT * FROM epics_cache WHERE project_id=? ORDER BY (end_date IS NULL), end_date').all(proj.id);
   const epicsByKey = new Map(epics.map(e => [e.jira_key, e]));
   const wsStatuses = JSON.parse(report.workstream_statuses_json);
 
