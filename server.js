@@ -397,14 +397,19 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, re
 
   const stats = { done:0, prog:0, blk:0, ts:0, total: resolvedWs.length };
   resolvedWs.forEach(ws => stats[ws.status] = (stats[ws.status]||0)+1);
-  const health = stats.blk > 0 || stats.ts > stats.total * 0.6 ? 'at-risk' : 'on-track';
+  const risks = JSON.parse(report.risks_json);
+  // Workstream progress alone doesn't tell the whole story — a page can list an open HIGH risk
+  // while every workstream is still nominally on schedule. Surfacing that risk was the entire
+  // point of the Risk matrix section, so it must be able to flip the badge too.
+  const hasHighRisk = risks.some(r => r.level === 'high');
+  const health = stats.blk > 0 || stats.ts > stats.total * 0.6 || hasHighRisk ? 'at-risk' : 'on-track';
 
   const html = genReport({
     project: proj, year, week,
     pmName: proj.pm_name,
     execSummary: report.exec_summary,
     highlights:  JSON.parse(report.highlights_json),
-    risks:       JSON.parse(report.risks_json),
+    risks,
     workstreams: resolvedWs,
     epics: epics.filter(e => e.start_date && e.end_date).map(e => ({
       key: e.jira_key, label: e.summary, team: e.team,

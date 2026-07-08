@@ -116,6 +116,17 @@ function jiraKeyFromCell(html) {
   return m ? m[1] : null;
 }
 
+// A single "Jira" column cell can embed more than one {jira} macro (e.g. an epic that got
+// split mid-quarter, or a workstream tracked across two tickets) — jiraKeyFromCell's
+// non-global match only ever returns the first, silently dropping every epic after it.
+function jiraKeysFromCell(html) {
+  const re = /ac:name="key">([A-Z][A-Z0-9]*-\d+)</gi;
+  const keys = [];
+  let m;
+  while ((m = re.exec(html))) keys.push(m[1]);
+  return keys;
+}
+
 function liItems(html) {
   const items = [];
   const re = /<li[^>]*>([\s\S]*?)<\/li>/gi;
@@ -187,17 +198,33 @@ function parseDeliverables(html) {
     const wsName = (cells[idx] ? stripTags(cells[idx].html) : null) || (deliverableJustSet ? currentDeliverable : null);
     const team   = cells[idx + 1] ? stripTags(cells[idx + 1].html) : null;
     const jiraCellHtml = cells[idx + 2] ? cells[idx + 2].html : '';
-    const jiraKey = jiraKeyFromCell(jiraCellHtml);
+    const jiraKeys = jiraKeysFromCell(jiraCellHtml);
     const plainStatusText = stripTags(jiraCellHtml); // e.g. "Done" when no jira macro is used
     if (!wsName) continue;
-    workstreams.push({
-      deliverable: currentDeliverable,
-      name: wsName,
-      team: team || null,
-      jira_key: jiraKey,
-      manual_status: !jiraKey && plainStatusText ? plainStatusText : null,
-      sort_order: sortOrder++
-    });
+    if (jiraKeys.length > 1) {
+      // Multiple epics tracked under one workstream cell (e.g. split mid-quarter) — one row
+      // per epic so each still gets synced/shown, instead of silently keeping only the first.
+      // The (deliverable,name) pair is unique in the DB, so later rows need a disambiguated name.
+      jiraKeys.forEach((key, i) => {
+        workstreams.push({
+          deliverable: currentDeliverable,
+          name: i === 0 ? wsName : `${wsName} (${key})`,
+          team: team || null,
+          jira_key: key,
+          manual_status: null,
+          sort_order: sortOrder++
+        });
+      });
+    } else {
+      workstreams.push({
+        deliverable: currentDeliverable,
+        name: wsName,
+        team: team || null,
+        jira_key: jiraKeys[0] || null,
+        manual_status: !jiraKeys.length && plainStatusText ? plainStatusText : null,
+        sort_order: sortOrder++
+      });
+    }
   }
   return workstreams;
 }
