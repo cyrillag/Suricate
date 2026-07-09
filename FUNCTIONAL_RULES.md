@@ -38,6 +38,11 @@ to be re-applied here by hand rather than resolved by merging code:
   ("done"/"ongoing"/"to do" observed in practice; "ongoing" maps to In Progress alongside the
   usual "progress"/"review"/"dev" synonyms). Never let the lozenge's colour parameter leak into
   the extracted text — it will silently break the exact-match status lookup.
+- The **Executive summary** must preserve a PM's manual bold/italic/underline emphasis from the
+  Confluence page — it is not flattened to plain text like the rest of the parsed content. Any
+  other Confluence-sourced formatting/markup is still discarded; only these three inline styles
+  survive, and only via an escape-then-restore path (see confluence.js's stripTagsKeepEmphasis /
+  report-gen.js's escKeepEmphasis) — never by trusting raw HTML from Confluence directly.
 - The **Planning / Gantt** section must show the exhaustive set of **epics** (never tasks) under
   the project's root LVL2 epic, whether or not each one is listed on the Confluence page. This is
   computed via a recursive portfolio JQL (`portfolioChildrenOf`) that walks the Advanced
