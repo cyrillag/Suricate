@@ -128,7 +128,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
 
   <div class="doc-section">
     <div class="section-label">Project identity</div>
-    ${execSummary ? `<div class="exec-summary">${esc(execSummary)}</div>` : ''}
+    ${execSummary ? `<div class="exec-summary">${escKeepEmphasis(execSummary)}</div>` : ''}
     <div class="identity-grid">
       <div class="identity-cell"><div class="f-label">Project</div><div class="f-value">${esc(project.name)}</div></div>
       <div class="identity-cell"><div class="f-label">Project Manager</div><div class="f-value">${esc(pmName || '')}</div></div>
@@ -318,6 +318,16 @@ function GANTT_JS(epics) {
 
 function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+// execSummary carries {{STRONG}}/{{EM}}/{{U}} placeholders (see confluence.js's
+// stripTagsKeepEmphasis) for a PM's manual bold/italic/underline emphasis — escape everything
+// else first (esc), THEN turn the placeholders into real tags, so nothing from Confluence except
+// those specific markers can ever inject actual HTML into the report.
+function escKeepEmphasis(s) {
+  return esc(s)
+    .replace(/\{\{STRONG\}\}/g, '<strong>').replace(/\{\{\/STRONG\}\}/g, '</strong>')
+    .replace(/\{\{EM\}\}/g, '<em>').replace(/\{\{\/EM\}\}/g, '</em>')
+    .replace(/\{\{U\}\}/g, '<u>').replace(/\{\{\/U\}\}/g, '</u>');
 }
 function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
 function pct(n, total) { return total ? Math.round(n / total * 100) : 0; }

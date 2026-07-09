@@ -82,6 +82,24 @@ function stripTags(html) {
     .trim();
 }
 
+// Same as stripTags, but keeps a PM's manual bold/italic/underline emphasis (e.g. on the
+// executive summary) instead of discarding it. Real <strong>/<em>/<u> tags are swapped for plain
+// text placeholders here — surviving the same tag-stripping this function otherwise does — so
+// the caller can safely HTML-escape the rest of the text (protecting against anything else
+// Confluence-sourced) before turning the placeholders back into real tags at render time. Never
+// return raw HTML directly from here: nothing downstream should have to trust this string as-is.
+function stripTagsKeepEmphasis(html) {
+  return String(html || '')
+    .replace(/<ac:structured-macro ac:name="status"[^>]*>[\s\S]*?<ac:parameter ac:name="title">([^<]*)<\/ac:parameter>[\s\S]*?<\/ac:structured-macro>/gi, ' $1 ')
+    .replace(/<(\/?)(strong|b)(?=[\s>])[^>]*>/gi, (_, close) => close ? '{{/STRONG}}' : '{{STRONG}}')
+    .replace(/<(\/?)(em|i)(?=[\s>])[^>]*>/gi, (_, close) => close ? '{{/EM}}' : '{{EM}}')
+    .replace(/<(\/?)u(?=[\s>])[^>]*>/gi, (_, close) => close ? '{{/U}}' : '{{U}}')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function extractSection(html, heading) {
   // Grabs everything between an <h1>N. Heading</h1> marker and the next <h1> (or end of doc)
   const re = new RegExp(`<h1[^>]*>\\s*\\d+\\.\\s*${heading}\\s*<\\/h1>([\\s\\S]*?)(?=<h1[^>]*>|$)`, 'i');
@@ -155,7 +173,7 @@ function categoryItems(cellHtml) {
 // ── Executive summary ────────────────────────────────────────────────
 function parseExecSummary(html) {
   const section = extractSection(html, 'Executive summary');
-  const text = stripTags(section);
+  const text = stripTagsKeepEmphasis(section);
   return text || null;
 }
 
