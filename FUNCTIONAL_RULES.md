@@ -32,6 +32,12 @@ to be re-applied here by hand rather than resolved by merging code:
   roll-up: Done only if *all* its epics are Done, otherwise Blocked if any is Blocked, otherwise
   In Progress if any is In Progress, otherwise To Start. Example: 4 epics Done + 1 In Progress ⇒
   the workstream shows In Progress, not Done.
+- A workstream with no Jira epic at all gets its status from a manually-set Confluence status
+  lozenge in the same "Jira" cell instead (a PM types the status by hand when there's nothing to
+  link to Jira for). The lozenge's colour is decorative only — only its title text is the status
+  ("done"/"ongoing"/"to do" observed in practice; "ongoing" maps to In Progress alongside the
+  usual "progress"/"review"/"dev" synonyms). Never let the lozenge's colour parameter leak into
+  the extracted text — it will silently break the exact-match status lookup.
 - The **Planning / Gantt** section must show the exhaustive set of **epics** (never tasks) under
   the project's root LVL2 epic, whether or not each one is listed on the Confluence page. This is
   computed via a recursive portfolio JQL (`portfolioChildrenOf`) that walks the Advanced
