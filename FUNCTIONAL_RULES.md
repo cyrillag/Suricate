@@ -83,7 +83,10 @@ to be re-applied here by hand rather than resolved by merging code:
 - A project's target ETA always comes from its root Jira epic's "End date" field — it is never
   typed in manually, at creation or on edit.
 - Editing a project (name, root epic, Confluence page, extra epics) does not itself resync
-  workstreams — the "Sync Jira"/"Sync Confluence" buttons on the project page do that afterward.
+  workstreams — the "Generate report"/"↻ Regenerate" action on the project page does that (it
+  refreshes the Confluence-backed matrix and Jira/Planning epics, then generates the report, all
+  in one click — there are no separate Sync Jira/Sync Confluence buttons; a version that had them
+  existed briefly but they had no visible effect on the page and read as broken).
 - Renaming a project never changes its slug (the stable URL identifier).
 
 ## Error handling
