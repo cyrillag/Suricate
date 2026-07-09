@@ -424,7 +424,7 @@ const CSS = `
   .risk-ref{font-family:var(--fm);font-size:12.5px;color:var(--tx3);letter-spacing:.05em}
   .risk-badge{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:3px 8px;border-radius:2px;white-space:nowrap}
   .risk-badge.high{background:var(--blk-bg);color:var(--blk-c);border:1px solid #F4A17D}
-  .risk-badge.medium{background:#FFFBEB;color:#8A6300;border:1px solid #FDE68A}
+  .risk-badge.medium{background:#FFF6D6;color:var(--db);border:1px solid #FFE16D}
   .risk-badge.low{background:var(--ts-bg);color:var(--ts-c);border:1px solid var(--bd)}
   .risk-desc{font-size:13px;color:var(--tx);font-weight:600;line-height:1.4;margin-bottom:4px}
   .risk-mit{font-size:13px;color:var(--tx2);line-height:1.4}
@@ -439,6 +439,7 @@ const CSS = `
   .cell-team{font-size:15px;color:var(--tx2);white-space:nowrap;padding:5px 12px;border-bottom:1px solid var(--bd2);vertical-align:middle;width:20%}
   tbody tr.del-first:not(:first-child) td{border-top:2px solid var(--mb)}
   tbody tr:last-child td{border-bottom:none}
+  tbody tr:nth-child(even) td{background:var(--gnd)}
   tbody tr:hover td{background:#ECEEF8}
   tbody tr:hover .td-del{background:var(--gnd)!important}
   .ws-name{font-size:13px;color:var(--tx);line-height:1.3}
