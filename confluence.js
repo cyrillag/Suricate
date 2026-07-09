@@ -69,7 +69,13 @@ function validatePageFormat(html) {
 
 function stripTags(html) {
   return String(html || '')
-    .replace(/<ac:parameter[^>]*ac:name="title">([^<]*)<\/ac:parameter>/gi, ' $1 ') // keep status-macro titles (e.g. HIGH)
+    // A Confluence "status" macro (colored lozenge) always carries a "colour" parameter
+    // alongside "title" — collapsing the whole macro down to just its title (e.g. "done",
+    // "HIGH") avoids leaking the colour name as loose text once the other tags are stripped
+    // below (a bare `<ac:parameter ac:name="title">` replace would strip the <ac:parameter>
+    // tags around "colour" but leave its inner text "Green"/"Yellow"/etc. sitting in the
+    // output, corrupting any exact-match status lookup downstream, e.g. "Green done").
+    .replace(/<ac:structured-macro ac:name="status"[^>]*>[\s\S]*?<ac:parameter ac:name="title">([^<]*)<\/ac:parameter>[\s\S]*?<\/ac:structured-macro>/gi, ' $1 ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
     .replace(/\s+/g, ' ')

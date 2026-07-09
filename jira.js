@@ -48,7 +48,9 @@ function mapStatus(jiraStatus) {
   if (!jiraStatus) return 'ts';
   const s = jiraStatus.toLowerCase();
   if (s === 'done' || s === 'closed' || s === 'resolved' || s === 'complete') return 'done';
-  if (s.includes('progress') || s.includes('review') || s.includes('dev')) return 'prog';
+  // "ongoing" covers PMs typing a manual status directly on a no-Jira workstream's Confluence
+  // cell (a status-macro lozenge) rather than a real Jira issue status.
+  if (s.includes('progress') || s.includes('review') || s.includes('dev') || s.includes('ongoing')) return 'prog';
   if (s === 'blocked' || s === 'impediment') return 'blk';
   return 'ts';
 }
