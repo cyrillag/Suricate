@@ -23,10 +23,6 @@
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end">
       <a href="/projects/<%= proj.slug %>/edit" class="btn-ghost btn-sm"><%= t('detail.edit') %></a>
-      <button class="btn-ghost btn-sm" id="sync-jira-btn" data-slug="<%= proj.slug %>"><%= t('detail.sync_jira') %></button>
-      <% if (proj.confluence_page) { %>
-      <button class="btn-ghost btn-sm" id="sync-confluence-btn" data-slug="<%= proj.slug %>"><%= t('detail.sync_confluence') %></button>
-      <% } %>
       <form method="POST" action="/projects/<%= proj.slug %>/reports/generate" style="display:flex;gap:6px;align-items:center">
         <input class="field-input" type="text" name="week" value="<%= currentWeek %>" pattern="\d{4}-W\d{2}" style="width:110px" title="<%= t('detail.week_input_title') %>" aria-label="<%= t('detail.week_input_aria') %>">
         <button type="submit" class="btn-primary"><%= t('detail.generate_report') %></button>
@@ -74,30 +70,5 @@
     <% } %>
   </div>
 </div>
-<script>
-var I18N = {
-  syncing: <%= JSON.stringify(t('detail.syncing')) %>,
-  error: <%= JSON.stringify(t('detail.error')) %>,
-  syncJira: <%= JSON.stringify(t('detail.sync_jira')) %>,
-  syncConfluence: <%= JSON.stringify(t('detail.sync_confluence')) %>,
-  syncedEpics: <%= JSON.stringify(t('detail.synced_epics', { count: '__N__' })) %>,
-  syncedWorkstreams: <%= JSON.stringify(t('detail.synced_workstreams', { count: '__N__' })) %>
-};
-document.getElementById('sync-jira-btn').addEventListener('click', async function() {
-  this.textContent = I18N.syncing; this.disabled = true;
-  const r = await fetch('/api/projects/<%= proj.slug %>/sync-epics', { method:'POST' });
-  const d = await r.json();
-  this.textContent = r.ok ? I18N.syncedEpics.replace('__N__', d.count) : ('✗ ' + (d.error || I18N.error));
-  setTimeout(() => { this.textContent = I18N.syncJira; this.disabled = false; }, 3000);
-});
-var syncConfBtn = document.getElementById('sync-confluence-btn');
-if (syncConfBtn) syncConfBtn.addEventListener('click', async function() {
-  this.textContent = I18N.syncing; this.disabled = true;
-  const r = await fetch('/api/projects/<%= proj.slug %>/sync-confluence', { method:'POST' });
-  const d = await r.json();
-  this.textContent = r.ok ? I18N.syncedWorkstreams.replace('__N__', d.count) : ('✗ ' + (d.error || I18N.error));
-  setTimeout(() => { this.textContent = I18N.syncConfluence; this.disabled = false; }, 3000);
-});
-</script>
 </body>
 </html>

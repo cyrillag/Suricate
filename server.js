@@ -420,10 +420,33 @@ app.post('/projects/:slug/reports/generate', requireAuth, async (req, res) => {
   if (isFutureWeek(year, week)) {
     return res.redirect(`/projects/${proj.slug}?${warningQuery({ source: 'confluence', message: res.locals.t('detail.err_future_week') })}`);
   }
+
+  // Generate/Regenerate is the single action that refreshes everything — workstreams, epic
+  // statuses, Planning, and the week's own content — rather than requiring a separate Sync
+  // Jira/Sync Confluence click first. Those buttons worked but had no visible effect on this
+  // page (only the button's own text changed for 3s), which read as broken even though the
+  // sync itself succeeded — folding it into the one action people actually look for feedback
+  // from fixes that.
+  let syncFailure = null;
+  try {
+    if (proj.confluence_space && proj.confluence_page) {
+      await syncConfluenceProject(proj.id, proj.confluence_space, proj.confluence_page);
+      await refreshFullEpicTree(proj.id, proj.jira_root_epic, parseExtraEpics(proj.extra_epics));
+    } else {
+      await seedWorkstreamsFromJiraTree(proj.id, proj.jira_root_epic);
+    }
+  } catch (err) {
+    syncFailure = friendlyError(res.locals.t, err);
+  }
+
   try {
     await generateReportRow(proj, year, week);
   } catch (err) {
     return res.redirect(`/projects/${proj.slug}?${warningQuery({ source: 'confluence', message: friendlyError(res.locals.t, err) })}`);
+  }
+
+  if (syncFailure) {
+    return res.redirect(`/projects/${proj.slug}?${warningQuery({ source: 'confluence', message: syncFailure })}`);
   }
   res.redirect(`/projects/${proj.slug}/${year}-W${String(week).padStart(2,'0')}`);
 });
@@ -495,40 +518,6 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, re
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(html);
-});
-
-// ── API ───────────────────────────────────────────────────────────
-app.post('/api/projects/:slug/sync-epics', requireAuth, async (req, res) => {
-  const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
-  if (!proj) return res.status(404).json({ error: 'Not found' });
-  try {
-    let count;
-    if (proj.confluence_space && proj.confluence_page) {
-      // Workstream list comes from Confluence and stays untouched here — but Planning must show
-      // every epic under the root, not just the ones a PM happened to list in the matrix, so this
-      // also walks the full Jira tree (refreshFullEpicTree) alongside the known matrix keys.
-      const keys = db.prepare('SELECT jira_key FROM workstreams WHERE project_id=? AND jira_key IS NOT NULL').all(proj.id).map(r => r.jira_key);
-      await Promise.all([refreshEpicStatuses(proj.id, keys), refreshFullEpicTree(proj.id, proj.jira_root_epic, parseExtraEpics(proj.extra_epics))]);
-      count = db.prepare('SELECT COUNT(*) as n FROM epics_cache WHERE project_id=?').get(proj.id).n;
-    } else {
-      count = await seedWorkstreamsFromJiraTree(proj.id, proj.jira_root_epic);
-    }
-    res.json({ ok: true, count });
-  } catch (err) {
-    res.status(500).json({ error: friendlyError(res.locals.t, err) });
-  }
-});
-
-app.post('/api/projects/:slug/sync-confluence', requireAuth, async (req, res) => {
-  const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
-  if (!proj) return res.status(404).json({ error: 'Not found' });
-  if (!proj.confluence_space || !proj.confluence_page) return res.status(400).json({ error: res.locals.t('detail.err_no_confluence_configured') });
-  try {
-    const data = await syncConfluenceProject(proj.id, proj.confluence_space, proj.confluence_page);
-    res.json({ ok: true, count: data.workstreams.length, pageVersion: data.version });
-  } catch (err) {
-    res.status(500).json({ error: friendlyError(res.locals.t, err) });
-  }
 });
 
 app.listen(PORT, '0.0.0.0', () => console.log(`Reports app → http://localhost:${PORT}`));

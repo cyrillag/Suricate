@@ -67,15 +67,13 @@ const DICT = {
   },
   detail: {
     edit:      { fr: '✎ Modifier',                en: '✎ Edit' },
-    sync_jira: { fr: '↻ Sync Jira',               en: '↻ Sync Jira' },
-    sync_confluence: { fr: '↻ Sync Confluence',   en: '↻ Sync Confluence' },
     generate_report: { fr: 'Générer le rapport',  en: 'Generate report' },
     week_input_title: { fr: 'AAAA-Wss',           en: 'YYYY-Www' },
     week_input_aria: { fr: 'Semaine à générer, format AAAA-Wss', en: 'Week to generate, format YYYY-Www' },
     auto_note: { fr: 'Les rapports sont générés automatiquement depuis {{source}} et les statuts d’epics Jira — il n’y a rien à saisir ici. Pour corriger un rapport, corrige-le à la source (page Confluence ou Jira) puis régénère-le.', en: 'Reports are generated automatically from {{source}} and Jira epic statuses — there is nothing to type in here. To correct a report, fix it at the source (Confluence page or Jira) then regenerate.' },
     auto_note_confluence: { fr: 'la page Confluence', en: 'the Confluence page' },
     auto_note_jira: { fr: 'Jira',                 en: 'Jira' },
-    sync_failed: { fr: '⚠ La synchronisation {{source}} a échoué : {{message}} — réessaie avec les boutons ci-dessus.', en: '⚠ {{source}} sync failed: {{message}} — retry with the buttons above.' },
+    sync_failed: { fr: '⚠ La synchronisation {{source}} a échoué : {{message}} — réessaie en cliquant à nouveau sur «Générer».', en: '⚠ {{source}} sync failed: {{message}} — retry by clicking "Generate" again.' },
     source_jira: { fr: 'Jira',                    en: 'Jira' },
     source_confluence: { fr: 'Confluence',        en: 'Confluence' },
     past_reports: { fr: 'Rapports précédents',    en: 'Past reports' },
@@ -85,10 +83,6 @@ const DICT = {
     regenerate: { fr: '↻ Régénérer',              en: '↻ Regenerate' },
     delete:   { fr: '🗑 Supprimer',               en: '🗑 Delete' },
     delete_confirm: { fr: 'Supprimer le rapport {{week}} ? Cette action est irréversible.', en: 'Delete the {{week}} report? This cannot be undone.' },
-    syncing:  { fr: 'Synchronisation…',           en: 'Syncing…' },
-    synced_epics: { fr: '✓ {{count}} epics synchronisés', en: '✓ {{count}} epics synced' },
-    synced_workstreams: { fr: '✓ {{count}} workstreams synchronisés', en: '✓ {{count}} workstreams synced' },
-    error:    { fr: '✗ Erreur',                   en: '✗ Error' },
 
     // Human-readable translations of every classified sync/integration failure (see errors.js
     // AppError codes) — a PM must never see a raw HTTP status or JSON API payload in the UI.
@@ -99,7 +93,6 @@ const DICT = {
     err_confluence_no_deliverables_table: { fr: 'La page Confluence a été trouvée, mais aucun tableau «Deliverables status» n’a pu être lu — vérifie que la page suit le format requis (voir le modèle lié sur le formulaire de création de projet).', en: 'The Confluence page was found, but no "Deliverables status" table could be read — check that the page follows the required format (see the template page linked on the New project form).' },
     err_confluence_empty_deliverables: { fr: 'Le tableau «Deliverables status» a été trouvé mais semble vide — ajoute au moins une ligne de workstream.', en: 'The "Deliverables status" table was found but appears empty — add at least one workstream row.' },
     err_confluence_no_week_summary_table: { fr: 'Aucun tableau «Week summary» n’a été trouvé sur la page Confluence — vérifie que la page suit le format requis (voir le modèle lié sur le formulaire de création de projet).', en: 'No "Week summary" table could be found on the Confluence page — check that it follows the required format (see the template page linked on the New project form).' },
-    err_no_confluence_configured: { fr: 'Aucune page Confluence n’est configurée pour ce projet.', en: 'No Confluence page is configured for this project.' },
     err_invalid_week: { fr: 'Semaine invalide : « {{week}} ».', en: 'Invalid week: "{{week}}".' },
     err_future_week: { fr: 'Impossible de générer un rapport pour une semaine future.', en: 'Cannot generate a report for a future week.' },
     err_jira_not_found: { fr: 'L’epic ou le ticket Jira demandé est introuvable — vérifie la référence de l’epic racine (✎ Modifier).', en: 'The requested Jira epic or ticket could not be found — check the root epic reference (✎ Edit).' },
