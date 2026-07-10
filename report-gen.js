@@ -512,37 +512,52 @@ const CSS = `
   @page{size:A4 portrait;margin:8mm}
   @media print{
     *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}
-    body{background:#fff}
-    .doc-body{max-width:none;padding:10px 14px 20px}
+    body{background:#fff;font-size:11.5px}
+    .doc-body{max-width:none;padding:8px 12px 14px}
     .btn-export-pdf,.back-link-hdr,.week-arrow,.hdr-deco{display:none!important}
-    .doc-header{overflow:visible;padding:12px 20px}
-    .matrix-scroll,.gantt-outer{overflow:visible}
+    .doc-header{overflow:visible;padding:9px 16px}
+    .matrix-scroll{overflow:visible}
     .doc-section,.matrix-section,.risk-item,.identity-cell,tr{break-inside:avoid;page-break-inside:avoid}
     .gantt-lrow,.gantt-row{break-inside:avoid;page-break-inside:avoid}
 
     /* Condensed spacing/sizing throughout — the matrix and Gantt repeat this per row across
        dozens of rows, so even small per-row savings compound into whole fewer pages. Screen
        styles are untouched; all of this is scoped to print only. */
-    .doc-section{margin-bottom:8px}
-    .matrix-section{margin-bottom:8px}
-    .section-label{padding:7px 14px 6px}
-    .exec-summary{padding:8px 14px}
-    .identity-cell{padding:8px 14px}
-    .abc-col{padding:10px 14px}
-    .abc-items{gap:5px}
-    .abc-items li{font-size:11.5px}
-    .chart-pane{padding:12px;gap:10px}
-    .risk-item{padding:8px 14px;gap:10px}
-    .risk-desc,.risk-mit{font-size:12px}
-    .td-ws,.td-st,.cell-team{padding:3px 12px!important}
-    .td-del{padding:6px 12px!important}
-    .ws-name,.cell-team,.st{font-size:12px}
-    .mx thead th{padding:7px 16px}
-    .gantt-lrow,.gantt-row{height:19px!important}
-    .gantt-lhdr{height:28px}
-    .gantt-months{height:28px}
-    .g-team{padding:0 4px;line-height:1.2}
-    .g-name{font-size:12px}
+    .doc-section{margin-bottom:6px}
+    .matrix-section{margin-bottom:6px}
+    .section-label{padding:5px 12px 5px;font-size:12.5px}
+    .exec-summary{padding:6px 12px}
+    .identity-cell{padding:6px 12px}
+    .abc-col{padding:7px 12px}
+    .abc-items{gap:3px}
+    .abc-items li{font-size:11px}
+    .chart-pane{padding:8px;gap:6px}
+    #donut{width:80px;height:80px}
+    .leg-row{gap:5px}
+    .risk-item{padding:6px 12px;gap:8px}
+    .risk-desc,.risk-mit{font-size:11.5px}
+    .td-ws,.td-st,.cell-team{padding:2px 10px!important}
+    .td-del{padding:4px 10px!important}
+    .ws-name,.cell-team,.st{font-size:11.5px}
+    .mx thead th{padding:5px 14px;font-size:12.5px}
+    .g-team,.g-key,.g-name{font-size:10.5px;line-height:1.2}
+    .g-team{padding:0 4px}
+
+    /* The Gantt's right column is hard-pinned to a 680px minimum for screen/landscape use —
+       unconstrained here so flex can actually shrink it to the portrait page width instead of
+       silently overflowing past the right edge (previously: the Planning section got cut off
+       rather than fitting, since overflow:visible alone doesn't shrink anything, it just stops
+       clipping — the content still has to fit the box it's given). Bar/gridline positions are
+       already percentage-based, so they rescale correctly at any container width. */
+    .gantt-outer{overflow:hidden}
+    .gantt-lcol{width:145px}
+    .gantt-rcol{min-width:0}
+    .gantt-lrow,.gantt-row{height:16px!important}
+    .gantt-lhdr,.gantt-months{height:22px}
+    .gantt-mqtr,.gantt-mname{line-height:1.1}
+    .gantt-mqtr{font-size:8px}
+    .gantt-mname{font-size:9.5px}
+    .gantt-vlabel{font-size:8px}
   }
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 `;
