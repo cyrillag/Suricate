@@ -89,6 +89,27 @@ function aggregateEpicStatus(jiraKeyField, epicsByKey) {
   return 'ts';
 }
 
+// Resolves the CURRENT live matrix/Planning state — used to freeze a snapshot at report
+// generation time, and as a last-resort fallback when viewing a report generated before
+// snapshots existed (legacyStatusOverrides is that old report's workstream_statuses_json, kept
+// only so those older rows don't regress further than they already have).
+function resolveWorkstreamsAndEpics(projectId, legacyStatusOverrides) {
+  const workstreams = db.prepare('SELECT * FROM workstreams WHERE project_id=? ORDER BY sort_order').all(projectId);
+  const epicRows    = db.prepare('SELECT * FROM epics_cache WHERE project_id=? ORDER BY (end_date IS NULL), end_date').all(projectId);
+  const epicsByKey  = new Map(epicRows.map(e => [e.jira_key, e]));
+
+  const resolvedWs = workstreams.map(ws => ({
+    ...ws,
+    status: (legacyStatusOverrides && legacyStatusOverrides[ws.id])
+      || (ws.jira_key ? (aggregateEpicStatus(ws.jira_key, epicsByKey) || 'ts') : (ws.default_status || 'ts'))
+  }));
+  const epics = epicRows.map(e => ({
+    key: e.jira_key, label: e.summary, team: e.team,
+    status: jira.mapStatus(e.status), start: e.start_date, end: e.end_date
+  }));
+  return { resolvedWs, epics };
+}
+
 const upsertWorkstreamFromJira = db.prepare(`
   INSERT INTO workstreams(project_id,deliverable,name,team,jira_key,sort_order) VALUES(?,?,?,?,?,?)
   ON CONFLICT(project_id,deliverable,name) DO UPDATE SET
@@ -399,13 +420,19 @@ async function generateReportRow(proj, year, week) {
     highlights = confluence.parseWeekSummary(page.html, week) || highlights;
     risks = confluence.parseRisks(page.html);
   }
-  db.prepare(`INSERT INTO reports(project_id,year,week,exec_summary,highlights_json,risks_json,workstream_statuses_json,updated_at)
-    VALUES(?,?,?,?,?,?,'{}',unixepoch())
+  // Freeze the matrix/Planning state now — this is the one moment a report is allowed to reflect
+  // "current" data. From here on, viewing this week must never depend on what workstreams/
+  // epics_cache look like later (see FUNCTIONAL_RULES.md).
+  const { resolvedWs, epics } = resolveWorkstreamsAndEpics(proj.id);
+  db.prepare(`INSERT INTO reports(project_id,year,week,exec_summary,highlights_json,risks_json,workstream_statuses_json,workstreams_snapshot_json,epics_snapshot_json,updated_at)
+    VALUES(?,?,?,?,?,?,'{}',?,?,unixepoch())
     ON CONFLICT(project_id,year,week) DO UPDATE SET
       exec_summary=excluded.exec_summary,
       highlights_json=excluded.highlights_json,
       risks_json=excluded.risks_json,
-      updated_at=unixepoch()`).run(proj.id, year, week, execSummary, JSON.stringify(highlights), JSON.stringify(risks));
+      workstreams_snapshot_json=excluded.workstreams_snapshot_json,
+      epics_snapshot_json=excluded.epics_snapshot_json,
+      updated_at=unixepoch()`).run(proj.id, year, week, execSummary, JSON.stringify(highlights), JSON.stringify(risks), JSON.stringify(resolvedWs), JSON.stringify(epics));
 }
 
 app.post('/projects/:slug/reports/generate', requireAuth, async (req, res) => {
@@ -478,17 +505,22 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, re
     report = db.prepare('SELECT * FROM reports WHERE project_id=? AND year=? AND week=?').get(proj.id, year, week);
   }
 
-  const workstreams = db.prepare('SELECT * FROM workstreams WHERE project_id=? ORDER BY sort_order').all(proj.id);
-  // Purely chronological by end date, across all teams — not grouped by team first. Dateless
-  // epics (see the no-fabricated-dates rule) sort last rather than breaking up the timeline order.
-  const epics      = db.prepare('SELECT * FROM epics_cache WHERE project_id=? ORDER BY (end_date IS NULL), end_date').all(proj.id);
-  const epicsByKey = new Map(epics.map(e => [e.jira_key, e]));
-  const wsStatuses = JSON.parse(report.workstream_statuses_json);
-
-  const resolvedWs = workstreams.map(ws => ({
-    ...ws,
-    status: wsStatuses[ws.id] || (ws.jira_key ? (aggregateEpicStatus(ws.jira_key, epicsByKey) || 'ts') : (ws.default_status || 'ts'))
-  }));
+  // A report is a frozen snapshot from the moment it was generated — never recompute the
+  // matrix/Planning from the live workstreams/epics_cache tables for a row that already has one
+  // (that live-recompute was the actual bug: a workstream added or changing status *after* a past
+  // week was generated used to silently show up in that old week too). Only a legacy row from
+  // before this existed falls back to live data, seeded with whatever the old per-ID status
+  // override map still applies to.
+  let resolvedWs, epicsForView;
+  if (report.workstreams_snapshot_json) {
+    resolvedWs = JSON.parse(report.workstreams_snapshot_json);
+    epicsForView = report.epics_snapshot_json ? JSON.parse(report.epics_snapshot_json) : [];
+  } else {
+    const legacyOverrides = JSON.parse(report.workstream_statuses_json || '{}');
+    const live = resolveWorkstreamsAndEpics(proj.id, legacyOverrides);
+    resolvedWs = live.resolvedWs;
+    epicsForView = live.epics;
+  }
 
   const stats = { done:0, prog:0, blk:0, ts:0, total: resolvedWs.length };
   resolvedWs.forEach(ws => stats[ws.status] = (stats[ws.status]||0)+1);
@@ -506,13 +538,7 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, re
     highlights:  JSON.parse(report.highlights_json),
     risks,
     workstreams: resolvedWs,
-    // No date filter here: an epic with no Start/End date still belongs in Planning (see
-    // FUNCTIONAL_RULES.md) — it's report-gen's job to list it without drawing a bar it has no
-    // dates for, rather than this route silently dropping it from the section altogether.
-    epics: epics.map(e => ({
-      key: e.jira_key, label: e.summary, team: e.team,
-      status: jira.mapStatus(e.status), start: e.start_date, end: e.end_date
-    })),
+    epics: epicsForView,
     stats, health
   });
 

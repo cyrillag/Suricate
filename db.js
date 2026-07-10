@@ -80,6 +80,15 @@ ensureColumn('reports', 'exec_summary', 'exec_summary TEXT');
 // and so have no hierarchy link to derive them from automatically.
 ensureColumn('projects', 'extra_epics', 'extra_epics TEXT');
 
+// A past report must stay a true frozen snapshot — the matrix/Planning were being recomputed
+// live from the CURRENT workstreams/epics_cache tables on every view, so a workstream added (or
+// its status changing) after the fact silently changed what an old report showed. These freeze
+// the fully-resolved workstream list (with status) and epic list at generation time; NULL on
+// rows generated before this fix (no way to reconstruct their true historical state after the
+// fact — the report route falls back to live computation only for those).
+ensureColumn('reports', 'workstreams_snapshot_json', 'workstreams_snapshot_json TEXT');
+ensureColumn('reports', 'epics_snapshot_json', 'epics_snapshot_json TEXT');
+
 // workstreams had no UNIQUE constraint pre-v2, so every "Sync Jira" click duplicated all rows.
 // Rebuild the table with UNIQUE(project_id,deliverable,name) so syncs upsert instead of duplicating.
 // Safe to do unconditionally at startup: reports.workstream_statuses_json (keyed by workstream id)

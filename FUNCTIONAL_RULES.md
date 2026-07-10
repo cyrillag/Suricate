@@ -90,11 +90,25 @@ to be re-applied here by hand rather than resolved by merging code:
 ## Report generation
 
 - A weekly report is never edited by hand. Its entire content (exec summary, achievements/
-  blockers/clarify, risks, epic/workstream statuses) is generated fresh from Confluence and Jira
-  each time it's requested or regenerated.
+  blockers/clarify, risks, epic/workstream statuses) is pulled from Confluence and Jira, but only
+  at the moment it's generated or explicitly regenerated — never recomputed from live data on a
+  plain view.
+- **A generated report is a frozen snapshot, permanently.** The full resolved workstream matrix
+  (with status) and Planning epic list are captured into the report row at generation time
+  (`workstreams_snapshot_json`/`epics_snapshot_json`) and read back as-is on every later view.
+  Viewing an old week must never reflect a workstream added afterward, a status that changed
+  since, or an epic removed later — only regenerating that specific week is allowed to refresh it.
+  This was a real, shipped bug once: the matrix/Planning were being rebuilt from the live
+  `workstreams`/`epics_cache` tables on *every* view regardless of week, so a workstream added (or
+  a status changing) today silently changed how *every past report* rendered too. A handful of
+  legacy rows generated before this existed have no snapshot (`workstreams_snapshot_json IS
+  NULL`) — those still fall back to live data seeded with whatever their old
+  `workstream_statuses_json` override map covers, because there is no way to reconstruct their
+  true historical state after the fact.
 - Navigating to or generating a report for a future ISO week is always blocked.
-- Regenerating an existing week overwrites its stored content with the current Confluence/Jira
-  state — this is the intended way to "fix" a report (fix the source, then regenerate).
+- Regenerating an existing week overwrites its stored content (including the snapshot above) with
+  the current Confluence/Jira state — this is the *only* intended way to "fix" a report (fix the
+  source, then regenerate that specific week).
 
 ## Project onboarding & editing
 
