@@ -133,3 +133,18 @@ to be re-applied here by hand rather than resolved by merging code:
 - No hardcoded session secret: the app refuses to start if `SESSION_SECRET` is unset.
 - Any Jira/Confluence-sourced content injected into client-side HTML (e.g. the Gantt) is escaped
   before insertion.
+
+## Accessibility
+
+- Any interactive element (button, link, arrow) placed on a colored surface (the navy header,
+  brand-colored cards) must have a real, computed contrast ratio for its own visible
+  boundary/fill — not just for the text/icon sitting on top of it. A translucent-white overlay at
+  low opacity (e.g. ~.18-.28) on a dark background often still passes a quick glance but computes
+  under WCAG 1.4.11's 3:1 non-text minimum and reads as "invisible" in practice (this exact bug
+  shipped once — the PDF export button and week-nav arrows were both under ~1.5:1 against the
+  report header). Compute the actual ratio (or push opacity clearly past ~.3 fill / .5 border)
+  rather than eyeballing it.
+- Prefer reusing an established, already-legible pattern over inventing a new translucent
+  treatment: the yellow CTA fill (`var(--yellow)` background, `var(--db)` text) used for every
+  primary action elsewhere in this app computes at ~10.9:1 and is the brand's own reserved
+  "primary CTA" color — reach for it before designing a new low-contrast variant.
