@@ -386,15 +386,21 @@ const CSS = `
   .proj-name{font-size:15px;font-weight:700;color:#fff;letter-spacing:.01em}
   .brand-sub{font-size:12.5px;color:rgba(255,255,255,.35);letter-spacing:.04em}
   .hdr-right{display:flex;align-items:center;gap:20px;flex-shrink:0;position:relative;z-index:1}
-  .btn-export-pdf{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 12px;border-radius:var(--r);color:#fff;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.28);cursor:pointer;font-family:var(--f);transition:background .15s,border-color .15s;white-space:nowrap}
-  .btn-export-pdf:hover{background:rgba(255,255,255,.32);border-color:rgba(255,255,255,.5)}
+  /* Yellow is reserved for primary CTAs (see FUNCTIONAL_RULES.md brand section) — also gives
+     this button real contrast against the navy header, unlike a translucent white fill that
+     barely differs from the background it sits on. */
+  .btn-export-pdf{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 12px;border-radius:var(--r);color:var(--db);font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:var(--yellow);border:1px solid var(--yellow);cursor:pointer;font-family:var(--f);transition:background .15s;white-space:nowrap}
+  .btn-export-pdf:hover{background:var(--dyellow);border-color:var(--dyellow)}
   .back-link-hdr{display:inline-flex;align-items:center;gap:2px;color:rgba(255,255,255,.85);font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap}
   .back-link-hdr:hover{color:#fff;text-decoration:underline}
   .week-nav{display:flex;align-items:center;gap:3px;justify-content:flex-end}
-  .week-arrow{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:var(--r);color:#fff;font-size:18px;line-height:1;text-decoration:none;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.28);transition:background .15s,border-color .15s;flex-shrink:0;user-select:none}
-  .week-arrow:hover{background:rgba(255,255,255,.32);border-color:rgba(255,255,255,.5)}
-  .week-arrow.week-arrow-disabled{color:rgba(255,255,255,.3);background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12);cursor:default}
-  .week-arrow.week-arrow-disabled:hover{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12)}
+  /* A translucent-white fill this faint (.18/.28) reads as barely-there against the navy header —
+     boosted so the button's own boundary is actually visible, not just its (already-legible)
+     white glyph. */
+  .week-arrow{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:var(--r);color:#fff;font-size:18px;line-height:1;text-decoration:none;background:rgba(255,255,255,.3);border:1px solid rgba(255,255,255,.5);transition:background .15s,border-color .15s;flex-shrink:0;user-select:none}
+  .week-arrow:hover{background:rgba(255,255,255,.45);border-color:rgba(255,255,255,.7)}
+  .week-arrow.week-arrow-disabled{color:rgba(255,255,255,.35);background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);cursor:default}
+  .week-arrow.week-arrow-disabled:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2)}
   .ref-week{font-family:var(--fm);font-size:23px;color:#fff;letter-spacing:-.5px;line-height:1;text-align:center;min-width:80px}
   .ref-meta{font-size:13.5px;color:rgba(255,255,255,.4);margin-top:4px;letter-spacing:.03em;text-align:right}
   .doc-body{max-width:1100px;margin:0 auto;padding:28px 32px 48px}
@@ -499,16 +505,44 @@ const CSS = `
   .gantt-leg-swatch{width:14px;height:10px;border-radius:1px;flex-shrink:0}
   .doc-footer{background:var(--mb);color:rgba(255,255,255,.4);text-align:center;padding:18px 32px;font-size:13.5px;letter-spacing:.04em}
   @media(max-width:768px){.doc-header{padding:14px 16px}.brand-divider{display:none}.doc-body{padding:16px}.identity-grid{grid-template-columns:1fr 1fr}.sr-grid{grid-template-columns:1fr}.abc-grid{grid-template-columns:1fr}}
-  @page{size:A4 landscape;margin:10mm}
+  /* Portrait, not landscape: a landscape A4 page has ~40% LESS usable height (only its short
+     edge), so a vertically long report (many workstream/epic rows) needs MORE pages in landscape
+     despite the extra width — the opposite of what "fewer pages" wants. Matrix/Gantt just get a
+     bit more compressed horizontally instead; see the width-oriented rules below. */
+  @page{size:A4 portrait;margin:8mm}
   @media print{
     *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}
     body{background:#fff}
-    .doc-body{max-width:none}
-    .btn-export-pdf,.back-link-hdr,.week-arrow{display:none!important}
-    .doc-header{overflow:visible}
+    .doc-body{max-width:none;padding:10px 14px 20px}
+    .btn-export-pdf,.back-link-hdr,.week-arrow,.hdr-deco{display:none!important}
+    .doc-header{overflow:visible;padding:12px 20px}
     .matrix-scroll,.gantt-outer{overflow:visible}
     .doc-section,.matrix-section,.risk-item,.identity-cell,tr{break-inside:avoid;page-break-inside:avoid}
     .gantt-lrow,.gantt-row{break-inside:avoid;page-break-inside:avoid}
+
+    /* Condensed spacing/sizing throughout — the matrix and Gantt repeat this per row across
+       dozens of rows, so even small per-row savings compound into whole fewer pages. Screen
+       styles are untouched; all of this is scoped to print only. */
+    .doc-section{margin-bottom:8px}
+    .matrix-section{margin-bottom:8px}
+    .section-label{padding:7px 14px 6px}
+    .exec-summary{padding:8px 14px}
+    .identity-cell{padding:8px 14px}
+    .abc-col{padding:10px 14px}
+    .abc-items{gap:5px}
+    .abc-items li{font-size:11.5px}
+    .chart-pane{padding:12px;gap:10px}
+    .risk-item{padding:8px 14px;gap:10px}
+    .risk-desc,.risk-mit{font-size:12px}
+    .td-ws,.td-st,.cell-team{padding:3px 12px!important}
+    .td-del{padding:6px 12px!important}
+    .ws-name,.cell-team,.st{font-size:12px}
+    .mx thead th{padding:7px 16px}
+    .gantt-lrow,.gantt-row{height:19px!important}
+    .gantt-lhdr{height:28px}
+    .gantt-months{height:28px}
+    .g-team{padding:0 4px;line-height:1.2}
+    .g-name{font-size:12px}
   }
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 `;
