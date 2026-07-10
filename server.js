@@ -231,8 +231,16 @@ app.use(session({
 }));
 
 function requireAuth(req, res, next) {
-  if (!req.session.userId) return res.redirect('/login');
+  if (!req.session.userId) return res.redirect(`/login?returnTo=${encodeURIComponent(req.originalUrl)}`);
   next();
+}
+
+// Never redirect to whatever a query/form param says verbatim — only ever an internal path.
+// Guards against an open redirect (returnTo=https://evil.example or the protocol-relative
+// returnTo=//evil.example, which browsers treat as a full external URL).
+function safeReturnTo(value) {
+  if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//') || value.includes('://')) return '/';
+  return value;
 }
 
 // ── LANGUAGE (FR default) ────────────────────────────────────────
@@ -254,17 +262,23 @@ app.get('/lang/:code', (req, res) => {
 });
 
 // ── LOGIN ─────────────────────────────────────────────────────────
+// A logged-out visitor hitting a shared report link is bounced here by requireAuth with
+// ?returnTo=<the link they wanted> — carried through the form as a hidden field, and back out
+// via the post-login redirect, so a shared link actually lands where it promised to instead of
+// dumping everyone on their own (possibly empty, if they don't own that project) dashboard.
 app.get('/login', (req, res) => {
-  if (req.session.userId) return res.redirect('/');
-  res.render('login', { error: null });
+  const returnTo = safeReturnTo(req.query.returnTo);
+  if (req.session.userId) return res.redirect(returnTo);
+  res.render('login', { error: null, returnTo });
 });
 
 app.post('/login', async (req, res) => {
   const email = (req.body.email || '').trim().toLowerCase();
-  if (!email || !email.includes('@')) return res.render('login', { error: res.locals.t('login.err_email_required') });
+  const returnTo = safeReturnTo(req.body.returnTo);
+  if (!email || !email.includes('@')) return res.render('login', { error: res.locals.t('login.err_email_required'), returnTo });
   try {
     const me = await jira.findUserByEmail(JIRA_TOKEN, email);
-    if (!me) return res.render('login', { error: res.locals.t('login.err_not_found') });
+    if (!me) return res.render('login', { error: res.locals.t('login.err_not_found'), returnTo });
     const accountId   = me.key || me.name;
     const displayName = me.displayName || me.name || email;
     const existing = db.prepare('SELECT id FROM users WHERE jira_account_id=?').get(accountId);
@@ -278,9 +292,9 @@ app.post('/login', async (req, res) => {
     }
     req.session.userId   = uid;
     req.session.userName = displayName;
-    req.session.save(() => res.redirect('/'));
+    req.session.save(() => res.redirect(returnTo));
   } catch (err) {
-    res.render('login', { error: res.locals.t('login.err_generic') + friendlyError(res.locals.t, err) });
+    res.render('login', { error: res.locals.t('login.err_generic') + friendlyError(res.locals.t, err), returnTo });
   }
 });
 
