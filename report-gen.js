@@ -113,6 +113,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
     </div>
   </div>
   <div class="hdr-right">
+    <button type="button" class="btn-export-pdf" onclick="window.print()">⬇ Export PDF</button>
     <div>
       <div class="week-nav">
         <a class="week-arrow" href="/projects/${esc(project.slug)}/${prevW.year}-W${prevW.weekPad}" aria-label="Previous week">&#x2039;</a>
@@ -219,9 +220,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
   var segs=${donutJSON};
   var total=${stats.total},dur=900,start=null;
   function ease(t){return 1-Math.pow(1-t,3);}
-  function draw(ts){
-    if(!start)start=ts;
-    var p=Math.min(ease((ts-start)/dur),1);
+  function draw(p){
     ctx.clearRect(0,0,120,120);
     var a=-Math.PI/2,gap=0.025;
     segs.forEach(function(s){
@@ -242,9 +241,18 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
       ctx.fillStyle='#87878C';ctx.font='400 8px \\"Source Sans Pro\\",Arial,sans-serif';
       ctx.fillText('workstreams',cx,cy+9);
     }
-    if(p<1)requestAnimationFrame(draw);
   }
-  requestAnimationFrame(draw);
+  function step(ts){
+    if(!start)start=ts;
+    var p=Math.min(ease((ts-start)/dur),1);
+    draw(p);
+    if(p<1)requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+  // The animation may still be mid-flight (or the print dialog opened before it even started)
+  // when the browser's native Ctrl+P/Export-PDF print pass fires — force the finished frame so
+  // the PDF never captures a half-drawn or blank donut.
+  window.addEventListener('beforeprint', function(){ draw(1); });
 })();
 ${ganttEpics.length ? GANTT_JS(ganttEpics) : ''}
 </script>
@@ -378,6 +386,8 @@ const CSS = `
   .proj-name{font-size:15px;font-weight:700;color:#fff;letter-spacing:.01em}
   .brand-sub{font-size:12.5px;color:rgba(255,255,255,.35);letter-spacing:.04em}
   .hdr-right{display:flex;align-items:center;gap:20px;flex-shrink:0;position:relative;z-index:1}
+  .btn-export-pdf{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 12px;border-radius:var(--r);color:#fff;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.28);cursor:pointer;font-family:var(--f);transition:background .15s,border-color .15s;white-space:nowrap}
+  .btn-export-pdf:hover{background:rgba(255,255,255,.32);border-color:rgba(255,255,255,.5)}
   .back-link-hdr{display:inline-flex;align-items:center;gap:2px;color:rgba(255,255,255,.85);font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap}
   .back-link-hdr:hover{color:#fff;text-decoration:underline}
   .week-nav{display:flex;align-items:center;gap:3px;justify-content:flex-end}
@@ -489,7 +499,17 @@ const CSS = `
   .gantt-leg-swatch{width:14px;height:10px;border-radius:1px;flex-shrink:0}
   .doc-footer{background:var(--mb);color:rgba(255,255,255,.4);text-align:center;padding:18px 32px;font-size:13.5px;letter-spacing:.04em}
   @media(max-width:768px){.doc-header{padding:14px 16px}.brand-divider{display:none}.doc-body{padding:16px}.identity-grid{grid-template-columns:1fr 1fr}.sr-grid{grid-template-columns:1fr}.abc-grid{grid-template-columns:1fr}}
-  @media print{body{background:#fff}.doc-header,.risk-badge,.health-dot,.abc-head,.mx thead th,.doc-section,.matrix-section{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+  @page{size:A4 landscape;margin:10mm}
+  @media print{
+    *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}
+    body{background:#fff}
+    .doc-body{max-width:none}
+    .btn-export-pdf,.back-link-hdr,.week-arrow{display:none!important}
+    .doc-header{overflow:visible}
+    .matrix-scroll,.gantt-outer{overflow:visible}
+    .doc-section,.matrix-section,.risk-item,.identity-cell,tr{break-inside:avoid;page-break-inside:avoid}
+    .gantt-lrow,.gantt-row{break-inside:avoid;page-break-inside:avoid}
+  }
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 `;
 
