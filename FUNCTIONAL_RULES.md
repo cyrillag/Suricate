@@ -152,6 +152,14 @@ to be re-applied here by hand rather than resolved by merging code:
 - No hardcoded session secret: the app refuses to start if `SESSION_SECRET` is unset.
 - Any Jira/Confluence-sourced content injected into client-side HTML (e.g. the Gantt) is escaped
   before insertion.
+- **A shared report link must land a logged-out visitor back on that exact link after login** —
+  never a hardcoded redirect to `/`. Report links are meant to be shared with colleagues who don't
+  own the project (the report route itself has no ownership check, by design), so the login round
+  trip is often someone's very first visit; dumping them on their own dashboard afterward (empty,
+  if they've never created a project) reads as "I don't have access" even though nothing was ever
+  actually blocked. `requireAuth` passes the original URL as `?returnTo=`, carried through the
+  login form and back out on success — `safeReturnTo()` only ever accepts an internal path (never
+  an absolute or protocol-relative URL) so this can't become an open redirect.
 
 ## Accessibility
 
