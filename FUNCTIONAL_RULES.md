@@ -155,15 +155,36 @@ to be re-applied here by hand rather than resolved by merging code:
 
 ## Accessibility
 
-- Any interactive element (button, link, arrow) placed on a colored surface (the navy header,
-  brand-colored cards) must have a real, computed contrast ratio for its own visible
-  boundary/fill — not just for the text/icon sitting on top of it. A translucent-white overlay at
-  low opacity (e.g. ~.18-.28) on a dark background often still passes a quick glance but computes
-  under WCAG 1.4.11's 3:1 non-text minimum and reads as "invisible" in practice (this exact bug
-  shipped once — the PDF export button and week-nav arrows were both under ~1.5:1 against the
-  report header). Compute the actual ratio (or push opacity clearly past ~.3 fill / .5 border)
-  rather than eyeballing it.
-- Prefer reusing an established, already-legible pattern over inventing a new translucent
-  treatment: the yellow CTA fill (`var(--yellow)` background, `var(--db)` text) used for every
-  primary action elsewhere in this app computes at ~10.9:1 and is the brand's own reserved
-  "primary CTA" color — reach for it before designing a new low-contrast variant.
+Target: WCAG 2.2 Level AA. Concrete, checkable thresholds — not "make it accessible" in the
+abstract — so a QA pass can actually verify pass/fail instead of eyeballing it.
+
+- **Text contrast (1.4.3)**: at least 4.5:1 for normal text; 3:1 is only acceptable for large text
+  (≥18pt/24px, or ≥14pt/18.66px if bold).
+- **Non-text contrast (1.4.11)**: at least 3:1 for UI component boundaries/states (button fills
+  and borders, form field borders, icons that carry meaning) against their *adjacent* colors — not
+  just the text/glyph sitting on top of them. A translucent-white overlay at low opacity (e.g.
+  ~.18-.28) on a dark background often still passes a quick glance but computes under 3:1 and
+  reads as "invisible" in practice. This exact bug shipped once — the PDF export button and
+  week-nav arrows were both under ~1.5:1 against the report header. Compute the actual ratio
+  before shipping a translucent-fill treatment; don't eyeball it.
+  - Prefer reusing an established, already-legible pattern over inventing a new translucent one:
+    the yellow CTA fill (`var(--yellow)` background, `var(--db)` text) used for every primary
+    action elsewhere in this app computes at ~10.9:1 and is the brand's own reserved "primary CTA"
+    color — reach for it before designing a new low-contrast variant.
+- **Focus indicators (2.4.7 Focus Visible / 2.4.11 Focus Appearance)**: every focusable element
+  (link, button, form field) needs a visible focus indicator, and that indicator itself needs
+  ≥3:1 contrast against whatever it sits next to. Never `outline:none`/`:focus{outline:0}` without
+  a replacement indicator of equivalent visibility.
+- **Focus not obscured (2.4.11 in 2.2)**: a focused element must not be entirely hidden behind the
+  sticky nav bar or any other overlay — relevant here since `.app-nav` is `position:sticky`.
+- **Target size (2.5.8, new in WCAG 2.2)**: interactive targets should be at least 24×24 CSS px.
+  Directly relevant to this app's icon-only buttons (🗑 delete, ✎ edit, the FR/EN language links) —
+  check their actual clickable box, not just the glyph's visual size.
+- **Labels, not placeholders**: every form input needs a real associated `<label>` (or
+  `aria-label`) — a placeholder alone is not an accessible name and disappears the moment the user
+  types.
+- **Keyboard operability**: every action reachable with a mouse must also be reachable via
+  keyboard alone, in a logical tab order, with no keyboard trap.
+- **Color is never the only signal**: a status (Done/Blocked/In Progress/To Start, On Track/At
+  Risk) must keep its text label alongside its color — already the pattern in this app's
+  matrix/health badge; don't regress it by ever rendering status as a bare color swatch.
