@@ -448,6 +448,20 @@ app.post('/projects/:slug/reports/generate', requireAuth, async (req, res) => {
     return res.redirect(`/projects/${proj.slug}?${warningQuery({ source: 'confluence', message: res.locals.t('detail.err_future_week') })}`);
   }
 
+  // A past week that already has a report is a frozen snapshot (see FUNCTIONAL_RULES.md) —
+  // regenerating it would overwrite real history with today's Confluence/Jira state. Only the
+  // current week (still "live") stays freely regenerable; a past week with no report yet can
+  // still be generated for the first time (backfilling a missed week), since there is nothing
+  // frozen to lose there.
+  const now = new Date();
+  const isPastWeek = year < isoYear(now) || (year === isoYear(now) && week < isoWeek(now));
+  if (isPastWeek) {
+    const existing = db.prepare('SELECT 1 FROM reports WHERE project_id=? AND year=? AND week=?').get(proj.id, year, week);
+    if (existing) {
+      return res.redirect(`/projects/${proj.slug}?${warningQuery({ source: 'confluence', message: res.locals.t('detail.err_past_week_locked') })}`);
+    }
+  }
+
   // Generate/Regenerate is the single action that refreshes everything — workstreams, epic
   // statuses, Planning, and the week's own content — rather than requiring a separate Sync
   // Jira/Sync Confluence click first. Those buttons worked but had no visible effect on this

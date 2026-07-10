@@ -55,10 +55,12 @@
         <td><strong><%= ws %></strong></td>
         <td class="td-actions">
           <a href="/projects/<%= proj.slug %>/<%= ws %>" class="btn-ghost btn-sm"><%= t('detail.view') %></a>
+          <% if (ws === currentWeek) { %>
           <form method="POST" action="/projects/<%= proj.slug %>/reports/generate" style="display:inline">
             <input type="hidden" name="week" value="<%= ws %>">
             <button type="submit" class="btn-ghost btn-sm"><%= t('detail.regenerate') %></button>
           </form>
+          <% } %>
           <form method="POST" action="/projects/<%= proj.slug %>/reports/<%= ws %>/delete" style="display:inline" onsubmit="return confirm(<%= JSON.stringify(t('detail.delete_confirm', { week: ws })) %>);">
             <button type="submit" class="btn-ghost btn-sm btn-danger"><%= t('detail.delete') %></button>
           </form>

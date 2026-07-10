@@ -106,9 +106,14 @@ to be re-applied here by hand rather than resolved by merging code:
   `workstream_statuses_json` override map covers, because there is no way to reconstruct their
   true historical state after the fact.
 - Navigating to or generating a report for a future ISO week is always blocked.
-- Regenerating an existing week overwrites its stored content (including the snapshot above) with
-  the current Confluence/Jira state — this is the *only* intended way to "fix" a report (fix the
-  source, then regenerate that specific week).
+- **Only the current ISO week can be regenerated.** A past week that already has a report is
+  permanently locked — the "↻ Regenerate" button doesn't even render for it, and the route
+  rejects the request server-side too if reached another way (the editable week field on the
+  "Generate" form, for instance). This is a deliberate reversal of the earlier "fix at the source,
+  then regenerate" rule: that correction path is gone for anything but the current week, in
+  exchange for past reports never being silently rewritable by anyone, ever. A past week that has
+  *no* report yet can still be generated for the first time (backfilling a missed week) — there's
+  no frozen state to protect there.
 
 ## Project onboarding & editing
 
