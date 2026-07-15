@@ -50,6 +50,12 @@ to be re-applied here by hand rather than resolved by merging code:
 - A project can pin extra Jira keys (`extra_epics` field, Edit page) that always appear in
   Planning even though they belong to a different LVL2 program entirely and have no automatic
   hierarchy link back to this project's root epic.
+- **A cancelled epic (Jira status "Cancelled" or "Canceled" — this instance's workflows use both
+  spellings depending on the project) never appears in Planning.** Filtered against the raw Jira
+  status, not the done/prog/blk/ts bucket `mapStatus` produces — once mapped, a cancelled epic is
+  indistinguishable from a plain "To Start" and silently passes through as one. This exact bug
+  shipped once (a stale, dead `status !== 'cancel'` check in report-gen.js compared against a
+  bucket value `mapStatus` can never produce).
 - If an epic has no Start/End date filled in (Jira "Start date"/"End date" fields), it is left
   with no date — never a fabricated fallback (no fallback to duedate, created, resolutiondate, or
   baseline dates). It still gets a row in Planning (name, team, status) so it stays visible and
