@@ -67,8 +67,12 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
 
   // Gantt data — an epic with no Start/End date still gets listed (name/team/status), it just
   // has no bar to draw; excluding it from the section entirely would make it invisible instead
-  // of just dateless (see FUNCTIONAL_RULES.md).
-  const ganttEpics = epics.filter(e => e.status !== 'cancel');
+  // of just dateless (see FUNCTIONAL_RULES.md). Cancelled epics are filtered upstream (server.js'
+  // resolveWorkstreamsAndEpics), against the raw Jira status — by the time `epics` gets here,
+  // status has already been mapped to done/prog/blk/ts, which a cancelled epic is
+  // indistinguishable from (this used to be checked here against a 'cancel' bucket that
+  // mapStatus can never actually produce, so it silently never filtered anything).
+  const ganttEpics = epics;
 
   // Donut data
   const donutJSON = JSON.stringify([

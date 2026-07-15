@@ -118,7 +118,10 @@ async function getPortfolioEpics(token, rootEpic, extraKeys = []) {
   const EPIC_FIELDS = 'summary,status,customfield_10110,customfield_10111,issuetype';
   let jql = `(issuekey in (${rootEpic}) OR issueFunction in portfolioChildrenOf("issuekey in (${rootEpic})")) and issuetype = Epic`;
   if (extraKeys.length) jql = `(${jql} OR issuekey in (${extraKeys.join(',')}))`;
-  jql += ' and status != Cancelled';
+  // Jira workflows in this instance use both the British ("Cancelled") and American ("Canceled")
+  // spelling depending on the project — excluding only one lets the other slip straight through
+  // (see getChildEpics' notCancelled below, which already had to check both).
+  jql += ' and status not in (Cancelled, Canceled)';
   const data = await api(token, '/search', { jql, fields: EPIC_FIELDS, maxResults: 300 });
   return data.issues.map(i => ({
     key:     i.key,

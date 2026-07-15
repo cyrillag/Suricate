@@ -103,10 +103,17 @@ function resolveWorkstreamsAndEpics(projectId, legacyStatusOverrides) {
     status: (legacyStatusOverrides && legacyStatusOverrides[ws.id])
       || (ws.jira_key ? (aggregateEpicStatus(ws.jira_key, epicsByKey) || 'ts') : (ws.default_status || 'ts'))
   }));
-  const epics = epicRows.map(e => ({
-    key: e.jira_key, label: e.summary, team: e.team,
-    status: jira.mapStatus(e.status), start: e.start_date, end: e.end_date
-  }));
+  // Planning must never show a cancelled epic (either spelling — see jira.js). Checked here
+  // against the raw Jira status, not the done/prog/blk/ts bucket mapStatus produces below: once
+  // mapped, "cancelled" is indistinguishable from a plain To Start, which is how this used to
+  // silently slip through. epicsByKey (matrix status roll-up) is untouched — a workstream can
+  // still reference a cancelled epic's key there; this filter only governs the Planning list.
+  const epics = epicRows
+    .filter(e => !/^cancel(l)?ed$/i.test((e.status || '').trim()))
+    .map(e => ({
+      key: e.jira_key, label: e.summary, team: e.team,
+      status: jira.mapStatus(e.status), start: e.start_date, end: e.end_date
+    }));
   return { resolvedWs, epics };
 }
 
