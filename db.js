@@ -89,6 +89,16 @@ ensureColumn('projects', 'extra_epics', 'extra_epics TEXT');
 ensureColumn('reports', 'workstreams_snapshot_json', 'workstreams_snapshot_json TEXT');
 ensureColumn('reports', 'epics_snapshot_json', 'epics_snapshot_json TEXT');
 
+// eta_snapshot is the root epic's raw ISO End date at generation time (not the display-formatted
+// projects.eta) so week-over-week comparisons are plain string comparisons. eta_delayed is frozen
+// alongside it — whether that date is later than the previous existing report's eta_snapshot —
+// so the health badge (see report-gen.js/server.js) reads the same way on every future view
+// instead of silently changing if the epic's date moves again after this report was generated.
+// Both NULL on rows generated before this existed; there's no way to reconstruct what the target
+// date was back then, so those rows just never trigger the delayed state.
+ensureColumn('reports', 'eta_snapshot', 'eta_snapshot TEXT');
+ensureColumn('reports', 'eta_delayed', 'eta_delayed INTEGER DEFAULT 0');
+
 // workstreams had no UNIQUE constraint pre-v2, so every "Sync Jira" click duplicated all rows.
 // Rebuild the table with UNIQUE(project_id,deliverable,name) so syncs upsert instead of duplicating.
 // Safe to do unconditionally at startup: reports.workstream_statuses_json (keyed by workstream id)

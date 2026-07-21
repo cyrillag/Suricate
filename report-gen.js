@@ -1,4 +1,4 @@
-function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, epics, stats, health, isOwner }) {
+function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, epics, stats, health, isOwner, etaDelayed, etaDelayedFrom }) {
   const weekStr = `W${String(week).padStart(2, '0')}`;
   const yearWeek = `${year}-${weekStr}`;
   const dateLabel = isoWeekMonday(year, week);
@@ -137,6 +137,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
       <div class="identity-cell">
         <div class="f-label">Target ETA</div>
         <div class="f-value">${esc(project.eta || 'TBD')}</div>
+        ${etaDelayed ? `<div class="eta-delayed-note">⚠ Delayed${etaDelayedFrom ? ` from ${esc(etaDelayedFrom)}` : ''}</div>` : ''}
         <div class="health ${health} health-sub"><div class="health-dot"></div>${health === 'at-risk' ? 'At Risk' : 'On Track'}</div>
       </div>
       <div class="identity-cell">
@@ -411,6 +412,7 @@ const CSS = `
   .f-label{font-size:12.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--tx3);margin-bottom:5px}
   .f-value{font-size:13px;font-weight:600;color:var(--tx);line-height:1.3}
   .f-value.mono{font-family:var(--fm);font-size:13px;font-weight:400;color:var(--cobalt)}
+  .eta-delayed-note{font-size:12px;font-weight:600;color:var(--blk-c);margin-top:4px}
   .health{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
   .health-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
   .health.at-risk .health-dot{background:var(--orange)}.health.at-risk{color:var(--blk-c)}

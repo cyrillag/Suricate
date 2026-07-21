@@ -86,12 +86,27 @@ to be re-applied here by hand rather than resolved by merging code:
 
 ## Project health badge (On Track / At Risk)
 
-- The badge must reflect **both** workstream progress (any Blocked workstream, or more than 60%
-  still "To Start") **and** the risk register: any risk at level `high` also forces the badge to
-  At Risk. A project with an open High risk can never show "On Track", regardless of how far along
-  its workstreams are.
+- The badge must reflect workstream progress (any Blocked workstream, or more than 60% still
+  "To Start"), the risk register (any risk at level `high`), **and** a target-date slip: any risk
+  at level `high`, or the root epic's End date having moved later than the previous existing
+  report's own frozen date, each independently force the badge to At Risk. A project with an open
+  High risk, or a delayed target date, can never show "On Track", regardless of how far along its
+  workstreams are. The date moving *earlier* has no effect either way — only a slip counts.
+- The delayed-date check is frozen into the report at generation time (`reports.eta_delayed`,
+  compared against the nearest earlier existing report's `eta_snapshot`, both raw ISO dates — not
+  the display-formatted `projects.eta`), same reasoning as the workstream/epic snapshots: a report
+  must render the same way on every future view, not re-derive a verdict from whatever the epic's
+  date happens to be by the time someone looks at it. A row with no earlier report to compare
+  against, or no End date on either side, is never delayed — there's nothing to have slipped from.
+- When the badge is At Risk *only* because of a date slip (no Blocked workstream, no High risk),
+  the report shows why: a small "⚠ Delayed from {{previous date}}" note under Target ETA. Without
+  it the badge would look like a black box — nothing else on the page would explain it.
 
 ## Report generation
+
+- The root epic's End date (`projects.eta`) is re-read from Jira on every generate/regenerate, not
+  only on project creation/edit — the week-over-week delay check above needs it to actually track
+  the source on its own schedule, same as workstreams/epics already do on every generate.
 
 - A weekly report is never edited by hand. Its entire content (exec summary, achievements/
   blockers/clarify, risks, epic/workstream statuses) is pulled from Confluence and Jira, but only
@@ -130,7 +145,7 @@ to be re-applied here by hand rather than resolved by merging code:
   format mismatch produces an explicit, actionable error — never a silently empty project.
 - Any common Confluence URL shape is accepted (`/display/SPACE/Title`, or a `pageId=` link).
 - A project's target ETA always comes from its root Jira epic's "End date" field — it is never
-  typed in manually, at creation or on edit.
+  typed in manually, at creation, on edit, or on generate/regenerate (see Report generation).
 - Editing a project (name, root epic, Confluence page, extra epics) does not itself resync
   workstreams — the "Generate report"/"↻ Refresh" action on the project page does that (it
   refreshes the Confluence-backed matrix and Jira/Planning epics, then generates the report, all

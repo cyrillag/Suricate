@@ -452,15 +452,35 @@ async function generateReportRow(proj, year, week) {
   // "current" data. From here on, viewing this week must never depend on what workstreams/
   // epics_cache look like later (see FUNCTIONAL_RULES.md).
   const { resolvedWs, epics } = resolveWorkstreamsAndEpics(proj.id);
-  db.prepare(`INSERT INTO reports(project_id,year,week,exec_summary,highlights_json,risks_json,workstream_statuses_json,workstreams_snapshot_json,epics_snapshot_json,updated_at)
-    VALUES(?,?,?,?,?,?,'{}',?,?,unixepoch())
+
+  // Re-read the root epic's own End date from Jira here too (not just on project create/edit) —
+  // otherwise it would only ever change when someone happens to re-save the project, and a
+  // week-over-week delay comparison needs it to actually track the source on its own schedule,
+  // same as workstreams/epics already do on every generate.
+  let etaIso = null;
+  try { etaIso = (await jira.getRootEpicMeta(JIRA_TOKEN, proj.jira_root_epic)).eta; }
+  catch (err) { console.warn(`Could not read ETA from ${proj.jira_root_epic}: ${err.message}`); }
+  db.prepare('UPDATE projects SET eta=? WHERE id=?').run(formatDate(etaIso), proj.id);
+
+  // Delayed = later than the most recent *existing* prior report's own frozen eta_snapshot —
+  // not necessarily literally last week, so backfilling a gap still compares against the right
+  // baseline. Never true if either side is unknown (no prior report yet, or no End date set).
+  const prevEta = db.prepare(`
+    SELECT eta_snapshot FROM reports WHERE project_id=? AND (year<? OR (year=? AND week<?))
+    ORDER BY year DESC, week DESC LIMIT 1`).get(proj.id, year, year, week);
+  const etaDelayed = !!(prevEta?.eta_snapshot && etaIso && etaIso > prevEta.eta_snapshot);
+
+  db.prepare(`INSERT INTO reports(project_id,year,week,exec_summary,highlights_json,risks_json,workstream_statuses_json,workstreams_snapshot_json,epics_snapshot_json,eta_snapshot,eta_delayed,updated_at)
+    VALUES(?,?,?,?,?,?,'{}',?,?,?,?,unixepoch())
     ON CONFLICT(project_id,year,week) DO UPDATE SET
       exec_summary=excluded.exec_summary,
       highlights_json=excluded.highlights_json,
       risks_json=excluded.risks_json,
       workstreams_snapshot_json=excluded.workstreams_snapshot_json,
       epics_snapshot_json=excluded.epics_snapshot_json,
-      updated_at=unixepoch()`).run(proj.id, year, week, execSummary, JSON.stringify(highlights), JSON.stringify(risks), JSON.stringify(resolvedWs), JSON.stringify(epics));
+      eta_snapshot=excluded.eta_snapshot,
+      eta_delayed=excluded.eta_delayed,
+      updated_at=unixepoch()`).run(proj.id, year, week, execSummary, JSON.stringify(highlights), JSON.stringify(risks), JSON.stringify(resolvedWs), JSON.stringify(epics), etaIso, etaDelayed ? 1 : 0);
 }
 
 app.post('/projects/:slug/reports/generate', requireAuth, async (req, res) => {
@@ -572,14 +592,22 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, re
   // while every workstream is still nominally on schedule. Surfacing that risk was the entire
   // point of the Risk matrix section, so it must be able to flip the badge too.
   const hasHighRisk = risks.some(r => r.level === 'high');
-  const health = stats.blk > 0 || stats.ts > stats.total * 0.6 || hasHighRisk ? 'at-risk' : 'on-track';
+  const etaDelayed = !!report.eta_delayed;
+  const health = stats.blk > 0 || stats.ts > stats.total * 0.6 || hasHighRisk || etaDelayed ? 'at-risk' : 'on-track';
+  let etaDelayedFrom = null;
+  if (etaDelayed) {
+    const prevEta = db.prepare(`
+      SELECT eta_snapshot FROM reports WHERE project_id=? AND (year<? OR (year=? AND week<?))
+      ORDER BY year DESC, week DESC LIMIT 1`).get(proj.id, year, year, week);
+    etaDelayedFrom = prevEta?.eta_snapshot ? formatDate(prevEta.eta_snapshot) : null;
+  }
 
   const html = genReport({
     project: proj, year, week,
     pmName: proj.pm_name,
     execSummary: report.exec_summary,
     highlights:  JSON.parse(report.highlights_json),
-    risks,
+    risks, etaDelayed, etaDelayedFrom,
     workstreams: resolvedWs,
     epics: epicsForView,
     stats, health, isOwner
