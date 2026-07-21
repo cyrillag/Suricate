@@ -102,7 +102,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
     <polygon points="450,0 500,80 500,55" fill="rgba(20,125,232,0.12)"/>
   </svg>
   <div class="doc-header-brand">
-    <img src="/logo-white.png" height="32" alt="">
+    <img src="/logo-white.png" height="36" alt="">
     <div class="brand-divider"></div>
     <div class="brand-ctx">
       <a class="back-link-hdr" href="/projects/${esc(project.slug)}">&#x2039; All reports</a>
