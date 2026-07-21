@@ -7,7 +7,7 @@
 body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);background:var(--gnd);-webkit-font-smoothing:antialiased}
 
 /* NAV */
-.app-nav{background:var(--mb);height:56px;display:flex;align-items:center;padding:0 24px;gap:24px;position:sticky;top:0;z-index:100;overflow:hidden}
+.app-nav{background:var(--mb);height:90px;display:flex;align-items:center;padding:0 24px;gap:24px;position:sticky;top:0;z-index:100;overflow:hidden}
 .nav-deco{position:absolute;right:0;top:0;width:280px;height:100%;pointer-events:none}
 .nav-brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:#fff;flex-shrink:0}
 .nav-brand svg,.nav-brand img{flex-shrink:0}
