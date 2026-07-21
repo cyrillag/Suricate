@@ -69,16 +69,14 @@ to be re-applied here by hand rather than resolved by merging code:
   never grouped by team first, never alphabetical/key order. Epics with no end date sort last.
   A timeline view must read top-to-bottom as earliest-to-latest.
 
-## Report export (PDF)
+## Report export
 
-- PDF export is the browser's native print-to-PDF (a "⬇ Export PDF" button calling
-  `window.print()`), driven by `@page`/`@media print` CSS on the report document — not a
-  server-side renderer. Deliberate: a headless-Chromium dependency would have to ship inside the
-  production image just for this one feature, for something every browser already does reliably.
-  Don't reach for a server-side PDF library without a concrete reason the print path can't solve.
-- Anything animated (the status donut) must render its finished state on a `beforeprint` listener,
-  not just on its own timer — printing can be triggered before the animation starts or finishes
-  (the button, or a plain Ctrl+P), and a PDF must never capture a half-drawn or blank chart.
+- There is no PDF export. A "⬇ Export PDF" button existed, using the browser's native
+  print-to-PDF (`window.print()` driven by `@page`/`@media print` CSS on the report document) —
+  removed because the rendered output wasn't good enough to keep. If this comes back as a request,
+  don't just re-add the same print-CSS approach without addressing why it looked bad first; a
+  server-side renderer (headless Chromium) is the likely alternative, at the cost of that dependency
+  shipping in the production image.
 
 ## Risks
 

@@ -113,9 +113,8 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
   <div class="hdr-right">
     ${isOwner && isCurrentWeek ? `<form method="POST" action="/projects/${esc(project.slug)}/reports/generate" style="display:inline">
       <input type="hidden" name="week" value="${yearWeek}">
-      <button type="submit" class="btn-export-pdf">↻ Refresh</button>
+      <button type="submit" class="btn-hdr-refresh">↻ Refresh</button>
     </form>` : ''}
-    <button type="button" class="btn-export-pdf" onclick="window.print()">⬇ Export PDF</button>
     <div>
       <div class="week-nav">
         <a class="week-arrow" href="/projects/${esc(project.slug)}/${prevW.year}-W${prevW.weekPad}" aria-label="Previous week">&#x2039;</a>
@@ -251,10 +250,6 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
     if(p<1)requestAnimationFrame(step);
   }
   requestAnimationFrame(step);
-  // The animation may still be mid-flight (or the print dialog opened before it even started)
-  // when the browser's native Ctrl+P/Export-PDF print pass fires — force the finished frame so
-  // the PDF never captures a half-drawn or blank donut.
-  window.addEventListener('beforeprint', function(){ draw(1); });
 })();
 ${ganttEpics.length ? GANTT_JS(ganttEpics) : ''}
 </script>
@@ -391,8 +386,8 @@ const CSS = `
   /* Yellow is reserved for primary CTAs (see FUNCTIONAL_RULES.md brand section) — also gives
      this button real contrast against the navy header, unlike a translucent white fill that
      barely differs from the background it sits on. */
-  .btn-export-pdf{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 12px;border-radius:var(--r);color:var(--db);font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:var(--yellow);border:1px solid var(--yellow);cursor:pointer;font-family:var(--f);transition:background .15s;white-space:nowrap}
-  .btn-export-pdf:hover{background:var(--dyellow);border-color:var(--dyellow)}
+  .btn-hdr-refresh{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 12px;border-radius:var(--r);color:var(--db);font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:var(--yellow);border:1px solid var(--yellow);cursor:pointer;font-family:var(--f);transition:background .15s;white-space:nowrap}
+  .btn-hdr-refresh:hover{background:var(--dyellow);border-color:var(--dyellow)}
   .back-link-hdr{display:inline-flex;align-items:center;gap:2px;color:rgba(255,255,255,.85);font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap}
   .back-link-hdr:hover{color:#fff;text-decoration:underline}
   .week-nav{display:flex;align-items:center;gap:3px;justify-content:flex-end}
@@ -507,60 +502,6 @@ const CSS = `
   .gantt-leg-swatch{width:14px;height:10px;border-radius:1px;flex-shrink:0}
   .doc-footer{background:var(--mb);color:rgba(255,255,255,.4);text-align:center;padding:18px 32px;font-size:13.5px;letter-spacing:.04em}
   @media(max-width:768px){.doc-header{padding:14px 16px}.brand-divider{display:none}.doc-body{padding:16px}.identity-grid{grid-template-columns:1fr 1fr}.sr-grid{grid-template-columns:1fr}.abc-grid{grid-template-columns:1fr}}
-  /* Portrait, not landscape: a landscape A4 page has ~40% LESS usable height (only its short
-     edge), so a vertically long report (many workstream/epic rows) needs MORE pages in landscape
-     despite the extra width — the opposite of what "fewer pages" wants. Matrix/Gantt just get a
-     bit more compressed horizontally instead; see the width-oriented rules below. */
-  @page{size:A4 portrait;margin:8mm}
-  @media print{
-    *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}
-    body{background:#fff;font-size:11.5px}
-    .doc-body{max-width:none;padding:8px 12px 14px}
-    .btn-export-pdf,.back-link-hdr,.week-arrow,.hdr-deco{display:none!important}
-    .doc-header{overflow:visible;padding:9px 16px}
-    .matrix-scroll{overflow:visible}
-    .doc-section,.matrix-section,.risk-item,.identity-cell,tr{break-inside:avoid;page-break-inside:avoid}
-    .gantt-lrow,.gantt-row{break-inside:avoid;page-break-inside:avoid}
-
-    /* Condensed spacing/sizing throughout — the matrix and Gantt repeat this per row across
-       dozens of rows, so even small per-row savings compound into whole fewer pages. Screen
-       styles are untouched; all of this is scoped to print only. */
-    .doc-section{margin-bottom:6px}
-    .matrix-section{margin-bottom:6px}
-    .section-label{padding:5px 12px 5px;font-size:12.5px}
-    .exec-summary{padding:6px 12px}
-    .identity-cell{padding:6px 12px}
-    .abc-col{padding:7px 12px}
-    .abc-items{gap:3px}
-    .abc-items li{font-size:11px}
-    .chart-pane{padding:8px;gap:6px}
-    #donut{width:80px;height:80px}
-    .leg-row{gap:5px}
-    .risk-item{padding:6px 12px;gap:8px}
-    .risk-desc,.risk-mit{font-size:11.5px}
-    .td-ws,.td-st,.cell-team{padding:2px 10px!important}
-    .td-del{padding:4px 10px!important}
-    .ws-name,.cell-team,.st{font-size:11.5px}
-    .mx thead th{padding:5px 14px;font-size:12.5px}
-    .g-team,.g-key,.g-name{font-size:10.5px;line-height:1.2}
-    .g-team{padding:0 4px}
-
-    /* The Gantt's right column is hard-pinned to a 680px minimum for screen/landscape use —
-       unconstrained here so flex can actually shrink it to the portrait page width instead of
-       silently overflowing past the right edge (previously: the Planning section got cut off
-       rather than fitting, since overflow:visible alone doesn't shrink anything, it just stops
-       clipping — the content still has to fit the box it's given). Bar/gridline positions are
-       already percentage-based, so they rescale correctly at any container width. */
-    .gantt-outer{overflow:hidden}
-    .gantt-lcol{width:145px}
-    .gantt-rcol{min-width:0}
-    .gantt-lrow,.gantt-row{height:16px!important}
-    .gantt-lhdr,.gantt-months{height:22px}
-    .gantt-mqtr,.gantt-mname{line-height:1.1}
-    .gantt-mqtr{font-size:8px}
-    .gantt-mname{font-size:9.5px}
-    .gantt-vlabel{font-size:8px}
-  }
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 `;
 
