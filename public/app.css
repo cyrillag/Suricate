@@ -56,7 +56,8 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 .lang-switch-standalone .lang-sep{color:var(--bd)}
 .auth-card{background:#fff;border:1px solid var(--bd);border-radius:6px;padding:44px;width:100%;max-width:420px;box-shadow:0 4px 24px rgba(0,14,156,.07)}
 .auth-logo{margin-bottom:28px}
-.auth-title{font-size:24px;font-weight:700;color:var(--tx);margin-bottom:6px}
+.auth-title{font-size:24px;font-weight:700;color:var(--tx);margin-bottom:2px}
+.auth-tagline{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--cobalt);margin-bottom:14px}
 .auth-sub{font-size:15px;color:var(--tx2);margin-bottom:28px}
 .auth-error{background:#FEF0EE;color:var(--blk);border:1px solid #F4A17D;padding:11px 14px;border-radius:var(--r);font-size:13px;margin-bottom:16px}
 .auth-form{display:flex;flex-direction:column;gap:14px}

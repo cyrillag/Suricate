@@ -1,6 +1,7 @@
 const DICT = {
   nav: {
-    brand:   { fr: 'OVHcloud project reports',    en: 'OVHcloud project reports' },
+    brand:   { fr: 'Sentinel',                    en: 'Sentinel' },
+    tagline: { fr: 'OVHcloud project reports',    en: 'OVHcloud project reports' },
     projects:{ fr: 'Projets',                     en: 'Projects' },
     logout:  { fr: 'Déconnexion',                 en: 'Logout' }
   },
