@@ -192,9 +192,9 @@ access model trivial to reason about. There is exactly one distinction: **the cr
 ## Internationalization
 
 - French is the default language; an FR/EN toggle persists the choice via a cookie.
-- The site name ("Sentinel") and its tagline ("OVHcloud project reports") are never translated —
+- The site name ("Suricate") and its tagline ("OVHcloud project reports") are never translated —
   identical in both languages. The tagline appears alongside the name on the login page; elsewhere
-  (nav, browser tab titles) only "Sentinel" is shown, to keep tight spaces (the nav bar, a browser
+  (nav, browser tab titles) only "Suricate" is shown, to keep tight spaces (the nav bar, a browser
   tab) uncluttered.
 - Content sourced from Jira/Confluence (ticket text, summaries, mitigation notes, etc.) is not
   translated — only the app's own interface (labels, buttons, instructions, application error
