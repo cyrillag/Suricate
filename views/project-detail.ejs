@@ -19,8 +19,10 @@
         <% if (proj.eta) { %><span class="tag">ETA <%= proj.eta %></span><% } %>
         <span class="tag"><%= wsCount %> workstreams</span>
         <span class="tag"><%= epicCount %> epics</span>
+        <span class="tag"><%= t('detail.owner', { name: proj.owner_name }) %></span>
       </p>
     </div>
+    <% if (isOwner) { %>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end">
       <a href="/projects/<%= proj.slug %>/edit" class="btn-ghost btn-sm"><%= t('detail.edit') %></a>
       <form method="POST" action="/projects/<%= proj.slug %>/reports/generate" style="display:flex;gap:6px;align-items:center">
@@ -28,6 +30,7 @@
         <button type="submit" class="btn-primary"><%= t('detail.generate_report') %></button>
       </form>
     </div>
+    <% } %>
   </div>
 
   <p class="page-sub" style="margin-top:-8px;margin-bottom:16px">
@@ -45,7 +48,7 @@
   <div class="section-card">
     <div class="section-card-header"><%= t('detail.past_reports') %></div>
     <% if (reports.length === 0) { %>
-    <div class="empty-state-inline"><%= t('detail.no_reports', { week: currentWeek }) %></div>
+    <div class="empty-state-inline"><%= isOwner ? t('detail.no_reports', { week: currentWeek }) : t('detail.no_reports_viewer') %></div>
     <% } else { %>
     <table class="simple-table">
       <thead><tr><th><%= t('detail.week_col') %></th><th></th></tr></thead>
@@ -55,6 +58,7 @@
         <td><strong><%= ws %></strong></td>
         <td class="td-actions">
           <a href="/projects/<%= proj.slug %>/<%= ws %>" class="btn-ghost btn-sm"><%= t('detail.view') %></a>
+          <% if (isOwner) { %>
           <% if (ws === currentWeek) { %>
           <form method="POST" action="/projects/<%= proj.slug %>/reports/generate" style="display:inline">
             <input type="hidden" name="week" value="<%= ws %>">
@@ -64,6 +68,7 @@
           <form method="POST" action="/projects/<%= proj.slug %>/reports/<%= ws %>/delete" style="display:inline" onsubmit="return confirm(<%= JSON.stringify(t('detail.delete_confirm', { week: ws })) %>);">
             <button type="submit" class="btn-ghost btn-sm btn-danger"><%= t('detail.delete') %></button>
           </form>
+          <% } %>
         </td>
       </tr>
       <% }) %>

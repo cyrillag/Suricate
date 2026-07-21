@@ -13,12 +13,13 @@ const DICT = {
     err_generic: { fr: 'Erreur de connexion Jira : ', en: 'Jira connection error: ' }
   },
   dashboard: {
-    title:    { fr: 'Mes projets',                en: 'My projects' },
-    subtitle: { fr: 'Rapports de statut hebdomadaires pour tes projets OVHcloud', en: 'Weekly status reports for your OVHcloud projects' },
+    title:    { fr: 'Projets',                    en: 'Projects' },
+    subtitle: { fr: 'Rapports de statut hebdomadaires des projets OVHcloud', en: 'Weekly status reports for OVHcloud projects' },
     new_project: { fr: '+ Nouveau projet',        en: '+ New project' },
     empty_title: { fr: 'Aucun projet pour l’instant', en: 'No projects yet' },
     empty_text:  { fr: 'Crée ton premier projet pour commencer à générer des rapports hebdomadaires.', en: 'Create your first project to start generating weekly reports.' },
     empty_cta:   { fr: 'Créer un projet',         en: 'Create a project' },
+    owner:       { fr: 'Géré par {{name}}',       en: 'Managed by {{name}}' },
     report_one:  { fr: 'rapport',                 en: 'report' },
     report_other:{ fr: 'rapports',                en: 'reports' },
     last:        { fr: 'Dernier :',               en: 'Last:' },
@@ -66,6 +67,7 @@ const DICT = {
     extra_epics_hint: { fr: 'Clés Jira séparées par une virgule ou un espace, à toujours inclure dans la section Planning — utile pour des epics rattachés à un autre programme LVL2 et donc invisibles pour la détection automatique. N’affecte pas la matrice des deliverables.', en: 'Comma- or space-separated Jira keys to always include in the Planning section — useful for epics that belong to a different LVL2 program and so aren’t reachable by automatic detection. Does not affect the deliverable matrix.' }
   },
   detail: {
+    owner:     { fr: 'Responsable : {{name}}',    en: 'Owner: {{name}}' },
     edit:      { fr: '✎ Modifier',                en: '✎ Edit' },
     generate_report: { fr: 'Générer le rapport',  en: 'Generate report' },
     week_input_title: { fr: 'AAAA-Wss',           en: 'YYYY-Www' },
@@ -78,6 +80,7 @@ const DICT = {
     source_confluence: { fr: 'Confluence',        en: 'Confluence' },
     past_reports: { fr: 'Rapports précédents',    en: 'Past reports' },
     no_reports: { fr: 'Aucun rapport pour l’instant. Génère {{week}} ci-dessus pour créer le premier.', en: 'No reports yet. Generate {{week}} above to create the first one.' },
+    no_reports_viewer: { fr: 'Aucun rapport pour l’instant — seul le responsable du projet peut en générer.', en: 'No reports yet — only the project owner can generate one.' },
     week_col: { fr: 'Semaine',                    en: 'Week' },
     view:     { fr: 'Voir',                       en: 'View' },
     regenerate: { fr: '↻ Régénérer',              en: '↻ Regenerate' },

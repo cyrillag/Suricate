@@ -136,6 +136,29 @@ to be re-applied here by hand rather than resolved by merging code:
   existed briefly but they had no visible effect on the page and read as broken).
 - Renaming a project never changes its slug (the stable URL identifier).
 
+## Visibility & permissions
+
+There is no roles/admin system, and none is planned for the POC phase — deliberately, to keep the
+access model trivial to reason about. There is exactly one distinction: **the creator of a project
+(`projects.user_id`) vs. everyone else.**
+
+- Every authenticated user can see every project: the dashboard (`/`) lists all projects org-wide,
+  not just the current user's own, and a project's report-history page (`/projects/:slug`) opens
+  for anyone, matching the already-existing rule that the report view itself
+  (`/projects/:slug/:yearweek`) has no ownership check (see Security, shared-link rule below). A
+  weekly report is routinely shared by link with people who don't own the project — hiding the
+  page that lists the *other* weeks, or the dashboard entry that leads there, behind ownership
+  produced a broken-feeling dead end for exactly those people while the report itself was already
+  world-viewable to any logged-in user.
+- Only the creator can mutate a project: edit its settings, delete it, or generate/regenerate a
+  report. Every mutation route re-checks `user_id` itself (not just the UI) — hiding a button for a
+  non-owner is a courtesy, not the actual guard. A non-owner is shown the project's owner name
+  (`owner_name`, joined from `users`) instead of edit/generate/delete controls, so they know who to
+  ask for a change.
+- This intentionally does not distinguish "admin" from "user" — every account created via login is
+  equally privileged, scoped only by what it created. Introducing real roles is out of scope until
+  after the POC is validated.
+
 ## Error handling
 
 - No raw technical error (HTTP status, JSON payload, stack trace, auth/token detail) is ever shown

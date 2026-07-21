@@ -26,28 +26,33 @@
   </div>
   <% } else { %>
   <div class="project-grid">
-    <% projects.forEach(p => { %>
+    <% projects.forEach(p => { const isOwner = p.user_id === userId; %>
     <div class="project-card">
       <div class="project-card-top">
         <div class="project-card-name"><%= p.name %></div>
         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
           <span class="project-epic"><%= p.jira_root_epic %></span>
+          <% if (isOwner) { %>
           <form method="POST" action="/projects/<%= p.slug %>/delete"
                 onsubmit="return confirm(<%= JSON.stringify(t('dashboard.delete_confirm', {name: p.name, count: p.report_count})) %>);">
             <button type="submit" class="btn-ghost btn-sm btn-danger" title="<%= t('dashboard.delete_title') %>" aria-label="<%= t('dashboard.delete_title') %> <%= p.name %>">🗑</button>
           </form>
+          <% } %>
         </div>
       </div>
       <div class="project-card-meta">
-        <%= p.report_count %> <%= tPlural(p.report_count, 'dashboard.report_one', 'dashboard.report_other') %>
+        <%= t('dashboard.owner', { name: p.owner_name }) %>
+        · <%= p.report_count %> <%= tPlural(p.report_count, 'dashboard.report_one', 'dashboard.report_other') %>
         <% if (p.last_report) { %> · <%= t('dashboard.last') %> <strong><%= p.last_report %></strong><% } %>
         <% if (p.eta) { %> · <%= t('dashboard.eta') %> <strong><%= p.eta %></strong><% } %>
       </div>
       <div class="project-card-actions">
+        <% if (isOwner) { %>
         <form method="POST" action="/projects/<%= p.slug %>/reports/generate" style="display:inline">
           <input type="hidden" name="week" value="<%= currentWeek %>">
           <button type="submit" class="btn-primary btn-sm"><%= t('dashboard.generate', {week: currentWeek}) %></button>
         </form>
+        <% } %>
         <a href="/projects/<%= p.slug %>" class="btn-ghost btn-sm"><%= t('dashboard.view_reports') %></a>
       </div>
     </div>

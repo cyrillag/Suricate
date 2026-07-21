@@ -308,13 +308,16 @@ app.post('/login', async (req, res) => {
 app.post('/logout', (req, res) => req.session.destroy(() => res.redirect('/login')));
 
 // ── DASHBOARD ─────────────────────────────────────────────────────
+// Every project is visible to every authenticated OVHcloud user (see FUNCTIONAL_RULES.md
+// "Visibility & permissions") — only the creator (projects.user_id) can edit/delete/generate.
+// The dashboard is a read-only shared listing, not a private "my projects" view.
 app.get('/', requireAuth, (req, res) => {
   const projects = db.prepare(`
-    SELECT p.*,
+    SELECT p.*, u.name as owner_name,
       (SELECT COUNT(*) FROM reports r WHERE r.project_id=p.id) as report_count,
       (SELECT printf('%d-W%02d', year, week) FROM reports r WHERE r.project_id=p.id ORDER BY year DESC, week DESC LIMIT 1) as last_report
-    FROM projects p WHERE p.user_id=? ORDER BY p.created_at DESC`).all(req.session.userId);
-  res.render('dashboard', { projects, userName: req.session.userName, currentWeek: currentWeekStr() });
+    FROM projects p JOIN users u ON u.id=p.user_id ORDER BY p.created_at DESC`).all();
+  res.render('dashboard', { projects, userName: req.session.userName, userId: req.session.userId, currentWeek: currentWeekStr() });
 });
 
 // ── PROJECTS ──────────────────────────────────────────────────────
@@ -411,14 +414,18 @@ app.post('/projects/:slug/edit', requireAuth, async (req, res) => {
   res.redirect(`/projects/${proj.slug}`);
 });
 
+// Read-only for anyone authenticated (same reasoning as the dashboard above) — the mutation
+// routes below (edit/delete/generate) each re-check ownership independently, so this route being
+// open doesn't loosen who can actually change anything.
 app.get('/projects/:slug', requireAuth, (req, res) => {
-  const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
+  const proj = db.prepare('SELECT p.*, u.name as owner_name FROM projects p JOIN users u ON u.id=p.user_id WHERE p.slug=?').get(req.params.slug);
   if (!proj) return res.status(404).send('Project not found.');
+  const isOwner = proj.user_id === req.session.userId;
   const reports  = db.prepare('SELECT year,week FROM reports WHERE project_id=? ORDER BY year DESC,week DESC LIMIT 10').all(proj.id);
   const wsCount  = db.prepare('SELECT COUNT(*) as n FROM workstreams WHERE project_id=?').get(proj.id).n;
   const epicCount= db.prepare('SELECT COUNT(*) as n FROM epics_cache WHERE project_id=?').get(proj.id).n;
   const syncWarning = req.query.syncSource ? [{ source: req.query.syncSource, message: req.query.syncMessage || '' }] : [];
-  res.render('project-detail', { proj, reports, wsCount, epicCount, syncWarning, userName: req.session.userName, currentWeek: currentWeekStr() });
+  res.render('project-detail', { proj, reports, wsCount, epicCount, syncWarning, isOwner, userName: req.session.userName, currentWeek: currentWeekStr() });
 });
 
 // ── REPORT GENERATION ────────────────────────────────────────────
