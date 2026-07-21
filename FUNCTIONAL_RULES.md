@@ -112,13 +112,17 @@ to be re-applied here by hand rather than resolved by merging code:
   `workstream_statuses_json` override map covers, because there is no way to reconstruct their
   true historical state after the fact.
 - Navigating to or generating a report for a future ISO week is always blocked.
-- **Only the current ISO week can be regenerated.** A past week that already has a report is
-  permanently locked — the "↻ Regenerate" button doesn't even render for it, and the route
-  rejects the request server-side too if reached another way (the editable week field on the
-  "Generate" form, for instance). This is a deliberate reversal of the earlier "fix at the source,
-  then regenerate" rule: that correction path is gone for anything but the current week, in
-  exchange for past reports never being silently rewritable by anyone, ever. A past week that has
-  *no* report yet can still be generated for the first time (backfilling a missed week) — there's
+- **Only the current ISO week can be regenerated.** The action is labelled "↻ Refresh" (renamed
+  from "Regenerate" — clearer, and matches the term users already expect from other tools) and
+  appears in two places for the current week's owner: the per-week row on the project's report
+  list, and the report document's own header (next to "Export PDF"). A past week that already has
+  a report is permanently locked — neither button renders for it (on the report page, the check is
+  `isOwner && isCurrentWeek`, not just `isOwner`), and the route rejects the request server-side too
+  if reached another way (the editable week field on the "Generate" form, for instance). This is a
+  deliberate reversal of the earlier "fix at the source, then regenerate" rule: that correction path
+  is gone for anything but the current week, in exchange for past reports never being silently
+  rewritable by anyone, ever. A past week that has *no* report yet can still be generated for the
+  first time (backfilling a missed week) — there's
   no frozen state to protect there.
 
 ## Project onboarding & editing
@@ -130,7 +134,7 @@ to be re-applied here by hand rather than resolved by merging code:
 - A project's target ETA always comes from its root Jira epic's "End date" field — it is never
   typed in manually, at creation or on edit.
 - Editing a project (name, root epic, Confluence page, extra epics) does not itself resync
-  workstreams — the "Generate report"/"↻ Regenerate" action on the project page does that (it
+  workstreams — the "Generate report"/"↻ Refresh" action on the project page does that (it
   refreshes the Confluence-backed matrix and Jira/Planning epics, then generates the report, all
   in one click — there are no separate Sync Jira/Sync Confluence buttons; a version that had them
   existed briefly but they had no visible effect on the page and read as broken).

@@ -84,7 +84,7 @@ const DICT = {
     no_reports_viewer: { fr: 'Aucun rapport pour l’instant — seul le responsable du projet peut en générer.', en: 'No reports yet — only the project owner can generate one.' },
     week_col: { fr: 'Semaine',                    en: 'Week' },
     view:     { fr: 'Voir',                       en: 'View' },
-    regenerate: { fr: '↻ Régénérer',              en: '↻ Regenerate' },
+    regenerate: { fr: '↻ Rafraîchir',             en: '↻ Refresh' },
     delete:   { fr: '🗑 Supprimer',               en: '🗑 Delete' },
     delete_confirm: { fr: 'Supprimer le rapport {{week}} ? Cette action est irréversible.', en: 'Delete the {{week}} report? This cannot be undone.' },
 

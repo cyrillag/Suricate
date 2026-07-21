@@ -532,6 +532,7 @@ app.post('/projects/:slug/reports/:yearweek(\\d{4}-W\\d{2})/delete', requireAuth
 app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, res) => {
   const proj = db.prepare(`SELECT p.*,u.name as pm_name FROM projects p JOIN users u ON u.id=p.user_id WHERE p.slug=?`).get(req.params.slug);
   if (!proj) return res.status(404).send('Project not found.');
+  const isOwner = proj.user_id === req.session.userId;
   const [yr, wn] = req.params.yearweek.split('-W');
   const year = parseInt(yr), week = parseInt(wn);
   if (week < 1 || week > 53) return res.redirect(`/projects/${req.params.slug}`);
@@ -581,7 +582,7 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, re
     risks,
     workstreams: resolvedWs,
     epics: epicsForView,
-    stats, health
+    stats, health, isOwner
   });
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');

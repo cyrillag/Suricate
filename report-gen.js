@@ -1,9 +1,11 @@
-function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, epics, stats, health }) {
+function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, epics, stats, health, isOwner }) {
   const weekStr = `W${String(week).padStart(2, '0')}`;
+  const yearWeek = `${year}-${weekStr}`;
   const dateLabel = isoWeekMonday(year, week);
   const prevW = adjacentWeek(year, week, -1);
   const nextW = adjacentWeek(year, week,  1);
   const today = currentIsoWeek();
+  const isCurrentWeek = year === today.year && week === today.week;
   const nextIsFuture = nextW.year > today.year || (nextW.year === today.year && nextW.week > today.week);
   const nextWeekNav = nextIsFuture
     ? `<span class="week-arrow week-arrow-disabled" aria-disabled="true" title="Not available yet">&#x203A;</span>`
@@ -109,6 +111,10 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
     </div>
   </div>
   <div class="hdr-right">
+    ${isOwner && isCurrentWeek ? `<form method="POST" action="/projects/${esc(project.slug)}/reports/generate" style="display:inline">
+      <input type="hidden" name="week" value="${yearWeek}">
+      <button type="submit" class="btn-export-pdf">↻ Refresh</button>
+    </form>` : ''}
     <button type="button" class="btn-export-pdf" onclick="window.print()">⬇ Export PDF</button>
     <div>
       <div class="week-nav">
