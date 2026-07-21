@@ -84,23 +84,29 @@ to be re-applied here by hand rather than resolved by merging code:
   issue is already resolved, so it has nothing to report on for the current week.
 - Risk level (High/Medium/Low) is read from the status-macro title in the "Score" column.
 
-## Project health badge (On Track / At Risk)
+## Project health badge (On Track / At Risk / Delayed)
 
-- The badge must reflect workstream progress (any Blocked workstream, or more than 60% still
-  "To Start"), the risk register (any risk at level `high`), **and** a target-date slip: any risk
-  at level `high`, or the root epic's End date having moved later than the previous existing
-  report's own frozen date, each independently force the badge to At Risk. A project with an open
-  High risk, or a delayed target date, can never show "On Track", regardless of how far along its
-  workstreams are. The date moving *earlier* has no effect either way — only a slip counts.
+- **At Risk and Delayed are not the same thing and must not be merged.** At Risk is a projection —
+  workstream progress (any Blocked workstream, or more than 60% still "To Start") or the risk
+  register (any risk at level `high`) suggesting the target date *might* slip. Delayed is a fact —
+  the root epic's End date has *already* moved later than the previous existing report's own
+  frozen date. A confirmed slip is strictly more informative than a risk signal, so **Delayed takes
+  precedence over At Risk** when both would otherwise apply; it is never downgraded to "At Risk"
+  just because that's also true. The date moving *earlier* has no effect either way — only a slip
+  counts, and it never produces "On Track" either (a project isn't back on schedule just because a
+  later date happened to arrive before an even-later one).
 - The delayed-date check is frozen into the report at generation time (`reports.eta_delayed`,
   compared against the nearest earlier existing report's `eta_snapshot`, both raw ISO dates — not
   the display-formatted `projects.eta`), same reasoning as the workstream/epic snapshots: a report
   must render the same way on every future view, not re-derive a verdict from whatever the epic's
   date happens to be by the time someone looks at it. A row with no earlier report to compare
   against, or no End date on either side, is never delayed — there's nothing to have slipped from.
-- When the badge is At Risk *only* because of a date slip (no Blocked workstream, no High risk),
-  the report shows why: a small "⚠ Delayed from {{previous date}}" note under Target ETA. Without
-  it the badge would look like a black box — nothing else on the page would explain it.
+- Whenever the badge reads Delayed, the report also shows a small "⚠ Delayed from {{previous
+  date}}" note under Target ETA — the badge alone doesn't carry which date it slipped from, and
+  without the note it would look like an unexplained black box.
+- Delayed renders as a filled pill (reusing the `risk-badge.high` treatment), not the plain
+  dot+text the other two states use — visually more definite, on purpose, without inventing a new
+  color.
 
 ## Report generation
 

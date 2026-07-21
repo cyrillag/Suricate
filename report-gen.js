@@ -138,7 +138,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
         <div class="f-label">Target ETA</div>
         <div class="f-value">${esc(project.eta || 'TBD')}</div>
         ${etaDelayed ? `<div class="eta-delayed-note">⚠ Delayed${etaDelayedFrom ? ` from ${esc(etaDelayedFrom)}` : ''}</div>` : ''}
-        <div class="health ${health} health-sub"><div class="health-dot"></div>${health === 'at-risk' ? 'At Risk' : 'On Track'}</div>
+        <div class="health ${health} health-sub"><div class="health-dot"></div>${health === 'delayed' ? 'Delayed' : health === 'at-risk' ? 'At Risk' : 'On Track'}</div>
       </div>
       <div class="identity-cell">
         <div class="f-label">Epic LVL2</div>
@@ -417,6 +417,11 @@ const CSS = `
   .health-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
   .health.at-risk .health-dot{background:var(--orange)}.health.at-risk{color:var(--blk-c)}
   .health.on-track .health-dot{background:var(--done-s)}.health.on-track{color:var(--done-c)}
+  /* A confirmed slip is a fact, not a projection like "At Risk" — a filled pill (borrowed from
+     the risk-badge.high treatment) reads as more definite than the plain dot+text the other two
+     states use, without needing a brand-new color. */
+  .health.delayed{background:var(--blk-bg);color:var(--blk-c);border:1px solid #F4A17D;padding:3px 9px;border-radius:2px}
+  .health.delayed .health-dot{display:none}
   .health-sub{margin-top:8px}
   .abc-grid{display:grid;grid-template-columns:repeat(3,1fr)}
   .doc-section--abc{border-top:1px solid var(--bd)}

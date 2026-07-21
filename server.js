@@ -593,7 +593,12 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, re
   // point of the Risk matrix section, so it must be able to flip the badge too.
   const hasHighRisk = risks.some(r => r.level === 'high');
   const etaDelayed = !!report.eta_delayed;
-  const health = stats.blk > 0 || stats.ts > stats.total * 0.6 || hasHighRisk || etaDelayed ? 'at-risk' : 'on-track';
+  // Delayed is a fact (the date already moved), At Risk is a projection (it might) — not the same
+  // thing, so a slip gets its own badge state rather than being folded into "At Risk". Delayed
+  // takes precedence when both are true: a confirmed slip is more informative than a risk signal.
+  const health = etaDelayed ? 'delayed'
+    : (stats.blk > 0 || stats.ts > stats.total * 0.6 || hasHighRisk) ? 'at-risk'
+    : 'on-track';
   let etaDelayedFrom = null;
   if (etaDelayed) {
     const prevEta = db.prepare(`
