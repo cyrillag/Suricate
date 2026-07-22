@@ -101,6 +101,12 @@ to be re-applied here by hand rather than resolved by merging code:
   must render the same way on every future view, not re-derive a verdict from whatever the epic's
   date happens to be by the time someone looks at it. A row with no earlier report to compare
   against, or no End date on either side, is never delayed — there's nothing to have slipped from.
+- The **displayed** "Target ETA" value on a report is the report's own frozen `eta_snapshot`, never
+  the live `projects.eta` — the same freezing reasoning as the delayed check itself, but this was
+  missed once: `projects.eta` gets overwritten on every generate, so rendering it directly made
+  every past week's report silently show today's current date instead of the target that actually
+  applied back when that week was generated. A legacy row from before `eta_snapshot` existed shows
+  "TBD" rather than falling back to the live value, which would just reintroduce the same bug.
 - Whenever the badge reads Delayed, the report also shows a small "⚠ Previous date: {{previous
   date}}" note under Target ETA — the badge itself already says "Delayed", so the note states the
   prior date as a fact rather than repeating "delayed" a second time; without it the note would

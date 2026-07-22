@@ -606,13 +606,20 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, re
       ORDER BY year DESC, week DESC LIMIT 1`).get(proj.id, year, year, week);
     etaDelayedFrom = prevEta?.eta_snapshot ? formatDate(prevEta.eta_snapshot) : null;
   }
+  // The displayed Target ETA must come from THIS report's own frozen eta_snapshot, never the live
+  // projects.eta — that field gets overwritten on every generate (see the At Risk/Delayed rule),
+  // so rendering it directly used to make every past week's report silently show today's current
+  // date instead of what the target actually was back when that week was generated. A legacy row
+  // from before eta_snapshot existed has nothing frozen to show, so it's an honest "TBD" rather
+  // than falling back to the live (and by now likely wrong) value.
+  const etaDisplay = formatDate(report.eta_snapshot);
 
   const html = genReport({
     project: proj, year, week,
     pmName: proj.pm_name,
     execSummary: report.exec_summary,
     highlights:  JSON.parse(report.highlights_json),
-    risks, etaDelayed, etaDelayedFrom,
+    risks, etaDelayed, etaDelayedFrom, etaDisplay,
     workstreams: resolvedWs,
     epics: epicsForView,
     stats, health, isOwner,
