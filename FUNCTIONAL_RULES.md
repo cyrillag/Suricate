@@ -283,10 +283,14 @@ abstract — so a QA pass can actually verify pass/fail instead of eyeballing it
   and borders, form field borders, icons that carry meaning) against their *adjacent* colors — not
   just the text/glyph sitting on top of them. A translucent-white overlay at low opacity (e.g.
   ~.18-.28) on a dark background often still passes a quick glance but computes under 3:1 and
-  reads as "invisible" in practice. This exact bug shipped twice — the PDF export button and
-  week-nav arrows were both under ~1.5:1 against the report header, and later the `.nav-link`
-  hover/active fill in `.app-nav` at .1 opacity had the same problem. Compute the actual ratio
-  before shipping a translucent-fill treatment; don't eyeball it.
+  reads as "invisible" in practice. This exact failure mode has shipped three times now — the PDF
+  export button and week-nav arrows were both under ~1.5:1 against the (then-navy) report header;
+  later the `.nav-link` hover/active fill in `.app-nav` at .1 opacity had the same problem; then,
+  after the week-nav arrows moved to the light page-header, their border was left at `var(--bd)`
+  (#C8CAD4), which computes under 1.7:1 against white — a *light* border on a *light* background is
+  the same underlying mistake as a translucent fill on a dark one. Compute the actual ratio before
+  shipping any border/fill treatment; don't eyeball it, and don't assume a value that passed once
+  in one context (dark bg) still passes after the surrounding context changes (light bg).
   - Prefer reusing an established, already-legible pattern over inventing a new translucent one:
     the yellow CTA fill (`var(--yellow)` background, `var(--db)` text) used for every primary
     action elsewhere in this app computes at ~10.9:1 and is the brand's own reserved "primary CTA"

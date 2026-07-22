@@ -402,12 +402,15 @@ const CSS = `
   :root{--mb:#000E9C;--db:#00185E;--cobalt:#0050D5;--royal:#147DE8;--sky:#73E3FF;--yellow:#FFD124;--dyellow:#FFBB22;--orange:#ED733D;--dorange:#D85639;--green:#A6D64D;--dgr:#636369;--mgr:#87878C;--sgr:#BEC0C6;--lgr:#E5E7ED;--done-c:#4A7C1C;--done-bg:#EEF7E0;--done-s:#A6D64D;--prog-c:#0050D5;--prog-bg:#E8EFFF;--prog-s:#0050D5;--blk-c:#D85639;--blk-bg:#FEF0EE;--blk-s:#ED733D;--ts-c:#636369;--ts-bg:#F2F3F7;--ts-s:#BEC0C6;--sur:#FFFFFF;--gnd:#F3F4FA;--bd:#C8CAD4;--bd2:#E5E7ED;--tx:#00185E;--tx2:#636369;--tx3:#87878C;--f:'Source Sans Pro','Segoe UI',Arial,sans-serif;--fm:'Courier New',Courier,monospace;--r:2px}
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--gnd);color:var(--tx);font-family:var(--f);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased}
-  .week-nav{display:flex;align-items:center;gap:3px;justify-content:flex-end}
-  .week-arrow{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:var(--r);color:var(--tx2);font-size:18px;line-height:1;text-decoration:none;background:#fff;border:1px solid var(--bd);transition:border-color .15s,color .15s;flex-shrink:0;user-select:none}
+  .week-nav{display:flex;align-items:center;gap:12px;justify-content:flex-end}
+  /* var(--bd) (#C8CAD4) as a border against the white page-header computes under 1.7:1 -- nowhere
+     near the 3:1 non-text contrast minimum, which is exactly why these read as barely-there.
+     var(--tx2) computes at ~5.9:1. */
+  .week-arrow{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:var(--r);color:var(--tx2);font-size:18px;line-height:1;text-decoration:none;background:#fff;border:1.5px solid var(--tx2);transition:border-color .15s,color .15s;flex-shrink:0;user-select:none}
   .week-arrow:hover{border-color:var(--cobalt);color:var(--cobalt)}
   .week-arrow.week-arrow-disabled{color:var(--sgr);border-color:var(--bd2);cursor:default}
   .week-arrow.week-arrow-disabled:hover{border-color:var(--bd2);color:var(--sgr)}
-  .ref-week{font-family:var(--fm);font-size:18px;font-weight:700;color:var(--tx);letter-spacing:-.3px;line-height:1;text-align:center;min-width:70px}
+  .ref-week{font-family:var(--f);font-size:18px;font-weight:700;color:var(--tx);line-height:1;text-align:center;min-width:70px}
   .doc-section{background:var(--sur);border:1px solid var(--bd);border-top:3px solid var(--mb);border-radius:var(--r);margin-bottom:16px;overflow:hidden}
   .section-label{font-size:15px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mb);padding:11px 20px 10px;border-bottom:1px solid var(--bd2);background:var(--sur);display:flex;align-items:center;justify-content:space-between}
   .section-label .sl-right{color:var(--tx3);font-weight:400;letter-spacing:.04em}
