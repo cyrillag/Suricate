@@ -137,7 +137,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
       <div class="identity-cell">
         <div class="f-label">Target ETA</div>
         <div class="f-value">${esc(project.eta || 'TBD')}</div>
-        ${etaDelayed ? `<div class="eta-delayed-note">⚠ Delayed${etaDelayedFrom ? ` from ${esc(etaDelayedFrom)}` : ''}</div>` : ''}
+        ${etaDelayed ? `<div class="eta-delayed-note">${etaDelayedFrom ? `⚠ Previous date: ${esc(etaDelayedFrom)}` : '⚠ Delayed'}</div>` : ''}
         <div class="health ${health} health-sub"><div class="health-dot"></div>${health === 'delayed' ? 'Delayed' : health === 'at-risk' ? 'At Risk' : 'On Track'}</div>
       </div>
       <div class="identity-cell">

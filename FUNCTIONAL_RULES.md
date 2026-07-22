@@ -101,9 +101,10 @@ to be re-applied here by hand rather than resolved by merging code:
   must render the same way on every future view, not re-derive a verdict from whatever the epic's
   date happens to be by the time someone looks at it. A row with no earlier report to compare
   against, or no End date on either side, is never delayed — there's nothing to have slipped from.
-- Whenever the badge reads Delayed, the report also shows a small "⚠ Delayed from {{previous
-  date}}" note under Target ETA — the badge alone doesn't carry which date it slipped from, and
-  without the note it would look like an unexplained black box.
+- Whenever the badge reads Delayed, the report also shows a small "⚠ Previous date: {{previous
+  date}}" note under Target ETA — the badge itself already says "Delayed", so the note states the
+  prior date as a fact rather than repeating "delayed" a second time; without it the note would
+  look like an unexplained black box.
 - Delayed renders as a filled pill (reusing the `risk-badge.high` treatment), not the plain
   dot+text the other two states use — visually more definite, on purpose, without inventing a new
   color.
