@@ -150,7 +150,12 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
 
   <div class="doc-section">
     <div class="section-label">Project identity</div>
-    ${execSummary ? `<div class="exec-summary">${escKeepEmphasis(execSummary)}</div>` : ''}
+    ${execSummary ? (execSummary.length > 240
+      ? `<div class="exec-summary-wrap">
+          <div class="exec-summary exec-summary-clamped" id="exec-summary">${escKeepEmphasis(execSummary)}</div>
+          <div class="exec-summary-readmore" id="exec-summary-readmore" onclick="var e=document.getElementById('exec-summary'),x=e.classList.toggle('exec-summary-clamped');this.textContent=x?'Read more':'Show less';">Read more</div>
+        </div>`
+      : `<div class="exec-summary">${escKeepEmphasis(execSummary)}</div>`) : ''}
     <div class="identity-grid">
       <div class="identity-cell"><div class="f-label">Project</div><div class="f-value">${esc(project.name)}</div></div>
       <div class="identity-cell"><div class="f-label">Project Manager</div><div class="f-value">${esc(pmName || '')}</div></div>
@@ -215,6 +220,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
   ${ganttEpics.length ? `
   <div class="matrix-section">
     <div class="section-label">Planning — team epics</div>
+    <div class="gantt-mobile-note">📊 The planning timeline needs a wider screen — view this report on a desktop or tablet to see it.</div>
     <div class="gantt-outer">
       <div class="gantt-lcol" id="gantt-lcol"><div class="gantt-lhdr"></div></div>
       <div class="gantt-rcol">
@@ -406,6 +412,7 @@ const CSS = `
   .section-label{font-size:15px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mb);padding:11px 20px 10px;border-bottom:1px solid var(--bd2);background:var(--sur);display:flex;align-items:center;justify-content:space-between}
   .section-label .sl-right{color:var(--tx3);font-weight:400;letter-spacing:.04em}
   .exec-summary{padding:14px 20px;font-size:13px;color:var(--tx2);line-height:1.5;border-bottom:1px solid var(--bd2);font-style:italic}
+  .exec-summary-readmore{display:none}
   .identity-grid{display:grid;grid-template-columns:repeat(4,1fr)}
   .identity-cell{padding:16px 20px;border-right:1px solid var(--bd2)}
   .identity-cell:last-child{border-right:none}
@@ -505,10 +512,20 @@ const CSS = `
   .gantt-vline.vtoday{background:var(--orange);z-index:3;width:2px}
   .gantt-vlabel{position:absolute;top:2px;left:3px;font-size:10px;font-weight:700;letter-spacing:.05em;white-space:nowrap;line-height:1}
   .gantt-legend{display:flex;gap:16px;padding:10px 14px;border-top:1px solid var(--bd2);background:var(--gnd)}
+  .gantt-mobile-note{display:none}
   .gantt-leg-item{display:flex;align-items:center;gap:5px;font-size:13.5px;color:var(--tx2)}
   .gantt-leg-swatch{width:14px;height:10px;border-radius:1px;flex-shrink:0}
   .doc-footer{background:var(--mb);color:rgba(255,255,255,.4);text-align:center;padding:18px 32px;font-size:13.5px;letter-spacing:.04em}
-  @media(max-width:768px){.identity-grid{grid-template-columns:1fr 1fr}.sr-grid{grid-template-columns:1fr}.abc-grid{grid-template-columns:1fr}}
+  @media(max-width:700px){
+    .identity-grid{grid-template-columns:1fr 1fr}
+    .sr-grid{grid-template-columns:1fr}
+    .abc-grid{grid-template-columns:1fr}
+    .gantt-outer,.gantt-legend{display:none}
+    .gantt-mobile-note{display:block;padding:20px;font-size:13px;color:var(--tx2);text-align:center}
+    .exec-summary-clamped{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+    .exec-summary-readmore{display:block;text-align:center;font-size:12px;font-weight:700;color:var(--cobalt);padding:8px 20px;cursor:pointer;border-bottom:1px solid var(--bd2);background:var(--sur)}
+  }
+  @media(max-width:480px){.identity-grid{grid-template-columns:1fr}}
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 `;
 

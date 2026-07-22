@@ -28,7 +28,7 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 
 /* LAYOUT */
 .app-body{max-width:1000px;margin:0 auto;padding:32px 24px 60px}
-.page-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:28px}
+.page-header{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:28px}
 .page-title{font-size:26px;font-weight:700;color:var(--tx);letter-spacing:-.4px}
 .page-sub{font-size:15px;color:var(--tx2);margin-top:5px}
 .back-link{font-size:14px;color:var(--cobalt);text-decoration:none;display:block;margin-bottom:6px}
@@ -115,4 +115,14 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 @media(max-width:700px){
   .project-grid{grid-template-columns:1fr}
   .nav-brand .brand-divider,.auth-brand .brand-divider{display:none}
+  /* The nav bar's full content (logo+name+tagline, lang switch, username, logout) doesn't fit a
+     phone width without wrapping or clipping -- the tagline and username are the two droppable
+     items (the name alone still identifies the brand; the username is redundant, you know who you
+     are), which gets everything else back within a normal width instead of relying on
+     .app-nav's overflow:hidden to silently crop whatever didn't fit. */
+  .app-nav{height:64px;padding:0 14px;gap:10px}
+  .nav-brand{gap:10px}
+  .nav-brand-tagline,.nav-username{display:none}
+  .auth-page{padding:16px}
+  .auth-card{padding:28px 24px}
 }

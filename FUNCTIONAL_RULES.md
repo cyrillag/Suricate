@@ -234,6 +234,21 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   the first screen a new project manager sees and it's meant to read as a landing page, not a bare
   form.
 
+## Responsive / mobile
+
+- Below 700px, `.app-nav` drops the tagline and the username (not essential — the brand name alone
+  still identifies the app, and a logged-in user already knows who they are) rather than letting
+  `.app-nav`'s `overflow:hidden` silently crop whatever full-width content didn't fit.
+- The Planning/Gantt section is desktop/tablet-only: below 700px it's replaced by a note pointing
+  the reader to view the report on a larger screen, rather than trying to make a many-month
+  timeline usable at phone width (attempted via its existing horizontal scroll container, but
+  scrolling a chart sideways inside a page that also scrolls vertically is a poor mobile
+  experience) or hiding it behind an expand toggle (a collapsed Gantt still isn't usable once
+  opened on a phone, so there's nothing gained by making it reachable).
+- The exec summary is truncated to 4 lines with a "Read more" toggle below 700px, but only when it
+  exceeds 240 characters — a short summary is shown in full with no button, since there's nothing
+  to truncate and an inert "Read more" that expands nothing would just be confusing.
+
 ## Security
 
 - Login only accepts an *exact* email match against Jira — no fuzzy-search fallback to an
