@@ -93,10 +93,13 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 .new-project-layout{display:flex;gap:40px;align-items:flex-start}
 .mascot-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding-top:40px}
 @media(max-width:900px){.mascot-wrap{display:none}}
-/* Real 6-frame sprite (mascot-sprite.png, 270x350 per frame). Displayed at its exact native pixel
-   size -- ANY CSS-side scaling (even downscaling a supersampled source) invokes the browser's own
-   interpolation and softens crisp edges again, which is what a 2x-then-downscale attempt still
-   looked blurry doing. 1:1 native size is the only way to guarantee zero scaling-induced blur.
+/* Real 6-frame sprite (mascot-sprite.png, 270x350 per frame), displayed at its exact native pixel
+   size (no CSS scaling, which softens edges via browser interpolation regardless of source
+   quality). The chroma-key alpha band was tuned to match the reference logo's own anti-aliasing
+   ratio (~3% partial-alpha edge pixels) rather than pushed narrower -- a tighter band looked
+   *worse* (near-binary cutout, visible jaggies), not crisper. The AI-generated source art has
+   inherently softer edges than the hand-cutout reference logo; this is the closest achievable
+   match without regenerating the source art itself.
    A transform-only rotate/squash on a single flat silhouette never read as an actual body in
    motion, hence the real sprite. Faces right in the source art, which now looks toward the form
    since the mascot sits on its left (no mirroring -- moving it to the other side of the layout was
@@ -105,7 +108,7 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
    loop. steps(1) per segment so each frame holds crisply instead of sliding across the sheet. A
    negative animation-delay starts the timeline already near the flip instead of making the page
    wait out a full idle hold before the first jump. */
-.mascot-img{width:270px;height:350px;background-image:url('/mascot-sprite.png?v=4');background-repeat:no-repeat;background-size:1620px 350px;animation:mascot-sprite 6s steps(1) infinite;animation-delay:-4s}
+.mascot-img{width:270px;height:350px;background-image:url('/mascot-sprite.png?v=5');background-repeat:no-repeat;background-size:1620px 350px;animation:mascot-sprite 6s steps(1) infinite;animation-delay:-4s}
 @keyframes mascot-sprite{
   0%,70%{background-position:0 0}
   76%{background-position:-270px 0}
