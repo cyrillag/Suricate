@@ -95,13 +95,16 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 @media(max-width:900px){.mascot-wrap{display:none}}
 /* Real 6-frame sprite (mascot-sprite.png, rendered at 2x pixel density and downscaled by the
    browser for crisp edges on high-DPI screens) -- a transform-only rotate/squash on a single flat
-   silhouette never read as an actual body in motion. Faces right in the source art, mirrored via
-   scaleX(-1) so it looks toward the form on its left. Held on frame 1 (standing) most of the
-   cycle, steps through the somersault near the end, lands back on frame 6 (same pose as frame 1)
-   for a seamless loop. steps(1) per segment so each frame holds crisply instead of sliding across
-   the sheet. A negative animation-delay starts the timeline already near the flip instead of
-   making the page wait out a full idle hold before the first jump. */
-.mascot-img{width:231px;height:300px;transform:scaleX(-1);background-image:url('/mascot-sprite.png');background-repeat:no-repeat;background-size:1386px 300px;animation:mascot-sprite 6s steps(1) infinite;animation-delay:-4s}
+   silhouette never read as an actual body in motion. Faces right in the source art, which now
+   looks toward the form since the mascot sits on its left (no mirroring -- moving it to the other
+   side of the layout was the actual fix, not flipping the artwork). Held on frame 1 (standing)
+   most of the cycle, steps through the somersault near the end, lands back on frame 6 (same pose
+   as frame 1) for a seamless loop. steps(1) per segment so each frame holds crisply instead of
+   sliding across the sheet. A negative animation-delay starts the timeline already near the flip
+   instead of making the page wait out a full idle hold before the first jump. The ?v=2 cache-bust
+   on the sprite URL forces browsers to fetch the sharpened asset instead of serving the stale
+   pre-2x version from cache under the same filename. */
+.mascot-img{width:231px;height:300px;background-image:url('/mascot-sprite.png?v=2');background-repeat:no-repeat;background-size:1386px 300px;animation:mascot-sprite 6s steps(1) infinite;animation-delay:-4s}
 @keyframes mascot-sprite{
   0%,70%{background-position:0 0}
   76%{background-position:-231px 0}

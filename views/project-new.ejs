@@ -18,6 +18,9 @@
     </div>
   </div>
   <div class="new-project-layout">
+  <div class="mascot-wrap">
+    <div class="mascot-img" aria-hidden="true"></div>
+  </div>
   <div class="form-card">
     <% if (error) { %><div class="auth-error"><%= error %></div><% } %>
     <form method="POST" action="/projects">
@@ -52,9 +55,6 @@
         <button type="submit" class="btn-primary"><%= t('newProject.submit') %></button>
       </div>
     </form>
-  </div>
-  <div class="mascot-wrap">
-    <div class="mascot-img" aria-hidden="true"></div>
   </div>
   </div>
 </div>
