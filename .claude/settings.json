@@ -1,0 +1,39 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "agent",
+            "if": "Edit(**/server.js)",
+            "prompt": "A backend file in the project-reports-app repo (OVHcloud weekly project status report generator) was just edited. Hook input (tool call JSON): $ARGUMENTS\n\nRead the file_path from that JSON, then:\n1. Read FUNCTIONAL_RULES.md at the repo root in full.\n2. Read the changed file in full, and also report-gen.js if the changed file isn't already both server.js and report-gen.js -- the health badge / ETA-snapshot / workstream-resolution logic spans both files.\n3. Check specifically for: (a) business-rule-compliance -- does every rule written in FUNCTIONAL_RULES.md still have a matching, correct code path? (b) functional bugs -- broken logic, wrong conditions, off-by-one errors. (c) error-messaging leaks -- raw error/exception text reaching a user-facing response. Do not review UI/CSS/accessibility here -- this hook is scoped to backend logic only, the ui-reviewer/qa-agent-html subagents cover the rest when invoked directly.\n4. If you find a CRITICAL or MAJOR issue (a documented rule violated, a wrong business outcome, or a raw error leak), respond with a concise bug report: what, where, why it matters. Otherwise respond with exactly: \"QA: no critical/major issues found.\"\n\nBe fast and decisive -- this runs synchronously after every edit to this file. Do not pad the response.",
+            "timeout": 180,
+            "statusMessage": "Running backend QA check (server.js)..."
+          },
+          {
+            "type": "agent",
+            "if": "Write(**/server.js)",
+            "prompt": "A backend file in the project-reports-app repo (OVHcloud weekly project status report generator) was just edited. Hook input (tool call JSON): $ARGUMENTS\n\nRead the file_path from that JSON, then:\n1. Read FUNCTIONAL_RULES.md at the repo root in full.\n2. Read the changed file in full, and also report-gen.js if the changed file isn't already both server.js and report-gen.js -- the health badge / ETA-snapshot / workstream-resolution logic spans both files.\n3. Check specifically for: (a) business-rule-compliance -- does every rule written in FUNCTIONAL_RULES.md still have a matching, correct code path? (b) functional bugs -- broken logic, wrong conditions, off-by-one errors. (c) error-messaging leaks -- raw error/exception text reaching a user-facing response. Do not review UI/CSS/accessibility here -- this hook is scoped to backend logic only, the ui-reviewer/qa-agent-html subagents cover the rest when invoked directly.\n4. If you find a CRITICAL or MAJOR issue (a documented rule violated, a wrong business outcome, or a raw error leak), respond with a concise bug report: what, where, why it matters. Otherwise respond with exactly: \"QA: no critical/major issues found.\"\n\nBe fast and decisive -- this runs synchronously after every edit to this file. Do not pad the response.",
+            "timeout": 180,
+            "statusMessage": "Running backend QA check (server.js)..."
+          },
+          {
+            "type": "agent",
+            "if": "Edit(**/report-gen.js)",
+            "prompt": "A backend file in the project-reports-app repo (OVHcloud weekly project status report generator) was just edited. Hook input (tool call JSON): $ARGUMENTS\n\nRead the file_path from that JSON, then:\n1. Read FUNCTIONAL_RULES.md at the repo root in full.\n2. Read the changed file in full, and also server.js if the changed file isn't already both server.js and report-gen.js -- the health badge / ETA-snapshot / workstream-resolution logic spans both files.\n3. Check specifically for: (a) business-rule-compliance -- does every rule written in FUNCTIONAL_RULES.md still have a matching, correct code path? (b) functional bugs -- broken logic, wrong conditions, off-by-one errors. (c) error-messaging leaks -- raw error/exception text reaching a user-facing response. Do not review UI/CSS/accessibility here -- this hook is scoped to backend logic only, the ui-reviewer/qa-agent-html subagents cover the rest when invoked directly.\n4. If you find a CRITICAL or MAJOR issue (a documented rule violated, a wrong business outcome, or a raw error leak), respond with a concise bug report: what, where, why it matters. Otherwise respond with exactly: \"QA: no critical/major issues found.\"\n\nBe fast and decisive -- this runs synchronously after every edit to this file. Do not pad the response.",
+            "timeout": 180,
+            "statusMessage": "Running backend QA check (report-gen.js)..."
+          },
+          {
+            "type": "agent",
+            "if": "Write(**/report-gen.js)",
+            "prompt": "A backend file in the project-reports-app repo (OVHcloud weekly project status report generator) was just edited. Hook input (tool call JSON): $ARGUMENTS\n\nRead the file_path from that JSON, then:\n1. Read FUNCTIONAL_RULES.md at the repo root in full.\n2. Read the changed file in full, and also server.js if the changed file isn't already both server.js and report-gen.js -- the health badge / ETA-snapshot / workstream-resolution logic spans both files.\n3. Check specifically for: (a) business-rule-compliance -- does every rule written in FUNCTIONAL_RULES.md still have a matching, correct code path? (b) functional bugs -- broken logic, wrong conditions, off-by-one errors. (c) error-messaging leaks -- raw error/exception text reaching a user-facing response. Do not review UI/CSS/accessibility here -- this hook is scoped to backend logic only, the ui-reviewer/qa-agent-html subagents cover the rest when invoked directly.\n4. If you find a CRITICAL or MAJOR issue (a documented rule violated, a wrong business outcome, or a raw error leak), respond with a concise bug report: what, where, why it matters. Otherwise respond with exactly: \"QA: no critical/major issues found.\"\n\nBe fast and decisive -- this runs synchronously after every edit to this file. Do not pad the response.",
+            "timeout": 180,
+            "statusMessage": "Running backend QA check (report-gen.js)..."
+          }
+        ]
+      }
+    ]
+  }
+}
