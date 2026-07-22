@@ -18,11 +18,14 @@
   <a href="/lang/fr" class="lang-opt <%= lang==='fr' ? 'active' : '' %>">FR</a><span class="lang-sep">/</span><a href="/lang/en" class="lang-opt <%= lang==='en' ? 'active' : '' %>">EN</a>
 </div>
 <div class="auth-card">
-  <div class="auth-logo">
-    <img src="/logo-navy.png" height="40" alt="">
+  <div class="auth-brand">
+    <img src="/logo-navy.png" height="60" alt="">
+    <div class="brand-divider"></div>
+    <div class="auth-brand-text">
+      <h1 class="auth-title"><%= t('nav.brand') %></h1>
+      <p class="auth-tagline"><%= t('nav.tagline') %></p>
+    </div>
   </div>
-  <h1 class="auth-title"><%= t('nav.brand') %></h1>
-  <p class="auth-tagline"><%= t('nav.tagline') %></p>
   <p class="auth-sub"><%= t('login.subtitle') %></p>
   <% if (error) { %><div class="auth-error"><%= error %></div><% } %>
   <form method="POST" action="/login" class="auth-form">

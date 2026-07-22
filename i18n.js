@@ -2,7 +2,6 @@ const DICT = {
   nav: {
     brand:   { fr: 'Suricate',                    en: 'Suricate' },
     tagline: { fr: 'OVHcloud project reports',    en: 'OVHcloud project reports' },
-    projects:{ fr: 'Projets',                     en: 'Projects' },
     logout:  { fr: 'Déconnexion',                 en: 'Logout' }
   },
   login: {

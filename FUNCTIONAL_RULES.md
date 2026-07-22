@@ -211,20 +211,28 @@ access model trivial to reason about. There is exactly one distinction: **the cr
 
 - **One `.app-nav` bar, used identically on every authenticated page** — dashboard, project
   detail/edit/new, and the weekly report. It always carries the same things in the same place: the
-  logo (linking home, the standard "click the logo" convention), the "Suricate" name + "OVHcloud
-  project reports" tagline, the Projects link, the FR/EN language switch, and Logout. The weekly
-  report used to render its own separate header (different height, a bigger logo with no home link,
-  no brand/tagline, no language switch, no logout) — that drift is exactly what made the two headers
-  inconsistent, so the report page now links `/app.css` and reuses the same nav/page-header classes
-  instead of maintaining a parallel implementation.
+  logo (linking home, the standard "click the logo" convention) separated from the "Suricate" name +
+  "OVHcloud project reports" tagline by a thin `.brand-divider` line, the FR/EN language switch, and
+  Logout — no "Projects" link, since the logo already goes home and a dedicated nav item for it
+  added nothing. The weekly report used to render its own separate header (different height, a
+  bigger logo with no home link, no brand/tagline, no language switch, no logout) — that drift is
+  exactly what made the two headers inconsistent, so the report page now links `/app.css` and
+  reuses the same nav/page-header classes instead of maintaining a parallel implementation,
+  including the same `.app-body` width/padding (it used to be wider, `.doc-body` at 1100px vs.
+  `.app-body`'s 1000px, which is exactly the kind of drift a shared class prevents).
+- `.brand-divider` is a shape-only class (a 1px line stretching to the row's height) — its color is
+  set by context: translucent white in `.nav-brand` (navy background), `var(--bd)` in `.auth-brand`
+  (white background). It hides below 700px width so the header doesn't crowd on mobile.
 - Page-specific "back" breadcrumbs (e.g. "← Projects" on project detail, "← {{project name}}" on
   the edit form, "← All reports" on a report) live in the body's `.page-header`, styled with the
   shared `.back-link` class — not inside `.app-nav` itself. Different pages legitimately go back to
   different places (dashboard vs. the specific project), so the destination/label varies, but the
   visual treatment (arrow glyph, color, position above the page title) must not.
 - The login page is the one intentional exception: it has no `.app-nav` (there's no session yet, so
-  Projects/logout/username don't apply), just a standalone language switch and a centered logo
-  lockup — but it still shows the same "Suricate" name and tagline.
+  logout/username don't apply) and no Projects link either, just a standalone language switch — but
+  it shares the same logo/divider/name/tagline lockup (`.auth-brand`), sized larger, since this is
+  the first screen a new project manager sees and it's meant to read as a landing page, not a bare
+  form.
 
 ## Security
 

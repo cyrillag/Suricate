@@ -6,14 +6,12 @@
   </svg>
   <a href="/" class="nav-brand">
     <img src="/logo-white.png" height="36" alt="">
+    <div class="brand-divider"></div>
     <span class="nav-brand-text">
       <span class="nav-brand-name"><%= t('nav.brand') %></span>
       <span class="nav-brand-tagline"><%= t('nav.tagline') %></span>
     </span>
   </a>
-  <div class="nav-links">
-    <a href="/" class="nav-link <%= active==='dashboard' ? 'active' : '' %>"><%= t('nav.projects') %></a>
-  </div>
   <div class="nav-user">
     <div class="lang-switch">
       <a href="/lang/fr" class="lang-opt <%= lang==='fr' ? 'active' : '' %>">FR</a><span class="lang-sep">/</span><a href="/lang/en" class="lang-opt <%= lang==='en' ? 'active' : '' %>">EN</a>

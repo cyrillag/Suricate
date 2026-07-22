@@ -9,18 +9,14 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 /* NAV */
 .app-nav{background:var(--mb);height:90px;display:flex;align-items:center;padding:0 24px;gap:24px;position:sticky;top:0;z-index:100;overflow:hidden}
 .nav-deco{position:absolute;right:0;top:0;width:280px;height:100%;pointer-events:none}
-.nav-brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:#fff;flex-shrink:0}
+.nav-brand{display:flex;align-items:center;gap:18px;text-decoration:none;color:#fff;flex-shrink:0}
 .nav-brand svg,.nav-brand img{flex-shrink:0}
 .nav-brand-text{display:flex;flex-direction:column;line-height:1.15}
 .nav-brand-name{font-weight:700;font-size:15px}
 .nav-brand-tagline{font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:rgba(255,255,255,.55)}
-.nav-links{flex:1;display:flex;gap:4px}
-.nav-link{color:rgba(255,255,255,.85);text-decoration:none;font-size:13px;padding:6px 10px;border-radius:var(--r);font-weight:600;letter-spacing:.04em;text-transform:uppercase;border:1px solid rgba(255,255,255,.3)}
-/* A translucent-white fill this faint (was .1) reads as barely-there against the navy header —
-   boosted alongside a visible border so the link reads as a clickable tab at rest, not just text
-   floating in the header (see FUNCTIONAL_RULES.md accessibility section for the pattern history). */
-.nav-link:hover,.nav-link.active{color:#fff;background:rgba(255,255,255,.22);border-color:rgba(255,255,255,.55)}
-.nav-user{display:flex;align-items:center;gap:10px}
+.brand-divider{width:1px;align-self:stretch;flex-shrink:0}
+.nav-brand .brand-divider{background:rgba(255,255,255,.2)}
+.nav-user{display:flex;align-items:center;gap:10px;margin-left:auto}
 .lang-switch{display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700;letter-spacing:.04em}
 .lang-opt{color:rgba(255,255,255,.5);text-decoration:none;padding:2px 3px}
 .lang-opt:hover{color:#fff}
@@ -60,10 +56,12 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 .lang-switch-standalone .lang-opt:hover{color:var(--cobalt)}
 .lang-switch-standalone .lang-opt.active{color:var(--cobalt)}
 .lang-switch-standalone .lang-sep{color:var(--bd)}
-.auth-card{background:#fff;border:1px solid var(--bd);border-radius:6px;padding:44px;width:100%;max-width:420px;box-shadow:0 4px 24px rgba(0,14,156,.07)}
-.auth-logo{margin-bottom:28px}
-.auth-title{font-size:24px;font-weight:700;color:var(--tx);margin-bottom:2px}
-.auth-tagline{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--cobalt);margin-bottom:14px}
+.auth-card{background:#fff;border:1px solid var(--bd);border-radius:6px;padding:44px;width:100%;max-width:440px;box-shadow:0 4px 24px rgba(0,14,156,.07)}
+.auth-brand{display:flex;align-items:center;gap:20px;margin-bottom:28px}
+.auth-brand .brand-divider{background:var(--bd)}
+.auth-brand-text{display:flex;flex-direction:column;gap:4px}
+.auth-title{font-size:28px;font-weight:700;color:var(--tx);letter-spacing:-.4px}
+.auth-tagline{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--cobalt)}
 .auth-sub{font-size:15px;color:var(--tx2);margin-bottom:28px}
 .auth-error{background:#FEF0EE;color:var(--blk);border:1px solid #F4A17D;padding:11px 14px;border-radius:var(--r);font-size:13px;margin-bottom:16px}
 .auth-form{display:flex;flex-direction:column;gap:14px}
@@ -116,4 +114,5 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 
 @media(max-width:700px){
   .project-grid{grid-template-columns:1fr}
+  .nav-brand .brand-divider,.auth-brand .brand-divider{display:none}
 }

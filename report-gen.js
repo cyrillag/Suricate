@@ -88,7 +88,6 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
 
   const brandName = esc(translate(lang, 'nav.brand'));
   const tagline = esc(translate(lang, 'nav.tagline'));
-  const projectsLabel = esc(translate(lang, 'nav.projects'));
   const logoutLabel = esc(translate(lang, 'nav.logout'));
 
   return `<!DOCTYPE html>
@@ -111,14 +110,12 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
   </svg>
   <a href="/" class="nav-brand">
     <img src="/logo-white.png" height="36" alt="">
+    <div class="brand-divider"></div>
     <span class="nav-brand-text">
       <span class="nav-brand-name">${brandName}</span>
       <span class="nav-brand-tagline">${tagline}</span>
     </span>
   </a>
-  <div class="nav-links">
-    <a href="/" class="nav-link">${projectsLabel}</a>
-  </div>
   <div class="nav-user">
     <div class="lang-switch">
       <a href="/lang/fr" class="lang-opt ${lang === 'fr' ? 'active' : ''}">FR</a><span class="lang-sep">/</span><a href="/lang/en" class="lang-opt ${lang === 'en' ? 'active' : ''}">EN</a>
@@ -130,7 +127,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
   </div>
 </nav>
 
-<div class="doc-body">
+<div class="app-body">
 
   <div class="page-header">
     <div>
@@ -399,7 +396,6 @@ const CSS = `
   :root{--mb:#000E9C;--db:#00185E;--cobalt:#0050D5;--royal:#147DE8;--sky:#73E3FF;--yellow:#FFD124;--dyellow:#FFBB22;--orange:#ED733D;--dorange:#D85639;--green:#A6D64D;--dgr:#636369;--mgr:#87878C;--sgr:#BEC0C6;--lgr:#E5E7ED;--done-c:#4A7C1C;--done-bg:#EEF7E0;--done-s:#A6D64D;--prog-c:#0050D5;--prog-bg:#E8EFFF;--prog-s:#0050D5;--blk-c:#D85639;--blk-bg:#FEF0EE;--blk-s:#ED733D;--ts-c:#636369;--ts-bg:#F2F3F7;--ts-s:#BEC0C6;--sur:#FFFFFF;--gnd:#F3F4FA;--bd:#C8CAD4;--bd2:#E5E7ED;--tx:#00185E;--tx2:#636369;--tx3:#87878C;--f:'Source Sans Pro','Segoe UI',Arial,sans-serif;--fm:'Courier New',Courier,monospace;--r:2px}
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--gnd);color:var(--tx);font-family:var(--f);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased}
-  .doc-body{max-width:1100px;margin:0 auto;padding:28px 32px 48px}
   .week-nav{display:flex;align-items:center;gap:3px;justify-content:flex-end}
   .week-arrow{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:var(--r);color:var(--tx2);font-size:18px;line-height:1;text-decoration:none;background:#fff;border:1px solid var(--bd);transition:border-color .15s,color .15s;flex-shrink:0;user-select:none}
   .week-arrow:hover{border-color:var(--cobalt);color:var(--cobalt)}
@@ -512,7 +508,7 @@ const CSS = `
   .gantt-leg-item{display:flex;align-items:center;gap:5px;font-size:13.5px;color:var(--tx2)}
   .gantt-leg-swatch{width:14px;height:10px;border-radius:1px;flex-shrink:0}
   .doc-footer{background:var(--mb);color:rgba(255,255,255,.4);text-align:center;padding:18px 32px;font-size:13.5px;letter-spacing:.04em}
-  @media(max-width:768px){.doc-body{padding:16px}.identity-grid{grid-template-columns:1fr 1fr}.sr-grid{grid-template-columns:1fr}.abc-grid{grid-template-columns:1fr}}
+  @media(max-width:768px){.identity-grid{grid-template-columns:1fr 1fr}.sr-grid{grid-template-columns:1fr}.abc-grid{grid-template-columns:1fr}}
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 `;
 
