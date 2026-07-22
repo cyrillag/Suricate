@@ -1,4 +1,6 @@
-function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, epics, stats, health, isOwner, etaDelayed, etaDelayedFrom }) {
+const { translate } = require('./i18n');
+
+function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, epics, stats, health, isOwner, etaDelayed, etaDelayedFrom, lang, userName }) {
   const weekStr = `W${String(week).padStart(2, '0')}`;
   const yearWeek = `${year}-${weekStr}`;
   const dateLabel = isoWeekMonday(year, week);
@@ -84,49 +86,70 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
     { v: stats.ts,   c: '#BEC0C6' }
   ]);
 
+  const brandName = esc(translate(lang, 'nav.brand'));
+  const tagline = esc(translate(lang, 'nav.tagline'));
+  const projectsLabel = esc(translate(lang, 'nav.projects'));
+  const logoutLabel = esc(translate(lang, 'nav.logout'));
+
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${esc(lang)}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${esc(project.name)} — Weekly Report ${weekStr}/${year}</title>
+<link rel="stylesheet" href="/app.css">
 <link rel="icon" type="image/png" href="/favicon-32.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>${CSS}</style>
 </head>
 <body>
-<header class="doc-header">
-  <svg class="hdr-deco" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 80" preserveAspectRatio="none">
-    <polygon points="500,0 500,80 240,80" fill="rgba(255,255,255,0.04)"/>
-    <polygon points="500,0 500,50 370,0" fill="rgba(255,255,255,0.05)"/>
-    <polygon points="450,0 500,80 500,55" fill="rgba(20,125,232,0.12)"/>
+<nav class="app-nav">
+  <svg class="nav-deco" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 56" preserveAspectRatio="none">
+    <polygon points="300,0 300,56 180,56" fill="rgba(255,255,255,0.04)"/>
+    <polygon points="300,0 300,32 230,0" fill="rgba(255,255,255,0.05)"/>
+    <polygon points="270,0 300,56 300,36" fill="rgba(20,125,232,0.12)"/>
   </svg>
-  <div class="doc-header-brand">
+  <a href="/" class="nav-brand">
     <img src="/logo-white.png" height="36" alt="">
-    <div class="brand-divider"></div>
-    <div class="brand-ctx">
-      <a class="back-link-hdr" href="/projects/${esc(project.slug)}">&#x2039; All reports</a>
-      <span class="proj-name">${esc(project.name)}</span>
-      <span class="brand-sub">Weekly Status Report</span>
-    </div>
+    <span class="nav-brand-text">
+      <span class="nav-brand-name">${brandName}</span>
+      <span class="nav-brand-tagline">${tagline}</span>
+    </span>
+  </a>
+  <div class="nav-links">
+    <a href="/" class="nav-link">${projectsLabel}</a>
   </div>
-  <div class="hdr-right">
-    ${isOwner && isCurrentWeek ? `<form method="POST" action="/projects/${esc(project.slug)}/reports/generate" style="display:inline">
-      <input type="hidden" name="week" value="${yearWeek}">
-      <button type="submit" class="btn-hdr-refresh">↻ Refresh</button>
-    </form>` : ''}
+  <div class="nav-user">
+    <div class="lang-switch">
+      <a href="/lang/fr" class="lang-opt ${lang === 'fr' ? 'active' : ''}">FR</a><span class="lang-sep">/</span><a href="/lang/en" class="lang-opt ${lang === 'en' ? 'active' : ''}">EN</a>
+    </div>
+    <span class="nav-username">${esc(userName)}</span>
+    <form method="POST" action="/logout" style="display:inline">
+      <button type="submit" class="btn-ghost btn-sm">${logoutLabel}</button>
+    </form>
+  </div>
+</nav>
+
+<div class="doc-body">
+
+  <div class="page-header">
     <div>
+      <a href="/projects/${esc(project.slug)}" class="back-link">← All reports</a>
+      <h1 class="page-title">${esc(project.name)}</h1>
+      <p class="page-sub">Weekly Status Report · ${esc(dateLabel)} · ${esc(pmName || project.name)}</p>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:flex-end">
+      ${isOwner && isCurrentWeek ? `<form method="POST" action="/projects/${esc(project.slug)}/reports/generate" style="display:inline">
+        <input type="hidden" name="week" value="${yearWeek}">
+        <button type="submit" class="btn-primary btn-sm">↻ Refresh</button>
+      </form>` : ''}
       <div class="week-nav">
         <a class="week-arrow" href="/projects/${esc(project.slug)}/${prevW.year}-W${prevW.weekPad}" aria-label="Previous week">&#x2039;</a>
         <div class="ref-week">${weekStr} · ${year}</div>
         ${nextWeekNav}
       </div>
-      <div class="ref-meta">${dateLabel} · ${esc(pmName || project.name)}</div>
     </div>
   </div>
-</header>
-
-<div class="doc-body">
 
   <div class="doc-section">
     <div class="section-label">Project identity</div>
@@ -376,32 +399,13 @@ const CSS = `
   :root{--mb:#000E9C;--db:#00185E;--cobalt:#0050D5;--royal:#147DE8;--sky:#73E3FF;--yellow:#FFD124;--dyellow:#FFBB22;--orange:#ED733D;--dorange:#D85639;--green:#A6D64D;--dgr:#636369;--mgr:#87878C;--sgr:#BEC0C6;--lgr:#E5E7ED;--done-c:#4A7C1C;--done-bg:#EEF7E0;--done-s:#A6D64D;--prog-c:#0050D5;--prog-bg:#E8EFFF;--prog-s:#0050D5;--blk-c:#D85639;--blk-bg:#FEF0EE;--blk-s:#ED733D;--ts-c:#636369;--ts-bg:#F2F3F7;--ts-s:#BEC0C6;--sur:#FFFFFF;--gnd:#F3F4FA;--bd:#C8CAD4;--bd2:#E5E7ED;--tx:#00185E;--tx2:#636369;--tx3:#87878C;--f:'Source Sans Pro','Segoe UI',Arial,sans-serif;--fm:'Courier New',Courier,monospace;--r:2px}
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--gnd);color:var(--tx);font-family:var(--f);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased}
-  .doc-header{background:var(--mb);color:#fff;padding:18px 40px;display:flex;align-items:center;justify-content:space-between;gap:20px;position:relative;overflow:hidden}
-  .hdr-deco{position:absolute;right:0;top:0;width:50%;height:100%;pointer-events:none}
-  .doc-header-brand{display:flex;align-items:center;position:relative;z-index:1}
-  .brand-divider{width:1px;height:28px;background:rgba(255,255,255,.2);margin:0 18px;flex-shrink:0}
-  .brand-ctx{display:flex;flex-direction:column;gap:4px}
-  .proj-name{font-size:15px;font-weight:700;color:#fff;letter-spacing:.01em}
-  .brand-sub{font-size:12.5px;color:rgba(255,255,255,.35);letter-spacing:.04em}
-  .hdr-right{display:flex;align-items:center;gap:20px;flex-shrink:0;position:relative;z-index:1}
-  /* Yellow is reserved for primary CTAs (see FUNCTIONAL_RULES.md brand section) — also gives
-     this button real contrast against the navy header, unlike a translucent white fill that
-     barely differs from the background it sits on. */
-  .btn-hdr-refresh{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 12px;border-radius:var(--r);color:var(--db);font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:var(--yellow);border:1px solid var(--yellow);cursor:pointer;font-family:var(--f);transition:background .15s;white-space:nowrap}
-  .btn-hdr-refresh:hover{background:var(--dyellow);border-color:var(--dyellow)}
-  .back-link-hdr{display:inline-flex;align-items:center;gap:2px;color:rgba(255,255,255,.85);font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap}
-  .back-link-hdr:hover{color:#fff;text-decoration:underline}
-  .week-nav{display:flex;align-items:center;gap:3px;justify-content:flex-end}
-  /* A translucent-white fill this faint (.18/.28) reads as barely-there against the navy header —
-     boosted so the button's own boundary is actually visible, not just its (already-legible)
-     white glyph. */
-  .week-arrow{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:var(--r);color:#fff;font-size:18px;line-height:1;text-decoration:none;background:rgba(255,255,255,.3);border:1px solid rgba(255,255,255,.5);transition:background .15s,border-color .15s;flex-shrink:0;user-select:none}
-  .week-arrow:hover{background:rgba(255,255,255,.45);border-color:rgba(255,255,255,.7)}
-  .week-arrow.week-arrow-disabled{color:rgba(255,255,255,.35);background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);cursor:default}
-  .week-arrow.week-arrow-disabled:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2)}
-  .ref-week{font-family:var(--fm);font-size:23px;color:#fff;letter-spacing:-.5px;line-height:1;text-align:center;min-width:80px}
-  .ref-meta{font-size:13.5px;color:rgba(255,255,255,.4);margin-top:4px;letter-spacing:.03em;text-align:right}
   .doc-body{max-width:1100px;margin:0 auto;padding:28px 32px 48px}
+  .week-nav{display:flex;align-items:center;gap:3px;justify-content:flex-end}
+  .week-arrow{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:var(--r);color:var(--tx2);font-size:18px;line-height:1;text-decoration:none;background:#fff;border:1px solid var(--bd);transition:border-color .15s,color .15s;flex-shrink:0;user-select:none}
+  .week-arrow:hover{border-color:var(--cobalt);color:var(--cobalt)}
+  .week-arrow.week-arrow-disabled{color:var(--sgr);border-color:var(--bd2);cursor:default}
+  .week-arrow.week-arrow-disabled:hover{border-color:var(--bd2);color:var(--sgr)}
+  .ref-week{font-family:var(--fm);font-size:18px;font-weight:700;color:var(--tx);letter-spacing:-.3px;line-height:1;text-align:center;min-width:70px}
   .doc-section{background:var(--sur);border:1px solid var(--bd);border-top:3px solid var(--mb);border-radius:var(--r);margin-bottom:16px;overflow:hidden}
   .section-label{font-size:15px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mb);padding:11px 20px 10px;border-bottom:1px solid var(--bd2);background:var(--sur);display:flex;align-items:center;justify-content:space-between}
   .section-label .sl-right{color:var(--tx3);font-weight:400;letter-spacing:.04em}
@@ -508,7 +512,7 @@ const CSS = `
   .gantt-leg-item{display:flex;align-items:center;gap:5px;font-size:13.5px;color:var(--tx2)}
   .gantt-leg-swatch{width:14px;height:10px;border-radius:1px;flex-shrink:0}
   .doc-footer{background:var(--mb);color:rgba(255,255,255,.4);text-align:center;padding:18px 32px;font-size:13.5px;letter-spacing:.04em}
-  @media(max-width:768px){.doc-header{padding:14px 16px}.brand-divider{display:none}.doc-body{padding:16px}.identity-grid{grid-template-columns:1fr 1fr}.sr-grid{grid-template-columns:1fr}.abc-grid{grid-template-columns:1fr}}
+  @media(max-width:768px){.doc-body{padding:16px}.identity-grid{grid-template-columns:1fr 1fr}.sr-grid{grid-template-columns:1fr}.abc-grid{grid-template-columns:1fr}}
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 `;
 

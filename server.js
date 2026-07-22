@@ -615,7 +615,8 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, re
     risks, etaDelayed, etaDelayedFrom,
     workstreams: resolvedWs,
     epics: epicsForView,
-    stats, health, isOwner
+    stats, health, isOwner,
+    lang: req.lang, userName: req.session.userName
   });
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');

@@ -201,6 +201,25 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   translated — only the app's own interface (labels, buttons, instructions, application error
   messages) is.
 
+## Navigation
+
+- **One `.app-nav` bar, used identically on every authenticated page** — dashboard, project
+  detail/edit/new, and the weekly report. It always carries the same things in the same place: the
+  logo (linking home, the standard "click the logo" convention), the "Suricate" name + "OVHcloud
+  project reports" tagline, the Projects link, the FR/EN language switch, and Logout. The weekly
+  report used to render its own separate header (different height, a bigger logo with no home link,
+  no brand/tagline, no language switch, no logout) — that drift is exactly what made the two headers
+  inconsistent, so the report page now links `/app.css` and reuses the same nav/page-header classes
+  instead of maintaining a parallel implementation.
+- Page-specific "back" breadcrumbs (e.g. "← Projects" on project detail, "← {{project name}}" on
+  the edit form, "← All reports" on a report) live in the body's `.page-header`, styled with the
+  shared `.back-link` class — not inside `.app-nav` itself. Different pages legitimately go back to
+  different places (dashboard vs. the specific project), so the destination/label varies, but the
+  visual treatment (arrow glyph, color, position above the page title) must not.
+- The login page is the one intentional exception: it has no `.app-nav` (there's no session yet, so
+  Projects/logout/username don't apply), just a standalone language switch and a centered logo
+  lockup — but it still shows the same "Suricate" name and tagline.
+
 ## Security
 
 - Login only accepts an *exact* email match against Jira — no fuzzy-search fallback to an
@@ -228,8 +247,9 @@ abstract — so a QA pass can actually verify pass/fail instead of eyeballing it
   and borders, form field borders, icons that carry meaning) against their *adjacent* colors — not
   just the text/glyph sitting on top of them. A translucent-white overlay at low opacity (e.g.
   ~.18-.28) on a dark background often still passes a quick glance but computes under 3:1 and
-  reads as "invisible" in practice. This exact bug shipped once — the PDF export button and
-  week-nav arrows were both under ~1.5:1 against the report header. Compute the actual ratio
+  reads as "invisible" in practice. This exact bug shipped twice — the PDF export button and
+  week-nav arrows were both under ~1.5:1 against the report header, and later the `.nav-link`
+  hover/active fill in `.app-nav` at .1 opacity had the same problem. Compute the actual ratio
   before shipping a translucent-fill treatment; don't eyeball it.
   - Prefer reusing an established, already-legible pattern over inventing a new translucent one:
     the yellow CTA fill (`var(--yellow)` background, `var(--db)` text) used for every primary

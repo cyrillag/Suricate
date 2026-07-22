@@ -15,8 +15,11 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 .nav-brand-name{font-weight:700;font-size:15px}
 .nav-brand-tagline{font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:rgba(255,255,255,.55)}
 .nav-links{flex:1;display:flex;gap:4px}
-.nav-link{color:rgba(255,255,255,.6);text-decoration:none;font-size:13px;padding:6px 10px;border-radius:var(--r);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
-.nav-link:hover,.nav-link.active{color:#fff;background:rgba(255,255,255,.1)}
+.nav-link{color:rgba(255,255,255,.85);text-decoration:none;font-size:13px;padding:6px 10px;border-radius:var(--r);font-weight:600;letter-spacing:.04em;text-transform:uppercase;border:1px solid rgba(255,255,255,.3)}
+/* A translucent-white fill this faint (was .1) reads as barely-there against the navy header —
+   boosted alongside a visible border so the link reads as a clickable tab at rest, not just text
+   floating in the header (see FUNCTIONAL_RULES.md accessibility section for the pattern history). */
+.nav-link:hover,.nav-link.active{color:#fff;background:rgba(255,255,255,.22);border-color:rgba(255,255,255,.55)}
 .nav-user{display:flex;align-items:center;gap:10px}
 .lang-switch{display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700;letter-spacing:.04em}
 .lang-opt{color:rgba(255,255,255,.5);text-decoration:none;padding:2px 3px}
