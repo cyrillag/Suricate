@@ -109,7 +109,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
     <polygon points="270,0 300,56 300,36" fill="rgba(20,125,232,0.12)"/>
   </svg>
   <a href="/" class="nav-brand">
-    <img src="/logo-white.png" height="36" alt="">
+    <img src="/logo-white.png" height="40" alt="">
     <div class="brand-divider"></div>
     <span class="nav-brand-text">
       <span class="nav-brand-name">${brandName}</span>

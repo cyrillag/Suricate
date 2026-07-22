@@ -12,8 +12,8 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 .nav-brand{display:flex;align-items:center;gap:18px;text-decoration:none;color:#fff;flex-shrink:0}
 .nav-brand svg,.nav-brand img{flex-shrink:0}
 .nav-brand-text{display:flex;flex-direction:column;line-height:1.15}
-.nav-brand-name{font-weight:700;font-size:15px}
-.nav-brand-tagline{font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:rgba(255,255,255,.55)}
+.nav-brand-name{font-weight:700;font-size:17px}
+.nav-brand-tagline{font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:rgba(255,255,255,.55)}
 .brand-divider{width:1px;align-self:stretch;flex-shrink:0}
 .nav-brand .brand-divider{background:rgba(255,255,255,.2)}
 .nav-user{display:flex;align-items:center;gap:10px;margin-left:auto}
