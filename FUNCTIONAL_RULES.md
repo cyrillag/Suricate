@@ -165,6 +165,13 @@ to be re-applied here by hand rather than resolved by merging code:
   in one click — there are no separate Sync Jira/Sync Confluence buttons; a version that had them
   existed briefly but they had no visible effect on the page and read as broken).
 - Renaming a project never changes its slug (the stable URL identifier).
+- The New project form keeps each step label short and puts the longer explanation (what the field
+  is for, which Jira/Confluence field feeds it) behind a "?" tooltip (`.hint`/`.hint-btn`/
+  `.hint-bubble`) rather than an always-visible paragraph — the page should read as four short
+  steps at a glance, not a wall of text. The "template page" warning stays visible (it's a
+  necessary caveat, not background detail). A large animated Suricate mascot sits next to the form
+  on desktop (hidden below 900px, and respects `prefers-reduced-motion`) — purely decorative, first
+  impression for a new project manager.
 
 ## Visibility & permissions
 
