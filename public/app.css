@@ -92,16 +92,20 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 /* MASCOT */
 .new-project-layout{display:flex;gap:40px;align-items:flex-start}
 .mascot-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding-top:40px}
-.mascot-img{height:300px;width:auto;animation:mascot-flip 7s ease-in-out infinite}
+.mascot-img{height:300px;width:auto;transform-origin:50% 100%;animation:mascot-flip 7s ease-in-out infinite}
 @media(max-width:900px){.mascot-wrap{display:none}}
+/* Squash/stretch on top of the rotate (classic 2D animation principles) so the flip reads as a
+   body in motion -- a bare rotate() looks like a rigid sprite spinning in place. */
 @keyframes mascot-flip{
-  0%,72%{transform:translateY(0) rotate(0deg)}
-  76%{transform:translateY(-14px) rotate(0deg)}
-  84%{transform:translateY(-90px) rotate(180deg)}
-  90%{transform:translateY(-90px) rotate(360deg)}
-  95%{transform:translateY(0) rotate(360deg)}
-  97%{transform:translateY(-8px) rotate(360deg)}
-  100%{transform:translateY(0) rotate(360deg)}
+  0%,68%{transform:translate(0,0) scale(1,1) rotate(0deg)}
+  70%{transform:translate(2px,3px) scale(1.14,0.8) rotate(-5deg);animation-timing-function:cubic-bezier(.34,1.56,.64,1)}
+  74%{transform:translate(-5px,-32px) scale(0.82,1.28) rotate(25deg)}
+  80%{transform:translate(-9px,-96px) scale(0.7,0.72) rotate(195deg)}
+  86%{transform:translate(-3px,-96px) scale(0.7,0.72) rotate(360deg)}
+  90%{transform:translate(3px,-38px) scale(0.88,1.18) rotate(360deg);animation-timing-function:cubic-bezier(.55,0,1,.45)}
+  94%{transform:translate(0,3px) scale(1.16,0.78) rotate(360deg)}
+  97%{transform:translate(0,-6px) scale(0.96,1.05) rotate(360deg)}
+  100%{transform:translate(0,0) scale(1,1) rotate(360deg)}
 }
 @media(prefers-reduced-motion:reduce){.mascot-img{animation:none}}
 .form-info{background:var(--gnd);border:1px solid var(--bd2);border-radius:var(--r);padding:14px 18px;font-size:13px;color:var(--tx2);margin-top:24px;line-height:1.5}
