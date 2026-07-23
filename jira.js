@@ -51,6 +51,9 @@ function mapStatus(jiraStatus) {
   // "ongoing" covers PMs typing a manual status directly on a no-Jira workstream's Confluence
   // cell (a status-macro lozenge) rather than a real Jira issue status.
   if (s.includes('progress') || s.includes('review') || s.includes('dev') || s.includes('ongoing')) return 'prog';
+  // A paused epic has already started — bucketing it under "To Start" would misreport work
+  // that's underway as not yet begun.
+  if (s.includes('pause')) return 'prog';
   if (s === 'blocked' || s === 'impediment') return 'blk';
   return 'ts';
 }

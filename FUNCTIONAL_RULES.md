@@ -38,6 +38,9 @@ to be re-applied here by hand rather than resolved by merging code:
   ("done"/"ongoing"/"to do" observed in practice; "ongoing" maps to In Progress alongside the
   usual "progress"/"review"/"dev" synonyms). Never let the lozenge's colour parameter leak into
   the extracted text — it will silently break the exact-match status lookup.
+- **A paused Jira epic status maps to In Progress, not To Start.** `mapStatus` (jira.js) buckets
+  any status containing "pause" into `prog`. Work that has started and been paused is not the same
+  as work that hasn't started; the default fall-through bucket (`ts`) would misreport it.
 - The **Executive summary** must preserve a PM's manual bold/italic/underline emphasis from the
   Confluence page — it is not flattened to plain text like the rest of the parsed content. Any
   other Confluence-sourced formatting/markup is still discarded; only these three inline styles
