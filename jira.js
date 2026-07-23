@@ -54,7 +54,9 @@ function mapStatus(jiraStatus) {
   // A paused epic has already started — bucketing it under "To Start" would misreport work
   // that's underway as not yet begun.
   if (s.includes('pause')) return 'prog';
-  if (s === 'blocked' || s === 'impediment') return 'blk';
+  // "On Hold" reads as stalled/waiting-on-something rather than a work-in-progress pause —
+  // closer to Blocked than to In Progress.
+  if (s === 'blocked' || s === 'impediment' || s.includes('hold')) return 'blk';
   return 'ts';
 }
 
