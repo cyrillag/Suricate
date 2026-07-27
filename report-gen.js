@@ -59,7 +59,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
     ? risks.map((r, i) => `
       <div class="risk-item">
         <div class="risk-l">
-          <span class="risk-ref">RIS_${String(i + 1).padStart(2, '0')}</span>
+          <span class="risk-ref">RIS-${String(i + 1).padStart(2, '0')}</span>
           <div class="risk-badge ${r.level || 'high'}">${cap(r.level || 'High')}</div>
         </div>
         <div>
