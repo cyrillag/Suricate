@@ -444,7 +444,7 @@ const CSS = `
   .abc-col.clr .abc-head{color:var(--cobalt);border-color:var(--cobalt)}
   .abc-items{list-style:none;display:flex;flex-direction:column;gap:8px}
   .abc-items li{font-size:13px;line-height:1.5;color:var(--tx2);padding-left:18px;position:relative}
-  .abc-items li::before{content:'—';position:absolute;left:0;color:var(--tx3);font-size:12.5px;top:3px}
+  .abc-items li::before{content:'—';position:absolute;left:0;color:var(--tx3);font-size:12.5px;top:0}
   .ji{font-family:var(--fm);font-size:12.5px;color:var(--cobalt);background:var(--prog-bg);padding:1px 5px;border-radius:2px;text-decoration:none;margin-left:4px}
   .ji:hover{text-decoration:underline}
   .sr-grid{display:grid;grid-template-columns:1fr 2fr}
