@@ -39,6 +39,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
           <td class="td-del ${ds}" rowspan="${del.rows.length}">${esc(del.name)}</td>` : '<tr>'}
           <td class="td-ws"><div class="cell-n"><span class="ws-name">${esc(ws.name)}</span></div></td>
           <td class="cell-team">${esc(ws.team || '')}</td>
+          <td class="cell-enddate">${ws.endDate ? formatShortDate(ws.endDate) : '<span class="no-enddate">No date</span>'}</td>
           <td class="td-st">
             <span class="st ${st}">${statusLabel[st] || st}</span>
           </td>
@@ -207,10 +208,11 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
     <div class="matrix-scroll">
       <table class="mx">
         <thead><tr>
-          <th style="width:20%">Deliverable</th>
-          <th style="width:42%">Workstream</th>
-          <th style="width:20%">Team</th>
-          <th style="width:18%">Status</th>
+          <th style="width:18%">Deliverable</th>
+          <th style="width:34%">Workstream</th>
+          <th style="width:14%">Team</th>
+          <th style="width:17%">End Date</th>
+          <th style="width:17%">Status</th>
         </tr></thead>
         <tbody>${matrixRows}</tbody>
       </table>
@@ -362,6 +364,9 @@ function escKeepEmphasis(s) {
     .replace(/\{\{U\}\}/g, '<u>').replace(/\{\{\/U\}\}/g, '</u>');
 }
 function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+function formatShortDate(iso) {
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
 function pct(n, total) { return total ? Math.round(n / total * 100) : 0; }
 
 function isoWeekMonday(year, week) {
@@ -477,6 +482,8 @@ const CSS = `
   .td-ws{padding:5px 12px;border-bottom:1px solid var(--bd2);vertical-align:middle;width:42%}
   .td-st{padding:5px 12px;border-bottom:1px solid var(--bd2);vertical-align:middle;width:18%}
   .cell-team{font-size:15px;color:var(--tx2);white-space:nowrap;padding:5px 12px;border-bottom:1px solid var(--bd2);vertical-align:middle;width:20%}
+  .cell-enddate{font-size:13px;color:var(--tx2);white-space:nowrap;padding:5px 12px;border-bottom:1px solid var(--bd2);vertical-align:middle}
+  .no-enddate{font-style:italic;color:var(--tx3)}
   tbody tr.del-first:not(:first-child) td{border-top:2px solid var(--mb)}
   tbody tr:last-child td{border-bottom:none}
   tbody tr:nth-child(even) td{background:var(--gnd)}

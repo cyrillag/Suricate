@@ -89,6 +89,20 @@ function aggregateEpicStatus(jiraKeyField, epicsByKey) {
   return 'ts';
 }
 
+// A workstream's end date is the farthest (latest) End date among every epic behind it — a
+// workstream backed by several epics isn't actually finished until the last one is, so that's
+// the one date worth surfacing here. Plain ISO string comparison is safe since Jira's End date
+// field is always YYYY-MM-DD. Returns null (never a fabricated fallback) if jira_key is empty, no
+// epic behind it has a cached End date yet, or none of its epics have an End date set at all —
+// same "no date beats a wrong date" rule as epics themselves (see FUNCTIONAL_RULES.md).
+function aggregateEpicEndDate(jiraKeyField, epicsByKey) {
+  const keys = splitJiraKeys(jiraKeyField);
+  if (!keys.length) return null;
+  const endDates = keys.map(k => epicsByKey.get(k)?.end_date).filter(Boolean);
+  if (!endDates.length) return null;
+  return endDates.reduce((latest, d) => (d > latest ? d : latest));
+}
+
 // Resolves the CURRENT live matrix/Planning state — used to freeze a snapshot at report
 // generation time, and as a last-resort fallback when viewing a report generated before
 // snapshots existed (legacyStatusOverrides is that old report's workstream_statuses_json, kept
@@ -101,7 +115,8 @@ function resolveWorkstreamsAndEpics(projectId, legacyStatusOverrides) {
   const resolvedWs = workstreams.map(ws => ({
     ...ws,
     status: (legacyStatusOverrides && legacyStatusOverrides[ws.id])
-      || (ws.jira_key ? (aggregateEpicStatus(ws.jira_key, epicsByKey) || 'ts') : (ws.default_status || 'ts'))
+      || (ws.jira_key ? (aggregateEpicStatus(ws.jira_key, epicsByKey) || 'ts') : (ws.default_status || 'ts')),
+    endDate: ws.jira_key ? aggregateEpicEndDate(ws.jira_key, epicsByKey) : null
   }));
   // Planning must never show a cancelled epic (either spelling — see jira.js). Checked here
   // against the raw Jira status, not the done/prog/blk/ts bucket mapStatus produces below: once

@@ -44,6 +44,13 @@ to be re-applied here by hand rather than resolved by merging code:
 - **An "On Hold" Jira epic status maps to Blocked, not In Progress.** Unlike "Paused", "On Hold"
   reads as stalled/waiting-on-something rather than a work-in-progress pause, so `mapStatus` buckets
   any status containing "hold" into `blk` alongside "Blocked"/"Impediment".
+- The **Deliverable matrix** shows each workstream's **End Date**, taken from its backing epic's
+  Jira "End date" field — same source as everything else date-related in this app, never typed in
+  manually. A workstream backed by several epics (see the multi-epic rule above) shows the
+  *farthest* (latest) End date among them — it isn't actually finished until the last one is, so
+  that's the one date worth surfacing on that row. A workstream with no Jira epic, or whose epic(s)
+  have no End date set, shows "No date" — never a fabricated fallback, same "no date beats a wrong
+  date" rule the Planning/Gantt epics already follow.
 - The **Executive summary** must preserve a PM's manual bold/italic/underline emphasis from the
   Confluence page — it is not flattened to plain text like the rest of the parsed content. Any
   other Confluence-sourced formatting/markup is still discarded; only these three inline styles
