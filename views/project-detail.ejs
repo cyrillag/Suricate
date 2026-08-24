@@ -56,8 +56,16 @@
       <thead><tr><th><%= t('detail.week_col') %></th><th></th></tr></thead>
       <tbody>
       <% reports.forEach(r => { const ws = `${r.year}-W${String(r.week).padStart(2,'0')}`; %>
+      <% if (!r.exists) { %>
       <tr>
-        <td><strong><%= ws %></strong></td>
+        <td><strong style="color:var(--tx3)"><%= ws %></strong></td>
+        <td class="td-actions">
+          <span class="empty-state-inline" style="padding:0;font-style:italic"><%= t('detail.no_report_row') %></span>
+        </td>
+      </tr>
+      <% } else { %>
+      <tr>
+        <td><strong><%= ws %></strong><% if (r.backfilled) { %> <span class="tag" title="<%= t('detail.missing_generate_warning') %>"><%= t('detail.backfilled_tag') %></span><% } %></td>
         <td class="td-actions">
           <a href="/projects/<%= proj.slug %>/<%= ws %>" class="btn-ghost btn-sm"><%= t('detail.view') %></a>
           <% if (isOwner) { %>
@@ -73,6 +81,7 @@
           <% } %>
         </td>
       </tr>
+      <% } %>
       <% }) %>
       </tbody>
     </table>
