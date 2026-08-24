@@ -208,13 +208,21 @@ function parseDeliverables(html) {
   const workstreams = [];
   let currentDeliverable = null;
   let sortOrder = 0;
+  let headerColCount = null;
   for (const row of rows) {
     const cells = extractCells(row);
     if (!cells.length) continue;
-    if (cells.every(c => c.type === 'th')) continue; // header row (all-th, no data cells)
+    if (cells.every(c => c.type === 'th')) { headerColCount = cells.length; continue; } // header row (all-th, no data cells)
+    // A deliverable spanning several workstreams uses `rowspan` on its leading cell, and Confluence
+    // then omits that cell entirely from every following row of the group — so a row still
+    // carrying the full column count is starting a new deliverable, one cell short is another
+    // workstream under the previous one. Some pages additionally mark that leading cell as a
+    // <th> (an older template convention); checked as a fallback since not every page does.
     let idx = 0;
     let deliverableJustSet = false;
-    if (cells[0].type === 'th') { currentDeliverable = stripTags(cells[0].html); idx = 1; deliverableJustSet = true; }
+    if (cells[0].type === 'th' || (headerColCount != null && cells.length >= headerColCount)) {
+      currentDeliverable = stripTags(cells[0].html); idx = 1; deliverableJustSet = true;
+    }
     if (!currentDeliverable) continue;
     // Single-workstream deliverables (e.g. "E2E tests") sometimes leave the workstream-name
     // cell blank, relying on the deliverable label itself — fall back to it in that case.
