@@ -26,6 +26,15 @@ to be re-applied here by hand rather than resolved by merging code:
 - The **Deliverable matrix** comes exclusively from the project's Confluence page, "Deliverables
   status" section. It must stay strictly 1:1 with that table's rows — never split or duplicate a
   row (e.g. because a cell references more than one Jira epic).
+- A deliverable spanning several workstreams merges its leading cell with `rowspan` in Confluence's
+  table, which then omits that cell entirely from every row after the first. `parseDeliverables`
+  (confluence.js) detects "this row starts a new deliverable" by comparing the row's cell count to
+  the header row's — a full-width row carries the deliverable name, a one-cell-short row continues
+  the previous deliverable — rather than assuming the deliverable cell is a `<th>` (some pages still
+  format it that way and are checked as a fallback, but many don't). Getting this wrong either
+  merges every deliverable into one, or — if the header row itself isn't correctly skipped —
+  inserts a fake workstream from the header's own column labels ("Workstream"/"Team owner") at the
+  top of the matrix.
 - If a workstream's "Jira" cell embeds more than one `{jira}` macro (a workstream backed by
   several epics), every one of them drives that single row's status — never just the first, and
   never split into extra rows. The roll-up uses the same precedence as the deliverable-level
