@@ -237,6 +237,22 @@ function isFutureWeek(year, week) {
   const curYear = isoYear(n), curWeek = isoWeek(n);
   return year > curYear || (year === curYear && week > curWeek);
 }
+function isPastWeek(year, week) {
+  const n = new Date();
+  const curYear = isoYear(n), curWeek = isoWeek(n);
+  return year < curYear || (year === curYear && week < curWeek);
+}
+// Same algorithm as report-gen.js's own adjacentWeek (not exported from there, and this module
+// already has its own ISO week primitives) — steps a whole number of weeks from the Monday of
+// (year,week) and re-derives the resulting ISO (year,week), so it's correct across year
+// boundaries (a year can have 52 or 53 ISO weeks) instead of naively adding/subtracting 1.
+function adjacentWeek(year, week, delta) {
+  const jan4 = new Date(year, 0, 4);
+  const dow = jan4.getDay() || 7;
+  const mon = new Date(jan4);
+  mon.setDate(jan4.getDate() - dow + 1 + (week - 1 + delta) * 7);
+  return { year: isoYear(mon), week: isoWeek(mon) };
+}
 
 // ── App setup ─────────────────────────────────────────────────────
 app.set('view engine', 'ejs');
@@ -429,6 +445,30 @@ app.post('/projects/:slug/edit', requireAuth, async (req, res) => {
   res.redirect(`/projects/${proj.slug}`);
 });
 
+// Fills in any missed week between the earliest existing report and the current week with a
+// placeholder (exists:false) row, so a gap like 3 weeks of vacation shows up as visible "No
+// report" rows instead of just silently vanishing from the list (the list only ever queried
+// existing rows before, so skipped weeks were invisible — the very thing that made the live
+// matrix/risks on a since-backfilled report read as a real historical record instead of
+// leftover current-day data). Returns at most the most recent `limit` weeks, whether real or gap.
+function reportListWithGaps(projectId, limit) {
+  const existing = db.prepare('SELECT year,week,backfilled FROM reports WHERE project_id=?').all(projectId);
+  if (!existing.length) return [];
+  const byKey = new Map(existing.map(r => [`${r.year}-${r.week}`, r]));
+  const earliest = existing.reduce((a, b) => (b.year < a.year || (b.year === a.year && b.week < a.week)) ? b : a);
+  const now = new Date();
+  const current = { year: isoYear(now), week: isoWeek(now) };
+
+  const sequence = [];
+  let cur = { year: earliest.year, week: earliest.week };
+  while (cur.year < current.year || (cur.year === current.year && cur.week <= current.week)) {
+    const found = byKey.get(`${cur.year}-${cur.week}`);
+    sequence.push(found ? { year: cur.year, week: cur.week, backfilled: !!found.backfilled, exists: true } : { year: cur.year, week: cur.week, exists: false });
+    cur = adjacentWeek(cur.year, cur.week, 1);
+  }
+  return sequence.reverse().slice(0, limit);
+}
+
 // Read-only for anyone authenticated (same reasoning as the dashboard above) — the mutation
 // routes below (edit/delete/generate) each re-check ownership independently, so this route being
 // open doesn't loosen who can actually change anything.
@@ -436,7 +476,7 @@ app.get('/projects/:slug', requireAuth, (req, res) => {
   const proj = db.prepare('SELECT p.*, u.name as owner_name FROM projects p JOIN users u ON u.id=p.user_id WHERE p.slug=?').get(req.params.slug);
   if (!proj) return res.status(404).send('Project not found.');
   const isOwner = proj.user_id === req.session.userId;
-  const reports  = db.prepare('SELECT year,week FROM reports WHERE project_id=? ORDER BY year DESC,week DESC LIMIT 10').all(proj.id);
+  const reports  = reportListWithGaps(proj.id, 10);
   const wsCount  = db.prepare('SELECT COUNT(*) as n FROM workstreams WHERE project_id=?').get(proj.id).n;
   const epicCount= db.prepare('SELECT COUNT(*) as n FROM epics_cache WHERE project_id=?').get(proj.id).n;
   const syncWarning = req.query.syncSource ? [{ source: req.query.syncSource, message: req.query.syncMessage || '' }] : [];
@@ -485,8 +525,15 @@ async function generateReportRow(proj, year, week) {
     ORDER BY year DESC, week DESC LIMIT 1`).get(proj.id, year, year, week);
   const etaDelayed = !!(prevEta?.eta_snapshot && etaIso && etaIso > prevEta.eta_snapshot);
 
-  db.prepare(`INSERT INTO reports(project_id,year,week,exec_summary,highlights_json,risks_json,workstream_statuses_json,workstreams_snapshot_json,epics_snapshot_json,eta_snapshot,eta_delayed,updated_at)
-    VALUES(?,?,?,?,?,?,'{}',?,?,?,?,unixepoch())
+  // Only ever meaningful on the row's first INSERT — deliberately absent from the ON CONFLICT
+  // UPDATE SET below, so an already-backfilled row can't be un-flagged later, and a normal
+  // current-week row being refreshed several times doesn't get re-evaluated on every click (it
+  // would still always come out false for it anyway, since only the current week can be
+  // regenerated at all — but the intent is "set once at creation", not "recomputed every write").
+  const backfilled = isPastWeek(year, week) ? 1 : 0;
+
+  db.prepare(`INSERT INTO reports(project_id,year,week,exec_summary,highlights_json,risks_json,workstream_statuses_json,workstreams_snapshot_json,epics_snapshot_json,eta_snapshot,eta_delayed,backfilled,updated_at)
+    VALUES(?,?,?,?,?,?,'{}',?,?,?,?,?,unixepoch())
     ON CONFLICT(project_id,year,week) DO UPDATE SET
       exec_summary=excluded.exec_summary,
       highlights_json=excluded.highlights_json,
@@ -495,7 +542,7 @@ async function generateReportRow(proj, year, week) {
       epics_snapshot_json=excluded.epics_snapshot_json,
       eta_snapshot=excluded.eta_snapshot,
       eta_delayed=excluded.eta_delayed,
-      updated_at=unixepoch()`).run(proj.id, year, week, execSummary, JSON.stringify(highlights), JSON.stringify(risks), JSON.stringify(resolvedWs), JSON.stringify(epics), etaIso, etaDelayed ? 1 : 0);
+      updated_at=unixepoch()`).run(proj.id, year, week, execSummary, JSON.stringify(highlights), JSON.stringify(risks), JSON.stringify(resolvedWs), JSON.stringify(epics), etaIso, etaDelayed ? 1 : 0, backfilled);
 }
 
 app.post('/projects/:slug/reports/generate', requireAuth, async (req, res) => {
@@ -516,9 +563,7 @@ app.post('/projects/:slug/reports/generate', requireAuth, async (req, res) => {
   // current week (still "live") stays freely regenerable; a past week with no report yet can
   // still be generated for the first time (backfilling a missed week), since there is nothing
   // frozen to lose there.
-  const now = new Date();
-  const isPastWeek = year < isoYear(now) || (year === isoYear(now) && week < isoWeek(now));
-  if (isPastWeek) {
+  if (isPastWeek(year, week)) {
     const existing = db.prepare('SELECT 1 FROM reports WHERE project_id=? AND year=? AND week=?').get(proj.id, year, week);
     if (existing) {
       return res.redirect(`/projects/${proj.slug}?${warningQuery({ source: 'confluence', message: res.locals.t('detail.err_past_week_locked') })}`);
@@ -576,8 +621,23 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, re
   if (isFutureWeek(year, week)) return res.redirect(`/projects/${req.params.slug}`);
   let report = db.prepare('SELECT * FROM reports WHERE project_id=? AND year=? AND week=?').get(proj.id, year, week);
   if (!report) {
-    // Nothing to edit, so a week with no report yet is generated on the fly from
-    // Confluence/Jira the first time its URL is visited (e.g. via the week-nav arrows).
+    if (isPastWeek(year, week)) {
+      // A past week with no report is never auto-generated by mere navigation anymore — that
+      // silently created a permanent, misleading "historical" record built from today's live
+      // data (matrix/risks aren't versioned per week, so a report backfilled weeks late looks
+      // identical to the current week, not to what was actually true back then). Generating one
+      // now is still possible, but only as a deliberate, informed action from this page.
+      const prevW = adjacentWeek(year, week, -1);
+      const nextW = adjacentWeek(year, week, 1);
+      return res.render('report-missing', {
+        proj, year, week, isOwner, userName: req.session.userName,
+        weekStr: `${year}-W${String(week).padStart(2, '0')}`,
+        prevWeekStr: `${prevW.year}-W${String(prevW.week).padStart(2, '0')}`,
+        nextWeekStr: isFutureWeek(nextW.year, nextW.week) ? null : `${nextW.year}-W${String(nextW.week).padStart(2, '0')}`
+      });
+    }
+    // The current week is still "live" — generating it on first visit (e.g. via the week-nav
+    // arrows) reflects today's data for today's week, which is simply accurate, not backfilled.
     try { await generateReportRow(proj, year, week); }
     catch (err) { return res.redirect(`/projects/${req.params.slug}?${warningQuery({ source: 'confluence', message: friendlyError(res.locals.t, err) })}`); }
     report = db.prepare('SELECT * FROM reports WHERE project_id=? AND year=? AND week=?').get(proj.id, year, week);
@@ -638,6 +698,8 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, re
     workstreams: resolvedWs,
     epics: epicsForView,
     stats, health, isOwner,
+    backfilled: !!report.backfilled,
+    generatedAt: formatDate(new Date(report.created_at * 1000).toISOString()),
     lang: req.lang, userName: req.session.userName
   });
 

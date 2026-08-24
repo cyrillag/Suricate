@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="<%= lang %>">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title><%= t('detail.missing_title', { week: weekStr }) %> — Suricate</title>
+<link rel="stylesheet" href="/app.css">
+<link rel="icon" type="image/png" href="/favicon-32.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+</head>
+<body>
+<%- include('_nav', { userName }) %>
+<div class="app-body">
+  <a href="/projects/<%= proj.slug %>" class="back-link">← <%= proj.name %></a>
+
+  <div class="empty-state">
+    <div class="empty-icon">🗓️</div>
+    <h2><%= t('detail.missing_title', { week: weekStr }) %></h2>
+    <p><%= t('detail.missing_explanation') %></p>
+
+    <% if (isOwner) { %>
+    <form method="POST" action="/projects/<%= proj.slug %>/reports/generate">
+      <input type="hidden" name="week" value="<%= weekStr %>">
+      <button type="submit" class="btn-primary"><%= t('detail.missing_generate_cta') %></button>
+    </form>
+    <div class="format-callout" style="max-width:480px;margin:16px auto 0"><%= t('detail.missing_generate_warning') %></div>
+    <% } else { %>
+    <p class="page-sub"><%= t('detail.missing_viewer') %></p>
+    <% } %>
+
+    <p class="page-sub" style="margin-top:24px">
+      <a href="/projects/<%= proj.slug %>/<%= prevWeekStr %>" style="color:var(--cobalt);text-decoration:none">‹ <%= prevWeekStr %></a>
+      <% if (nextWeekStr) { %>
+      &nbsp;·&nbsp;
+      <a href="/projects/<%= proj.slug %>/<%= nextWeekStr %>" style="color:var(--cobalt);text-decoration:none"><%= nextWeekStr %> ›</a>
+      <% } %>
+    </p>
+  </div>
+</div>
+</body>
+</html>

@@ -99,6 +99,17 @@ ensureColumn('reports', 'epics_snapshot_json', 'epics_snapshot_json TEXT');
 ensureColumn('reports', 'eta_snapshot', 'eta_snapshot TEXT');
 ensureColumn('reports', 'eta_delayed', 'eta_delayed INTEGER DEFAULT 0');
 
+// Set once, at the row's first INSERT, never touched again (a past week can never be
+// regenerated, so this is never re-evaluated): whether the ISO week being generated was already
+// in the past *at generation time*. True means this report cannot be a real point-in-time record
+// — the matrix/risks/highlights all reflect whatever Confluence/Jira looked like on the
+// generation date, not the actual conditions during that week (there is no historical snapshot
+// of workstream status to reconstruct from). report-gen.js renders a permanent banner whenever
+// this is set, so nobody mistakes a backfilled report for a real weekly record. 0/NULL on rows
+// generated during their own current week — the normal case — and on legacy rows predating this
+// column, which is the safe default (no false "this was backfilled" claim on old normal reports).
+ensureColumn('reports', 'backfilled', 'backfilled INTEGER DEFAULT 0');
+
 // workstreams had no UNIQUE constraint pre-v2, so every "Sync Jira" click duplicated all rows.
 // Rebuild the table with UNIQUE(project_id,deliverable,name) so syncs upsert instead of duplicating.
 // Safe to do unconditionally at startup: reports.workstream_statuses_json (keyed by workstream id)

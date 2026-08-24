@@ -1,6 +1,6 @@
 const { translate } = require('./i18n');
 
-function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, epics, stats, health, isOwner, etaDelayed, etaDelayedFrom, etaDisplay, lang, userName }) {
+function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, epics, stats, health, isOwner, etaDelayed, etaDelayedFrom, etaDisplay, lang, userName, backfilled, generatedAt }) {
   const weekStr = `W${String(week).padStart(2, '0')}`;
   const yearWeek = `${year}-${weekStr}`;
   const dateLabel = isoWeekMonday(year, week);
@@ -90,6 +90,10 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
   const brandName = esc(translate(lang, 'nav.brand'));
   const tagline = esc(translate(lang, 'nav.tagline'));
   const logoutLabel = esc(translate(lang, 'nav.logout'));
+  // Permanent, baked into the frozen snapshot itself (not a today-only warning on the way in) —
+  // anyone reading this report later, even as a standalone export/screenshot, needs to know it's
+  // not a real point-in-time record (see FUNCTIONAL_RULES.md's backfilled-report rule).
+  const backfillNotice = backfilled ? esc(translate(lang, 'detail.backfilled_notice', { date: generatedAt, week: `${weekStr}/${year}` })) : null;
 
   return `<!DOCTYPE html>
 <html lang="${esc(lang)}">
@@ -148,6 +152,8 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
       </div>
     </div>
   </div>
+
+  ${backfillNotice ? `<div class="backfill-notice">${backfillNotice}</div>` : ''}
 
   <div class="doc-section">
     <div class="section-label">Project identity</div>
@@ -416,6 +422,7 @@ const CSS = `
   .week-arrow.week-arrow-disabled{color:var(--sgr);border-color:var(--bd2);cursor:default}
   .week-arrow.week-arrow-disabled:hover{border-color:var(--bd2);color:var(--sgr)}
   .ref-week{font-family:var(--f);font-size:18px;font-weight:700;color:var(--tx);line-height:1;text-align:center;min-width:70px}
+  .backfill-notice{background:#fcf4d6;border:1px solid #f1c21b;color:var(--db);border-radius:var(--r);padding:9px 14px;font-size:13px;font-weight:600;margin-bottom:16px}
   .doc-section{background:var(--sur);border:1px solid var(--bd);border-top:3px solid var(--mb);border-radius:var(--r);margin-bottom:16px;overflow:hidden}
   .section-label{font-size:15px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mb);padding:11px 20px 10px;border-bottom:1px solid var(--bd2);background:var(--sur);display:flex;align-items:center;justify-content:space-between}
   .section-label .sl-right{color:var(--tx3);font-weight:400;letter-spacing:.04em}
