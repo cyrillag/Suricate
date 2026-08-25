@@ -630,7 +630,7 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, re
       const prevW = adjacentWeek(year, week, -1);
       const nextW = adjacentWeek(year, week, 1);
       return res.render('report-missing', {
-        proj, year, week, isOwner, userName: req.session.userName,
+        proj, year, week, userName: req.session.userName,
         weekStr: `${year}-W${String(week).padStart(2, '0')}`,
         prevWeekStr: `${prevW.year}-W${String(prevW.week).padStart(2, '0')}`,
         nextWeekStr: isFutureWeek(nextW.year, nextW.week) ? null : `${nextW.year}-W${String(nextW.week).padStart(2, '0')}`

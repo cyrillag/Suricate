@@ -92,10 +92,7 @@ const DICT = {
     // The "missing week" page (report-missing.ejs) — a past week that was never generated, shown
     // instead of the old silent auto-backfill-on-visit behaviour (see FUNCTIONAL_RULES.md).
     missing_title: { fr: 'Aucun rapport pour {{week}}', en: 'No report for {{week}}' },
-    missing_explanation: { fr: 'Personne n’a généré de rapport pour cette semaine passée. Contrairement à la semaine en cours, une semaine passée n’est jamais générée automatiquement — la matrice et les risques ne sont pas versionnés par semaine, donc un rapport généré après coup afficherait l’état d’aujourd’hui, pas ce qui était vrai à l’époque.', en: 'Nobody generated a report for this past week. Unlike the current week, a past week is never generated automatically — the matrix and risks aren’t versioned per week, so a report generated after the fact would show today’s state, not what was actually true then.' },
-    missing_generate_cta: { fr: 'Générer quand même', en: 'Generate anyway' },
-    missing_generate_warning: { fr: 'Utilisera les données d’aujourd’hui, pas nécessairement ce qui était vrai pendant cette semaine — et restera ensuite figé pour toujours, comme tout rapport passé.', en: 'Will use today’s data, not necessarily what was true during that week — and will then stay frozen forever, like any past report.' },
-    missing_viewer: { fr: 'Aucun rapport n’a été généré pour cette semaine.', en: 'No report was generated for this week.' },
+    missing_explanation: { fr: 'Personne n’a généré de rapport pour cette semaine passée. Contrairement à la semaine en cours, une semaine passée n’est jamais générée automatiquement.', en: 'Nobody generated a report for this past week. Unlike the current week, a past week is never generated automatically.' },
     backfilled_notice: { fr: '⚠ Généré le {{date}}, après coup — reflète les données au moment de la génération, pas nécessairement l’état réel de la semaine {{week}}.', en: '⚠ Generated on {{date}}, after the fact — reflects data as of generation, not necessarily what was true during week {{week}}.' },
 
     // Human-readable translations of every classified sync/integration failure (see errors.js
