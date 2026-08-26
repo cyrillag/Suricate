@@ -11,30 +11,25 @@
 <body>
 <%- include('_nav', { userName }) %>
 <div class="app-body">
-  <a href="/projects/<%= proj.slug %>" class="back-link">← <%= proj.name %></a>
+  <div class="page-header">
+    <div>
+      <a href="/projects/<%= proj.slug %>" class="back-link">← <%= proj.name %></a>
+    </div>
+    <div class="week-nav">
+      <a class="week-arrow" href="/projects/<%= proj.slug %>/<%= prevWeekStr %>" aria-label="Previous week">&#x2039;</a>
+      <div class="ref-week"><%= weekStr %></div>
+      <% if (nextWeekStr) { %>
+      <a class="week-arrow" href="/projects/<%= proj.slug %>/<%= nextWeekStr %>" aria-label="Next week">&#x203A;</a>
+      <% } else { %>
+      <span class="week-arrow week-arrow-disabled" aria-disabled="true">&#x203A;</span>
+      <% } %>
+    </div>
+  </div>
 
   <div class="empty-state">
     <div class="empty-icon">🗓️</div>
     <h2><%= t('detail.missing_title', { week: weekStr }) %></h2>
     <p><%= t('detail.missing_explanation') %></p>
-
-    <% if (isOwner) { %>
-    <form method="POST" action="/projects/<%= proj.slug %>/reports/generate">
-      <input type="hidden" name="week" value="<%= weekStr %>">
-      <button type="submit" class="btn-primary"><%= t('detail.missing_generate_cta') %></button>
-    </form>
-    <div class="format-callout" style="max-width:480px;margin:16px auto 0"><%= t('detail.missing_generate_warning') %></div>
-    <% } else { %>
-    <p class="page-sub"><%= t('detail.missing_viewer') %></p>
-    <% } %>
-
-    <p class="page-sub" style="margin-top:24px">
-      <a href="/projects/<%= proj.slug %>/<%= prevWeekStr %>" style="color:var(--cobalt);text-decoration:none">‹ <%= prevWeekStr %></a>
-      <% if (nextWeekStr) { %>
-      &nbsp;·&nbsp;
-      <a href="/projects/<%= proj.slug %>/<%= nextWeekStr %>" style="color:var(--cobalt);text-decoration:none"><%= nextWeekStr %> ›</a>
-      <% } %>
-    </p>
   </div>
 </div>
 </body>
