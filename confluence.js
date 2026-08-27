@@ -267,8 +267,12 @@ function parseRisks(html) {
     const ref = stripTags(cells[0].html);
     const desc = stripTags(cells[1].html);
     const scoreText = stripTags(cells[2].html).toLowerCase();
+    // Extreme is a step above High, not a synonym for it — folding it into 'high' silently
+    // dropped the distinction the Confluence risk matrix's own colour scale (Yellow/Orange/Red)
+    // makes, understating the most severe risks on a page as "just High" like everything else.
     let level = 'medium';
-    if (/high|extreme/.test(scoreText)) level = 'high';
+    if (/extreme/.test(scoreText)) level = 'extreme';
+    else if (/high/.test(scoreText)) level = 'high';
     else if (/very low|^low/.test(scoreText)) level = 'low';
     const mitigation = liItems(cells[4].html).map(i => i.text).join('; ') || stripTags(cells[4].html);
     if (desc) risks.push({ ref, level, desc, mitigation });

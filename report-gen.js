@@ -470,6 +470,10 @@ const CSS = `
   .risk-l{display:flex;flex-direction:column;gap:6px;align-items:flex-start;flex-shrink:0;min-width:80px}
   .risk-ref{font-family:var(--fm);font-size:12.5px;color:var(--tx3);letter-spacing:.05em}
   .risk-badge{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:3px 8px;border-radius:2px;white-space:nowrap}
+  /* Extreme is a step above High on the Confluence risk matrix's own Yellow/Orange/Red scale, not
+     a synonym for it — a filled solid badge (same idea as the Delayed health badge) reads as more
+     severe than High's light-fill-plus-border treatment, instead of the two looking identical. */
+  .risk-badge.extreme{background:var(--blk-c);color:#fff;border:1px solid var(--blk-c)}
   .risk-badge.high{background:var(--blk-bg);color:var(--blk-c);border:1px solid #F4A17D}
   .risk-badge.medium{background:#FFF6D6;color:var(--db);border:1px solid #FFE16D}
   .risk-badge.low{background:var(--ts-bg);color:var(--ts-c);border:1px solid var(--bd)}
