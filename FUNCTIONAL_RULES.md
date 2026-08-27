@@ -104,7 +104,13 @@ to be re-applied here by hand rather than resolved by merging code:
 
 - A risk whose Confluence Status is **Closed** must never appear in the report — by definition the
   issue is already resolved, so it has nothing to report on for the current week.
-- Risk level (High/Medium/Low) is read from the status-macro title in the "Score" column.
+- Risk level (Extreme/High/Medium/Low) is read from the status-macro title in the "Score" column.
+  **Extreme is its own level, not folded into High** — Confluence's risk matrix scores on a
+  Yellow/Orange/Red scale where Red = Extreme is a step above Orange/Yellow = High, and collapsing
+  them would understate the report's most severe risks as merely "High" like everything else. It
+  gets a visually distinct filled badge (report-gen.js `.risk-badge.extreme`) for the same reason
+  Delayed gets a filled badge instead of reusing At Risk's — a more severe/definite state should
+  look more severe, not identical to the tier below it.
 
 ## Project health badge (On Track / At Risk / Delayed)
 
