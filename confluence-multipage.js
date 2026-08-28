@@ -89,6 +89,19 @@ function scoreToLevel(score) {
   return 'low';
 }
 
+// A page like this one strings multiple dated status updates into a single cell (bullet points,
+// or ";"/newline-separated points) — the report's risk description/mitigation slots expect one
+// short line, same as a normal single-page project's risk table, not the whole update history.
+// Take just the first point rather than joining everything.
+function firstPoint(cellHtml, maxLen = 160) {
+  const items = liItems(cellHtml);
+  // Split on a bullet-like ";", a line break, or a sentence boundary (period + space) — whichever
+  // convention this particular cell happens to use to string multiple points together.
+  const raw = items.length ? items[0].text : stripTags(cellHtml).split(/;|\n|\.\s+/)[0];
+  const text = raw.trim();
+  return text.length > maxLen ? text.slice(0, maxLen).trim() + '…' : text;
+}
+
 // Two risk-register shapes seen in the wild:
 //  - "legacy": Référence | Description | Score (a status-lozenge title: High/Medium/Low/Extreme)
 //    | Status | Mitigation — see confluence.js's parseRisks, same convention.
@@ -122,8 +135,11 @@ function parseRiskRegisterPage(html) {
     if (!/^[A-Za-z]+[_-]?\d+$/.test(ref)) continue; // skip blank/scaffold rows
     const statusText = stripTags(cells[statusIdx]?.html || '').toLowerCase();
     if (/closed/.test(statusText)) continue;
-    const desc = stripTags(cells[descIdx]?.html || '');
-    const mitigation = mitigationIdx !== -1 ? (liItems(cells[mitigationIdx].html).map(i => i.text).join('; ') || stripTags(cells[mitigationIdx].html)) : '';
+    // The legacy schema's desc/mitigation are already short one-liners (same convention as every
+    // single-page project) — only the numeric schema's cells have been seen holding a whole
+    // running history, so only that branch needs trimming to the first point.
+    const desc = numericSchema ? firstPoint(cells[descIdx]?.html || '') : stripTags(cells[descIdx]?.html || '');
+    const mitigation = mitigationIdx === -1 ? '' : numericSchema ? firstPoint(cells[mitigationIdx].html) : (liItems(cells[mitigationIdx].html).map(i => i.text).join('; ') || stripTags(cells[mitigationIdx].html));
     let level;
     if (numericSchema) {
       const score = parseInt(stripTags(cells[scoreIdx]?.html || ''), 10);
@@ -193,6 +209,10 @@ function parseActionsPage(html) {
   const commentIdx = findCol(header, [/comment|followup|how/]);
   const statusIdx = findCol(header, [/status/]);
   const etaIdx = findCol(header, [/eta|when/]);
+  // Not present on this page, but checked for generally (see groupActionsByWorkstream's signal
+  // 1) — a differently-authored log might dedicate its own column to the workstream instead of
+  // using a divider row.
+  const workstreamColIdx = findCol(header, [/^workstream$/, /^track$/, /^category$/]);
 
   const actions = [];
   for (const cells of dataRows) {
@@ -203,10 +223,11 @@ function parseActionsPage(html) {
       owner: ownerIdx !== -1 ? stripTags(cells[ownerIdx]?.html || '') : null,
       comment: commentIdx !== -1 ? stripTags(cells[commentIdx]?.html || '') : null,
       status: statusIdx !== -1 ? stripTags(cells[statusIdx]?.html || '') : null,
-      eta: etaIdx !== -1 ? stripTags(cells[etaIdx]?.html || '') : null
+      eta: etaIdx !== -1 ? stripTags(cells[etaIdx]?.html || '') : null,
+      workstreamCol: workstreamColIdx !== -1 ? stripTags(cells[workstreamColIdx]?.html || '') : null
     });
   }
-  return { status: 'parsed', actions };
+  return { status: 'parsed', actions, header };
 }
 
 // Best-effort reuse of the existing single-page parsers for Planning/Weekly child pages, in case
@@ -229,27 +250,81 @@ function mapActionStatus(status) {
   return 'ts';
 }
 
-// The Actions Log's row shape (Deliverable/Action, Owner, Comments, Status, ETA) already lines up
-// almost exactly with the report's deliverable-matrix columns — reusing it directly means a
-// multi-page project doesn't need a *second*, separate "Deliverables status" table just for the
-// matrix. Each action becomes its own single-workstream deliverable, since a flat action list has
-// no deliverable/workstream grouping hierarchy of its own. A row with a "what" but nothing else
-// at all (no status/comment/ETA) is a PM's section-divider row (e.g. "Legal", "Marketing" used to
-// group the items below it), not a real trackable item — dropped rather than shown as a fake
-// always-To-Start workstream.
+// ── Workstream/deliverable identification (general rule, not specific to this one page) ────────
+// Definition (given by the user, corrected from this POC's earlier — backwards — usage): a
+// WORKSTREAM is a functional track/parallel thread that organizes a group of related tasks; a
+// DELIVERABLE is one concrete, tangible-or-not output produced within it. A deliverable is a
+// subset of a workstream, never the other way round.
+//
+// A source table's own structural grouping is what tells us which rows are "one workstream", in
+// order of reliability:
+//   1. An explicit column already named for it (Workstream/Team/Track/Category), distinct from
+//      the item/action name column — use it directly, no inference needed.
+//   2. A rowspan-merged leading cell (see confluence.js's parseDeliverables — the single-page
+//      "Deliverables status" table already works this way): the merged label is the workstream,
+//      each row it spans is one deliverable under it.
+//   3. A "divider" row carrying only the item-name cell with every other cell on that row blank
+//      (seen on this Actions Log: a bare "Legal"/"Marketing"/"PU" row with no status/comment/ETA)
+//      — same grouping idea expressed without rowspan. The divider's text is the workstream;
+//      every populated row until the next divider is a deliverable under it.
+// A deliverable that no signal groups at all becomes its own single-deliverable workstream (same
+// "ungrouped" fallback confluence.js's parseDeliverables already applies), rather than being
+// dropped or mislabeled as something it isn't.
+//
+// This Actions Log only exercises signal 3 in practice (its columns are What/Owner/Comments/
+// Status/ETA — no dedicated Workstream column, and rowspan isn't how this particular page's
+// author expressed grouping), but the check order is written generally so a differently-authored
+// project's log can be plugged in without rewriting this function.
+function groupActionsByWorkstream(actions) {
+  const groups = [];
+  let current = null;
+  for (const a of actions) {
+    if (!a.what) continue;
+
+    if (a.workstreamCol) {
+      // Signal 1: an explicit column already says which workstream this row belongs to.
+      if (!current || current.workstream !== a.workstreamCol) {
+        current = { workstream: a.workstreamCol, deliverables: [] };
+        groups.push(current);
+      }
+      current.deliverables.push(a);
+      continue;
+    }
+
+    // Signal 3: a divider row (only the item-name cell populated) names the workstream for every
+    // deliverable row that follows, until the next divider.
+    const isDividerRow = !a.status && !a.comment && !a.eta;
+    if (isDividerRow) { current = { workstream: a.what, deliverables: [] }; groups.push(current); continue; }
+
+    if (!current) { current = { workstream: a.what, deliverables: [] }; groups.push(current); }
+    current.deliverables.push(a);
+  }
+  return groups;
+}
+
+// Adapts the grouped {workstream, deliverables[]} shape onto report-gen.js's existing, unmodified
+// matrix row shape — which still names its own fields `deliverable` (the rowspan-grouped column)
+// and `name` (the individual row) from this POC's earlier, backwards usage of those terms. Scope
+// decision: fix the identification logic above, but don't rename report-gen.js's template/columns
+// or the app's shipped `workstreams` DB schema — those are today's real, in-use production
+// terminology and out of scope for this POC. So yes, `deliverable: g.workstream` below really is
+// putting a workstream's name into the field literally called `deliverable` — deliberate, not a
+// regression of the fix.
+function groupsToMatrixRows(groups) {
+  return groups.flatMap(g => g.deliverables.map(a => ({
+    deliverable: g.workstream,
+    name: a.what,
+    team: a.owner || null,
+    status: mapActionStatus(a.status),
+    // ETA is free text on this page ("11 décembre", empty, etc.) — no reliable parse without
+    // guessing a date format per project, and a wrong date is worse than none (see
+    // FUNCTIONAL_RULES.md's "no date beats a wrong date" rule), so this stays unset for now.
+    endDate: null
+  })));
+}
+
 function actionsToWorkstreams(actions) {
-  return actions
-    .filter(a => a.what && (a.status || a.comment || a.eta))
-    .map(a => ({
-      deliverable: a.what,
-      name: a.what,
-      team: a.owner || null,
-      status: mapActionStatus(a.status),
-      // ETA is free text on this page ("11 décembre", empty, etc.) — no reliable parse without
-      // guessing a date format per project, and a wrong date is worse than none (see
-      // FUNCTIONAL_RULES.md's "no date beats a wrong date" rule), so this stays unset for now.
-      endDate: null
-    }));
+  return groupsToMatrixRows(groupActionsByWorkstream(actions));
 }
 
 function computeStats(workstreams) {
@@ -386,7 +461,7 @@ async function discoverAndParse(token, spaceKey, hubTitle) {
 module.exports = {
   classifyTitle, fetchChildren, fetchBodyById, fetchVersionHistory, fetchBodyAtOrBefore,
   parseRiskRegisterPage, parseDecisionsPage, parseActionsPage, parseGenericTablePage,
-  actionsToWorkstreams, computeStats,
+  groupActionsByWorkstream, groupsToMatrixRows, actionsToWorkstreams, computeStats,
   diffActionsToAchievements, diffRisksToBlockers, diffDecisionsToAchievementsAndClarify,
   buildWeeklyReportInputs, discoverAndParse
 };

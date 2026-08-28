@@ -115,19 +115,65 @@ to be re-applied here by hand rather than resolved by merging code:
   Score that's their product against a 3×3 legend grid elsewhere on the page). Bucketing: ≥9 →
   extreme, ≥6 → high, ≥3 → medium, else low — matches the observed 1/2/3/4/6/9 grid exactly and
   reuses the same Closed-risk exclusion rule as the legacy parser.
-- **Decisions register and Actions log are two entirely new categories** the current report has no
-  section for at all — this POC added minimal, always-optional sections to `report-gen.js`
-  (`decisions`/`actions` params, default `[]`, rendered nothing when empty) reusing the existing
-  `.risk-item`/`.risk-badge` visual language rather than inventing new styling, specifically so
-  every *existing* project (which never passes these params) renders identically to before.
-- **Proven feasible** against the real "WordPress Managed" project: discovery correctly classified
-  all 12 child pages, the numeric risk schema parsed correctly (all rows were Closed — a completed
-  project — validating the exclusion rule against the new shape too), Decisions and Actions parsed
-  real structured data and rendered cleanly. **Proven NOT fully achievable for that specific
-  project**: its "Planning" and "Weekly flash reports" child pages are external links only (Jira
-  BigPicture, SharePoint) with no real Confluence table — no amount of parser flexibility recovers
-  data that was never in Confluence to begin with. A full end-to-end report needs a project whose
-  Planning/Weekly content actually lives in Confluence.
+- **No new report sections, ever — the existing template is the hard constraint.** An earlier pass
+  of this POC added optional "Decisions register"/"Actions log" sections to `report-gen.js`; the
+  user explicitly rejected that. The current approach solves both problems by feeding the *existing*
+  sections from different sources instead, detailed below.
+- **Workstream/deliverable identification, corrected.** This POC initially had the terms backwards
+  (calling the grouping label "deliverable" and the individual item "workstream" — the same
+  inversion this whole app's shipped terminology and DB schema apparently also carry "depuis le
+  départ", per the user, but fixing *that* is out of scope for this POC by explicit decision — see
+  below). Correct definition: a **workstream** is a functional track/parallel thread organizing a
+  group of related tasks; a **deliverable** is one concrete output produced within it — a
+  deliverable is a subset of a workstream, never the reverse. `groupActionsByWorkstream` identifies
+  a workstream grouping in a source table via three structural signals, checked in order of
+  reliability: (1) an explicit column already named for it (Workstream/Track/Category) if the page
+  has one; (2) a rowspan-merged leading cell (the mechanism confluence.js's `parseDeliverables`
+  already relies on); (3) a "divider" row carrying only the item-name cell with every other cell on
+  that row blank (seen on this Actions Log: a bare "Legal"/"Marketing"/"PU" row groups the
+  populated rows that follow it, until the next divider). An item no signal groups becomes its own
+  single-deliverable workstream rather than being dropped.
+  - **Scope decision, explicitly confirmed with the user**: only this POC's *identification logic*
+    got corrected. report-gen.js's matrix columns, the `workstreams` DB table's `deliverable`/`name`
+    columns, and every existing label stay as they are in production — real people already read
+    reports built on that terminology every week, and renaming it is a separate, larger decision the
+    user deferred. Concretely, `groupsToMatrixRows` puts a workstream's name into the matrix row
+    field literally called `deliverable` — a deliberate, documented mismatch, not a regression.
+- **Deliverable matrix, populated from the Actions Log.** Its row shape (Deliverable-or-Action/
+  Owner/Comments/Status/ETA) doesn't need a second, separate "Deliverables status" table — signal 3
+  above groups its rows directly into the matrix. `mapActionStatus` additionally recognizes this
+  page's own status vocabulary ("ON GOING"/"ON PAUSE", space-separated, not just "WIP"/"blocked")
+  and treats "on pause" as In Progress, same treatment FUNCTIONAL_RULES.md's Risks section documents
+  for a paused Jira epic. ETA is free text ("11 décembre", "For Summit", empty) with no reliable
+  parse — matrix rows show "No date" rather than a guessed one.
+- **Week highlights (Achievements/Blockers/Clarify), derived from what changed.** This project has
+  no "Week summary" table anywhere in Confluence — the user's own hypothesis, proven out: diff the
+  Actions Log/Risk Register/Decisions register between two points in time instead.
+  `fetchBodyAtOrBefore` walks Confluence's real per-page version history to get each page's actual
+  state "as of" an instant — no fabricated snapshots. An action flipping to Done, a decision
+  flipping to (or starting) Taken, and a brand-new risk/pending-decision each map to one of the
+  three categories; matched by `what`/ref/id text since none of these pages has a stable per-row
+  identity otherwise.
+- **Risk register text must stay terse**, same expectation as a normal single-page project's risk
+  table. The numeric-schema pages seen so far string a whole running history of dated updates into
+  one cell (semicolon/newline/bullet-separated) — `firstPoint()` takes only the first point rather
+  than joining all of them, splitting on whichever convention (";", a line break, or a sentence
+  boundary) that particular cell happens to use.
+- **Proven feasible** against the real "WordPress Managed" project, diffing 2025-10-20 →
+  2025-10-27 (a week with real edits on all three source pages): a real Achievement (a decision
+  taken), a real Blocker (a new risk), and a correctly-grouped ~20-row deliverable matrix (Legal,
+  Product, Marketing, Design, PU, Support (CCO), etc. as workstreams) — rendered through the actual,
+  unmodified report-gen.js. **Proven NOT fully achievable for that specific project**: its
+  "Planning" and "Weekly flash reports" child pages are external links only (Jira BigPicture,
+  SharePoint) with no real Confluence table — no amount of parser flexibility recovers data that
+  was never in Confluence to begin with.
+- **Not yet wired into real project creation.** The demo so far runs as a standalone script with a
+  hardcoded project identity, not through Suricate's actual "New Project" flow. The user was clear
+  the end state must be a real project entry using the *same* fields Suricate already collects
+  (name, root Jira epic, Confluence page URL) — no separate onboarding path for multi-page
+  projects. The natural integration point once this POC is promoted: `syncConfluenceProject` tries
+  the single-page format first, and falls back to multi-page discovery only when that page doesn't
+  validate — not yet implemented.
 - Two Actions Log gotchas worth remembering if this gets picked back up: some Actions Log pages
   also carry a giant day-by-day calendar/Gantt table alongside the real register — skip any table
   with an implausible column count (>8) for what should be a 5-ish-column register. And when a page
