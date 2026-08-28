@@ -292,5 +292,9 @@ async function syncProjectFromConfluence(token, spaceKey, title, week) {
 
 module.exports = {
   fetchPageBody, fetchContentById, resolvePageUrl, validatePageFormat,
-  parseExecSummary, parseWeekSummary, parseDeliverables, parseRisks, syncProjectFromConfluence
+  parseExecSummary, parseWeekSummary, parseDeliverables, parseRisks, syncProjectFromConfluence,
+  // Low-level HTML helpers, additionally exported for confluence-multipage.js (POC — see
+  // FUNCTIONAL_RULES.md) to reuse instead of duplicating its own copy.
+  confluenceFetch, extractSection, extractTables, extractRows, extractCells, stripTags,
+  stripTagsKeepEmphasis, jiraKeyFromCell, jiraKeysFromCell, liItems, categoryItems
 };

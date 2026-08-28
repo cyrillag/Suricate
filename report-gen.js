@@ -1,6 +1,6 @@
 const { translate } = require('./i18n');
 
-function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, epics, stats, health, isOwner, etaDelayed, etaDelayedFrom, etaDisplay, lang, userName, backfilled, generatedAt }) {
+function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, epics, stats, health, isOwner, etaDelayed, etaDelayedFrom, etaDisplay, lang, userName, backfilled, generatedAt, decisions = [], actions = [] }) {
   const weekStr = `W${String(week).padStart(2, '0')}`;
   const yearWeek = `${year}-${weekStr}`;
   const dateLabel = isoWeekMonday(year, week);
@@ -69,6 +69,33 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
         </div>
       </div>`).join('')
     : '<div style="padding:14px 20px;font-size:13px;color:#636369">No risks recorded this week.</div>';
+
+  // POC (see FUNCTIONAL_RULES.md "Multi-page Confluence discovery") — Decisions/Actions come from
+  // a project's separate "Decisions register"/"Actions Log" Confluence pages, not every project's
+  // single-page setup, so both default to [] and render nothing when absent.
+  const decisionsHTML = decisions.map(d => `
+    <div class="risk-item">
+      <div class="risk-l">
+        <span class="risk-ref">${esc(d.id)}</span>
+        <div class="risk-badge ${/taken|done|closed/i.test(d.status || '') ? 'low' : 'medium'}">${esc(d.status || '')}</div>
+      </div>
+      <div>
+        <div class="risk-desc">${esc(d.desc)}</div>
+        <div class="risk-mit">${esc((d.decision || '').slice(0, 220))}${(d.decision || '').length > 220 ? '…' : ''}</div>
+      </div>
+    </div>`).join('');
+
+  const actionsHTML = actions.map(a => `
+    <div class="risk-item">
+      <div class="risk-l">
+        <span class="risk-ref">${esc(a.owner || '—')}</span>
+        <div class="risk-badge ${/done/i.test(a.status || '') ? 'low' : /wip|progress/i.test(a.status || '') ? 'medium' : 'high'}">${esc(a.status || 'Open')}</div>
+      </div>
+      <div>
+        <div class="risk-desc">${esc(a.what)}</div>
+        <div class="risk-mit">${esc((a.comment || '').slice(0, 220))}${(a.comment || '').length > 220 ? '…' : ''}</div>
+      </div>
+    </div>`).join('');
 
   // Gantt data — an epic with no Start/End date still gets listed (name/team/status), it just
   // has no bar to draw; excluding it from the section entirely would make it invisible instead
@@ -241,6 +268,18 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
       <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#0050D5"></div>In Progress</div>
       <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#BEC0C6;border:1px dashed #C8CAD4"></div>To Start</div>
     </div>
+  </div>` : ''}
+
+  ${decisions.length ? `
+  <div class="doc-section">
+    <div class="section-label">Decisions register</div>
+    <div class="risk-list">${decisionsHTML}</div>
+  </div>` : ''}
+
+  ${actions.length ? `
+  <div class="doc-section">
+    <div class="section-label">Actions log</div>
+    <div class="risk-list">${actionsHTML}</div>
   </div>` : ''}
 
 </div>
