@@ -99,7 +99,12 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
     }).join('');
   };
 
-  const risksHTML = risks.length
+  // `risks === null` means the source has no risk table at all (distinct from `risks === []`,
+  // a real table that's currently empty) — the whole Risk register block is hidden rather than
+  // showing a "No risks recorded" that would misleadingly imply risks are actually being tracked.
+  // Every classic single-page project always has a risk table by the required Confluence format,
+  // so this only ever applies to a source explicitly built without one.
+  const risksHTML = !risks ? null : risks.length
     ? risks.map((r, i) => `
       <div class="risk-item">
         <div class="risk-l">
@@ -232,7 +237,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
   </div>
 
   <div class="doc-section">
-    <div class="sr-grid">
+    <div class="sr-grid${risksHTML === null ? ' sr-grid-solo' : ''}">
       <div class="sr-left">
         <div class="section-label"><span>Status overview</span><span class="sl-right">${stats.total} ws · ${crossTabMatrix ? crossTabMatrix.rows.length : deliverables.length} del.</span></div>
         <div class="chart-pane">
@@ -245,10 +250,11 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
           </div>
         </div>
       </div>
+      ${risksHTML === null ? '' : `
       <div class="sr-right">
         <div class="section-label">Risk register</div>
         <div class="risk-list">${risksHTML}</div>
-      </div>
+      </div>`}
     </div>
   </div>
 
@@ -503,7 +509,11 @@ const CSS = `
   .ji{font-family:var(--fm);font-size:12.5px;color:var(--cobalt);background:var(--prog-bg);padding:1px 5px;border-radius:2px;text-decoration:none;margin-left:4px}
   .ji:hover{text-decoration:underline}
   .sr-grid{display:grid;grid-template-columns:1fr 2fr}
+  .sr-grid.sr-grid-solo{grid-template-columns:1fr}
   .sr-left{border-right:1px solid var(--bd2)}
+  .sr-grid-solo .sr-left{border-right:none}
+  .sr-grid-solo .chart-pane{flex-direction:row;justify-content:center;gap:40px;padding:24px 32px}
+  .sr-grid-solo .chart-legend{width:auto;max-width:260px}
   .chart-pane{padding:24px;display:flex;flex-direction:column;align-items:center;gap:20px}
   .chart-legend{display:flex;flex-direction:column;gap:9px;width:100%}
   .leg-row{display:flex;align-items:center;gap:6px}

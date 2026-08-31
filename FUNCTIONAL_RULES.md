@@ -224,6 +224,15 @@ to be re-applied here by hand rather than resolved by merging code:
   gets a visually distinct filled badge (report-gen.js `.risk-badge.extreme`) for the same reason
   Delayed gets a filled badge instead of reusing At Risk's — a more severe/definite state should
   look more severe, not identical to the tier below it.
+- **No risk table on the source at all → the whole Risk register block is hidden, not shown empty.**
+  `risks === null` (distinct from `risks === []`, a real table that's simply empty this week) means
+  the source has no risk-tracking table whatsoever — report-gen.js hides the section entirely
+  rather than rendering "No risks recorded this week", which would misleadingly imply risks *are*
+  being tracked and none currently exist. Every classic single-page project always has a risk table
+  by the required Confluence format, so `risks` is always at worst `[]`, never `null`, for it —
+  this only applies to a source genuinely built without one (e.g. VPC M1's page has no risk section
+  at all — see FUNCTIONAL_RULES.md's multi-page POC notes). The Status overview panel widens to
+  fill the freed space (`.sr-grid-solo`) instead of leaving a blank half.
 
 ## Project health badge (On Track / At Risk / Delayed)
 
