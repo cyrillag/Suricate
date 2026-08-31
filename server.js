@@ -702,6 +702,11 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, re
     stats, health, isOwner,
     backfilled: !!report.backfilled,
     generatedAt: formatDate(new Date(report.created_at * 1000).toISOString()),
+    // POC only — see cross_tab_matrix_json/region_rollout_json in db.js. NULL/absent for every
+    // project outside the multi-page POC, which keeps genReport()'s defaults (classic matrix, no
+    // region section).
+    crossTabMatrix: report.cross_tab_matrix_json ? JSON.parse(report.cross_tab_matrix_json) : null,
+    regionRollout: report.region_rollout_json ? JSON.parse(report.region_rollout_json) : [],
     lang: req.lang, userName: req.session.userName
   });
 

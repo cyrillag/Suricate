@@ -110,6 +110,13 @@ ensureColumn('reports', 'eta_delayed', 'eta_delayed INTEGER DEFAULT 0');
 // column, which is the safe default (no false "this was backfilled" claim on old normal reports).
 ensureColumn('reports', 'backfilled', 'backfilled INTEGER DEFAULT 0');
 
+// POC only (see FUNCTIONAL_RULES.md "Multi-page Confluence discovery") — the two project-specific
+// matrix/section exceptions approved for VPC M1, passed straight through to report-gen.js's
+// crossTabMatrix/regionRollout params. NULL for every project that doesn't use them (which is
+// every project outside this POC), so this is inert everywhere else.
+ensureColumn('reports', 'cross_tab_matrix_json', 'cross_tab_matrix_json TEXT');
+ensureColumn('reports', 'region_rollout_json', 'region_rollout_json TEXT');
+
 // workstreams had no UNIQUE constraint pre-v2, so every "Sync Jira" click duplicated all rows.
 // Rebuild the table with UNIQUE(project_id,deliverable,name) so syncs upsert instead of duplicating.
 // Safe to do unconditionally at startup: reports.workstream_statuses_json (keyed by workstream id)
