@@ -665,8 +665,10 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, re
   const risks = JSON.parse(report.risks_json);
   // Workstream progress alone doesn't tell the whole story — a page can list an open HIGH risk
   // while every workstream is still nominally on schedule. Surfacing that risk was the entire
-  // point of the Risk matrix section, so it must be able to flip the badge too.
-  const hasHighRisk = risks.some(r => r.level === 'high');
+  // point of the Risk matrix section, so it must be able to flip the badge too. `risks` is null
+  // for a source with no risk table at all (see report-gen.js's risksHTML) rather than the usual
+  // real-but-possibly-empty array — nothing to surface either way.
+  const hasHighRisk = !!risks && risks.some(r => r.level === 'high');
   const etaDelayed = !!report.eta_delayed;
   // Delayed is a fact (the date already moved), At Risk is a projection (it might) — not the same
   // thing, so a slip gets its own badge state rather than being folded into "At Risk". Delayed
