@@ -1,6 +1,6 @@
 const { translate } = require('./i18n');
 
-function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, epics, stats, health, isOwner, etaDelayed, etaDelayedFrom, etaDisplay, lang, userName, backfilled, generatedAt }) {
+function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, epics, stats, health, isOwner, etaDelayed, etaDelayedFrom, etaDisplay, lang, userName, backfilled, generatedAt, crossTabMatrix = null, regionRollout = [] }) {
   const weekStr = `W${String(week).padStart(2, '0')}`;
   const yearWeek = `${year}-${weekStr}`;
   const dateLabel = isoWeekMonday(year, week);
@@ -46,6 +46,49 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
         </tr>`;
     }).join('');
   }).join('');
+
+  // Project-specific exception (see FUNCTIONAL_RULES.md): when a source's own deliverable matrix
+  // is genuinely a deliverable-by-team cross-tab (a deliverable can span several teams at once,
+  // not belong to exactly one), flattening it into the classic rowspan-grouped two-column table
+  // would lose that shape — crossTabMatrix renders it as-is instead. Every other project leaves
+  // this null and gets the unmodified classic table, byte-for-byte.
+  const matrixSectionHTML = crossTabMatrix ? `
+  <div class="matrix-section">
+    <div class="section-label"><span>Deliverable matrix</span></div>
+    <div class="matrix-scroll">
+      <table class="mx">
+        <thead><tr>
+          <th>Deliverable</th>
+          ${crossTabMatrix.teams.map(t => `<th>${esc(t)}</th>`).join('')}
+          <th>End Date</th>
+        </tr></thead>
+        <tbody>${crossTabMatrix.rows.map(row => `
+        <tr>
+          <td class="td-del">${esc(row.name)}</td>
+          ${crossTabMatrix.teams.map(t => {
+            const st = row.cells[t];
+            return `<td class="td-st">${st ? `<span class="st ${st}">${statusLabel[st] || st}</span>` : '<span class="no-enddate">—</span>'}</td>`;
+          }).join('')}
+          <td class="cell-enddate">${row.endDate ? formatShortDate(row.endDate) : '<span class="no-enddate">No date</span>'}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
+  </div>` : `
+  <div class="matrix-section">
+    <div class="section-label"><span>Deliverable matrix</span></div>
+    <div class="matrix-scroll">
+      <table class="mx">
+        <thead><tr>
+          <th style="width:18%">Deliverable</th>
+          <th style="width:34%">Workstream</th>
+          <th style="width:14%">Team</th>
+          <th style="width:17%">End Date</th>
+          <th style="width:17%">Status</th>
+        </tr></thead>
+        <tbody>${matrixRows}</tbody>
+      </table>
+    </div>
+  </div>`;
 
   const abcSection = cat => {
     const items = (highlights[cat] || []);
@@ -191,7 +234,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
   <div class="doc-section">
     <div class="sr-grid">
       <div class="sr-left">
-        <div class="section-label"><span>Status overview</span><span class="sl-right">${stats.total} ws · ${deliverables.length} del.</span></div>
+        <div class="section-label"><span>Status overview</span><span class="sl-right">${stats.total} ws · ${crossTabMatrix ? crossTabMatrix.rows.length : deliverables.length} del.</span></div>
         <div class="chart-pane">
           <canvas id="donut" width="120" height="120"></canvas>
           <div class="chart-legend">
@@ -209,21 +252,26 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
     </div>
   </div>
 
-  <div class="matrix-section">
-    <div class="section-label"><span>Deliverable matrix</span></div>
+  ${matrixSectionHTML}
+
+  ${regionRollout.length ? `
+  <div class="doc-section">
+    <div class="section-label"><span>Region rollout</span></div>
     <div class="matrix-scroll">
-      <table class="mx">
-        <thead><tr>
-          <th style="width:18%">Deliverable</th>
-          <th style="width:34%">Workstream</th>
-          <th style="width:14%">Team</th>
-          <th style="width:17%">End Date</th>
-          <th style="width:17%">Status</th>
-        </tr></thead>
-        <tbody>${matrixRows}</tbody>
+      <table class="simple-table">
+        <thead><tr><th>Region</th><th>Geo</th><th>Priority</th><th>AZ</th><th>ETA</th><th>Status</th></tr></thead>
+        <tbody>${regionRollout.map(r => `
+        <tr>
+          <td><strong>${esc(r.region)}</strong></td>
+          <td>${esc(r.geo)}</td>
+          <td>${esc(r.priority)}</td>
+          <td>${esc(r.az)}</td>
+          <td>${esc(r.eta)}</td>
+          <td>${esc(r.status)}</td>
+        </tr>`).join('')}</tbody>
       </table>
     </div>
-  </div>
+  </div>` : ''}
 
   ${ganttEpics.length ? `
   <div class="matrix-section">

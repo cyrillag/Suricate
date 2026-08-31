@@ -8,7 +8,7 @@
 const confluence = require('./confluence');
 const { AppError } = require('./errors');
 const {
-  confluenceFetch, extractTables, extractRows, extractCells, stripTags, liItems
+  confluenceFetch, extractTables, extractRows, extractCells, stripTags, liItems, jiraKeyFromCell
 } = confluence;
 const BASE = process.env.CONFLUENCE_BASE || 'https://confluence.ovhcloud.tools';
 
@@ -95,9 +95,16 @@ function scoreToLevel(score) {
 // Take just the first point rather than joining everything.
 function firstPoint(cellHtml, maxLen = 160) {
   const items = liItems(cellHtml);
-  // Split on a bullet-like ";", a line break, or a sentence boundary (period + space) — whichever
-  // convention this particular cell happens to use to string multiple points together.
-  const raw = items.length ? items[0].text : stripTags(cellHtml).split(/;|\n|\.\s+/)[0];
+  let raw;
+  if (items.length) {
+    raw = items[0].text;
+  } else {
+    // Some cells string multiple points together as separate <p> paragraphs instead of <li>
+    // bullets (seen on VPC M1's Week Summary "Topic" cells) — take the first paragraph before
+    // falling back to a bullet-like ";", a line break, or a sentence boundary.
+    const paras = [...cellHtml.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)].map(m => stripTags(m[1])).filter(Boolean);
+    raw = paras.length > 1 ? paras[0] : stripTags(cellHtml).split(/;|\n|\.\s+/)[0];
+  }
   const text = raw.trim();
   return text.length > maxLen ? text.slice(0, maxLen).trim() + '…' : text;
 }
@@ -458,10 +465,165 @@ async function discoverAndParse(token, spaceKey, hubTitle) {
   return { hub: { id: hub.id, title: hubTitle }, children: classified, categories };
 }
 
+// ── "Deliverable × Team matrix" shape (seen on VPC M1) ──────────────────────────────────────
+// A third table convention, distinct from both the single-page rowspan matrix and the Actions
+// Log's divider-row grouping: one row per deliverable, one column per team. Each (deliverable,
+// team) cell either holds that team's own Jira reference contributing to it, or an explicit
+// "N/A" status lozenge when that team has no part in it. Metadata columns are recognized by
+// name (an allowlist, not "everything unrecognized is metadata" — safer given how easily an
+// unfamiliar team name could otherwise get swallowed); every other column is a team, i.e. a
+// workstream per the corrected definition — so here a deliverable naturally participates in
+// several workstreams at once, unlike a rowspan group which implies exactly one.
+const META_COL_PATTERNS = [/^#$/, /^deliverable$/i, /description/i, /^eta$/i, /end date/i, /baseline/i, /^lvl\d/i, /dependenc/i, /^notes?$/i];
+
+function isMetaColumn(name) {
+  return META_COL_PATTERNS.some(p => p.test(name.trim()));
+}
+
+function parseDeliverableTeamMatrix(html) {
+  const tables = extractTables(html);
+  const candidate = tables.find(t => {
+    const { header } = headerAndDataRows(t);
+    return findCol(header, [/^deliverable$/i]) !== -1 && header.some(h => !isMetaColumn(stripTags(h.html)));
+  });
+  if (!candidate) return { status: 'no_table', items: [] };
+
+  const { header, dataRows } = headerAndDataRows(candidate);
+  const nameIdx = findCol(header, [/^deliverable$/i]);
+  const teamCols = header
+    .map((h, i) => ({ i, name: stripTags(h.html).trim() }))
+    .filter(c => !isMetaColumn(c.name));
+
+  const items = [];
+  for (const cells of dataRows) {
+    const deliverableName = stripTags(cells[nameIdx]?.html || '');
+    if (!deliverableName) continue;
+    for (const { i, name: team } of teamCols) {
+      // No Jira macro in the cell means "N/A" (or genuinely blank) — this team has no part in
+      // this deliverable, not a workstream with an unknown status.
+      const jiraKey = jiraKeyFromCell(cells[i]?.html || '');
+      if (!jiraKey) continue;
+      items.push({ deliverableName, team, jiraKey });
+    }
+  }
+  return { status: 'parsed', items };
+}
+
+// Resolves each item's real Jira status/end date — same source and "no invented dates" rule
+// FUNCTIONAL_RULES.md already documents for the classic single-page matrix (never the page's own
+// typed annotations, e.g. this page's own "End date"/"Baseline end date" columns), via jira.js's
+// existing getEpicsByKeys/mapStatus rather than reinventing status text parsing this page doesn't
+// even have (no Status column at all — only Jira knows).
+async function resolveDeliverableTeamMatrix(items, jiraToken) {
+  const jira = require('./jira');
+  const epics = await jira.getEpicsByKeys(jiraToken, items.map(it => it.jiraKey));
+  const byKey = new Map(epics.map(e => [e.key, e]));
+  return items.map(it => {
+    const epic = byKey.get(it.jiraKey);
+    return {
+      deliverableName: it.deliverableName,
+      team: it.team,
+      status: epic ? jira.mapStatus(epic.status) : 'ts',
+      endDate: epic?.end || null
+    };
+  });
+}
+
+// Groups resolved (deliverable, team) cells into the {teams, rows} shape report-gen.js's optional
+// crossTabMatrix param expects — one row per deliverable, one column per team, matching this
+// page's own "Deliverable × Team matrix" layout instead of flattening it into the classic
+// rowspan-grouped two-column matrix (an explicit, project-specific exception — see
+// FUNCTIONAL_RULES.md). A deliverable's own End Date is the *farthest* date among the teams
+// contributing to it, same "isn't actually finished until the last one is" rule
+// confluence.js's parseDeliverables already applies to a multi-epic workstream.
+function buildCrossTabMatrix(resolvedItems) {
+  const teams = [...new Set(resolvedItems.map(it => it.team))];
+  const byDeliverable = new Map();
+  for (const it of resolvedItems) {
+    if (!byDeliverable.has(it.deliverableName)) byDeliverable.set(it.deliverableName, { name: it.deliverableName, cells: {}, endDate: null });
+    const row = byDeliverable.get(it.deliverableName);
+    row.cells[it.team] = it.status;
+    if (it.endDate && (!row.endDate || it.endDate > row.endDate)) row.endDate = it.endDate;
+  }
+  return { teams, rows: [...byDeliverable.values()] };
+}
+
+// ── "Region rollout" section (project-specific, seen on VPC M1) ────────────────────────────
+// Not a category the classic report has any concept of — an explicit, project-specific
+// exception (see FUNCTIONAL_RULES.md), not a general new section every project gets. Table
+// shape: Region | Geo | Priority | AZ | ETA | Status | Notes — Notes dropped per the user's own
+// instruction, everything else kept as free text (unlike the deliverable matrix, there's no
+// Jira reference here to resolve a real status/date from — this section is inherently
+// PM-typed, so its text is shown as-is rather than mapped onto the done/prog/blk/ts vocabulary).
+function parseRegionRollout(html) {
+  const tables = extractTables(html);
+  const candidate = tables.find(t => {
+    const { header } = headerAndDataRows(t);
+    return findCol(header, [/^region$/i]) !== -1 && findCol(header, [/^geo$/i]) !== -1;
+  });
+  if (!candidate) return { status: 'no_table', rows: [] };
+
+  const { header, dataRows } = headerAndDataRows(candidate);
+  const regionIdx = findCol(header, [/^region$/i]);
+  const geoIdx = findCol(header, [/^geo$/i]);
+  const priorityIdx = findCol(header, [/priority/i]);
+  const azIdx = findCol(header, [/^az$/i]);
+  const etaIdx = findCol(header, [/^eta$/i]);
+  const statusIdx = findCol(header, [/^status$/i]);
+
+  const rows = [];
+  for (const cells of dataRows) {
+    const region = stripTags(cells[regionIdx]?.html || '');
+    if (!region) continue;
+    rows.push({
+      region,
+      geo: geoIdx !== -1 ? stripTags(cells[geoIdx]?.html || '') : '',
+      priority: priorityIdx !== -1 ? stripTags(cells[priorityIdx]?.html || '') : '',
+      az: azIdx !== -1 ? stripTags(cells[azIdx]?.html || '') : '',
+      eta: etaIdx !== -1 ? stripTags(cells[etaIdx]?.html || '') : '',
+      status: statusIdx !== -1 ? stripTags(cells[statusIdx]?.html || '') : ''
+    });
+  }
+  return { status: 'parsed', rows };
+}
+
+// ── "Typed week rows" Week Summary shape (seen on VPC M1) ───────────────────────────────────
+// Distinct from the single-page Week summary table (one row per week, one column per category)
+// — here every row is its own dated, typed item (W | Type | Team | Topic), and whoever maintains
+// this page has duplicated the table batch-by-batch over the project's life rather than growing
+// one continuously (several of the resulting tables are even missing their own header row,
+// re-using whatever the last copy-paste left behind) — so every matching table on the page has
+// to be scanned together, not just the first match.
+function parseWeekTypedRows(html, targetWeek) {
+  const tables = extractTables(html).filter(t => headerAndDataRows(t).header.length === 4);
+  const achievements = [], blockers = [], clarify = [];
+  for (const t of tables) {
+    const rows = extractRows(t).map(extractCells);
+    const isHeaderRow = r => /^w$/i.test(stripTags(r?.[0]?.html || '')) && /type/i.test(stripTags(r?.[1]?.html || ''));
+    const dataRows = isHeaderRow(rows[0]) ? rows.slice(1) : rows;
+    for (const cells of dataRows) {
+      const weekText = stripTags(cells[0]?.html || '');
+      const week = parseInt(weekText.replace(/^w/i, ''), 10);
+      if (week !== targetWeek) continue;
+      const type = stripTags(cells[1]?.html || '').toLowerCase();
+      const team = stripTags(cells[2]?.html || '');
+      const topic = firstPoint(cells[3]?.html || '');
+      if (!topic) continue;
+      const text = team ? `${team}: ${topic}` : topic;
+      if (/block/.test(type)) blockers.push({ text, jira_key: null });
+      else if (/clarify/.test(type)) clarify.push({ text, jira_key: null });
+      else achievements.push({ text, jira_key: null }); // default bucket also covers any unrecognized label
+    }
+  }
+  return { achievements, blockers, clarify };
+}
+
 module.exports = {
   classifyTitle, fetchChildren, fetchBodyById, fetchVersionHistory, fetchBodyAtOrBefore,
   parseRiskRegisterPage, parseDecisionsPage, parseActionsPage, parseGenericTablePage,
   groupActionsByWorkstream, groupsToMatrixRows, actionsToWorkstreams, computeStats,
   diffActionsToAchievements, diffRisksToBlockers, diffDecisionsToAchievementsAndClarify,
-  buildWeeklyReportInputs, discoverAndParse
+  buildWeeklyReportInputs, discoverAndParse,
+  parseDeliverableTeamMatrix, resolveDeliverableTeamMatrix, buildCrossTabMatrix,
+  parseRegionRollout, parseWeekTypedRows
 };

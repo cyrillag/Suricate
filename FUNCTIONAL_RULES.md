@@ -180,6 +180,29 @@ to be re-applied here by hand rather than resolved by merging code:
   has more than one table matching the expected header shape (seen: an older + a consolidated
   register on the same page), picking the one with the most real data rows is a reasonable
   heuristic, but worth a second look before trusting it as "the" register on a new project.
+- **A third source shape, seen on "NPM.MSC.VPC - VPC M1"**: a single, well-organized page (no
+  multi-page hub needed), but with a genuinely different deliverable-matrix convention — one row
+  per deliverable, one *column* per team, each (deliverable, team) cell either holding that team's
+  own Jira reference or an explicit "N/A" lozenge. `parseDeliverableTeamMatrix` recognizes
+  metadata columns by an allowlist (#, Deliverable, Description, ETA, End date, Baseline end date,
+  a `LVL\d` column, Dependencies, Notes) and treats every other column as a team — i.e. a
+  workstream, per the corrected definition — so a deliverable naturally spans several workstreams
+  at once here, unlike a rowspan group which implies exactly one.
+  - **Two explicit, project-specific exceptions approved for this project only** (not a new
+    general rule): (1) the matrix keeps this cross-tab shape in the rendered report instead of
+    being flattened into the classic rowspan two-column table — `report-gen.js`'s new
+    `crossTabMatrix` param (default `null`) renders it when present, and is otherwise a no-op so
+    every other project's report stays byte-for-byte identical; (2) a **"Region rollout" section**
+    (Region/Geo/Priority/AZ/ETA/Status — Notes dropped) was added via a second new optional param,
+    `regionRollout` (default `[]`), since this project tracks a geo rollout the classic template
+    has no place for at all. Neither param exists on any other project's report.
+  - **Every end date still comes from Jira, never the page's own typed columns** — same rule as
+    everywhere else in this app. A deliverable's own End Date in the cross-tab is the *farthest*
+    resolved Jira end date among the teams contributing to it (`buildCrossTabMatrix`), same
+    "isn't actually finished until the last one is" rule already applied to a multi-epic
+    single-page workstream. The Region rollout section is the one exception to "status/date always
+    from Jira": it has no Jira reference to resolve from at all, so its Priority/ETA/Status are
+    shown as free PM-typed text, same as they appear on the page.
 
 ## Report export
 
