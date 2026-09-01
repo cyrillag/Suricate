@@ -766,7 +766,11 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})/pdf', requireAuth, async (req
     });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${req.params.slug}-${req.params.yearweek}.pdf"`);
-    res.send(pdf);
+    // page.pdf() returns a Uint8Array, not a true Node Buffer — express.send() only recognizes
+    // Buffer.isBuffer() as "binary payload" and otherwise falls through to JSON-stringifying it
+    // (each byte as a numbered object key), silently corrupting the download. Buffer.from() forces
+    // the real type regardless of which one puppeteer-core happens to hand back.
+    res.send(Buffer.from(pdf));
   } catch (err) {
     console.error('PDF export failed:', err);
     res.status(500).send(res.locals.t('detail.err_pdf_export'));
