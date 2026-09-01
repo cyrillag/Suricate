@@ -751,6 +751,14 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})/pdf', requireAuth, async (req
   try {
     const browser = await getBrowser();
     page = await browser.newPage();
+    // The Planning/Gantt timeline is a horizontally-scrolling widget on screen
+    // (.gantt-outer{overflow-x:auto}) — page.pdf() prints the page's actual layout width, not
+    // whatever's scrolled into view, so at the default ~800px viewport every month past the
+    // first few got silently clipped rather than scrolled to. A wide viewport lets the whole
+    // timeline lay out in full instead of overflowing into a scrollbar; `scale` below then
+    // shrinks that wide layout back down to fit a landscape page, the same "shrink to fit" trick
+    // a real print dialog does for a wide sheet.
+    await page.setViewport({ width: 1600, height: 1000 });
     // Carries the requesting user's own session across — this internal request still goes
     // through requireAuth like any other, so a viewer only ever exports what they're already
     // allowed to see.
@@ -761,8 +769,8 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})/pdf', requireAuth, async (req
     // animation settles, so the PDF would otherwise capture a half-drawn chart.
     await new Promise(r => setTimeout(r, 1200));
     const pdf = await page.pdf({
-      format: 'A4', printBackground: true,
-      margin: { top: '12mm', right: '10mm', bottom: '12mm', left: '10mm' }
+      format: 'A4', landscape: true, printBackground: true, scale: 0.72,
+      margin: { top: '10mm', right: '8mm', bottom: '10mm', left: '8mm' }
     });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${req.params.slug}-${req.params.yearweek}.pdf"`);
