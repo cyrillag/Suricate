@@ -141,6 +141,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
       <p class="page-sub">Weekly Status Report · ${esc(dateLabel)} · ${esc(pmName || project.name)}</p>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:flex-end">
+      <a href="/projects/${esc(project.slug)}/${yearWeek}/pdf" class="btn-ghost btn-sm">⬇ Export PDF</a>
       ${isOwner && isCurrentWeek ? `<form method="POST" action="/projects/${esc(project.slug)}/reports/generate" style="display:inline">
         <input type="hidden" name="week" value="${yearWeek}">
         <button type="submit" class="btn-primary btn-sm">↻ Refresh</button>
@@ -543,6 +544,14 @@ const CSS = `
   }
   @media(max-width:480px){.identity-grid{grid-template-columns:1fr}}
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+  /* PDF export (puppeteer's page.pdf() emulates print media by default) and a browser's own
+     Ctrl+P both use this — nothing here is actionable on a static page, so it's noise rather
+     than a broken control. Purely cosmetic (visibility only) — never touches layout/page-break
+     rules, which is exactly the kind of print-specific logic that caused the earlier PDF attempt
+     to drift from the real page (see FUNCTIONAL_RULES.md "Report export"). Only the prev/next
+     arrows are hidden here, not the whole .week-nav — .ref-week (the "W35 · 2026" label) is the
+     one piece of that widget that's informational rather than an action, and must stay. */
+  @media print{.week-arrow,.nav-user,a[href$="/pdf"],form[action$="/reports/generate"]{display:none!important}}
 `;
 
 module.exports = generateReport;

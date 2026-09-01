@@ -112,7 +112,8 @@ const DICT = {
     err_jira_forbidden: { fr: 'Accès refusé à Jira : droits insuffisants ou token de service expiré. Contacte un administrateur si le problème persiste.', en: 'Access to Jira was denied: insufficient rights or an expired service token. Contact an administrator if this persists.' },
     err_jira_unavailable: { fr: 'Jira est temporairement indisponible ou injoignable. Réessaie dans quelques instants.', en: 'Jira is temporarily unavailable or unreachable. Try again in a moment.' },
     err_jira_http_error: { fr: 'Jira a renvoyé une erreur inattendue pendant la synchronisation. Réessaie, et contacte un administrateur si le problème persiste.', en: 'Jira returned an unexpected error during sync. Try again, and contact an administrator if this persists.' },
-    err_generic: { fr: 'Une erreur inattendue est survenue pendant la synchronisation. Réessaie, et contacte un administrateur si le problème persiste.', en: 'An unexpected error occurred during sync. Try again, and contact an administrator if this persists.' }
+    err_generic: { fr: 'Une erreur inattendue est survenue pendant la synchronisation. Réessaie, et contacte un administrateur si le problème persiste.', en: 'An unexpected error occurred during sync. Try again, and contact an administrator if this persists.' },
+    err_pdf_export: { fr: 'La génération du PDF a échoué. Réessaie, et contacte un administrateur si le problème persiste.', en: 'PDF generation failed. Try again, and contact an administrator if this persists.' }
   }
 };
 
