@@ -5,6 +5,7 @@ const db         = require('./db');
 const jira       = require('./jira');
 const confluence = require('./confluence');
 const genReport  = require('./report-gen');
+const qualityCheck = require('./quality-check');
 const { translate, pluralize } = require('./i18n');
 const { AppError } = require('./errors');
 
@@ -142,7 +143,7 @@ const upsertWorkstreamFromConfluence = db.prepare(`
   ON CONFLICT(project_id,deliverable,name) DO UPDATE SET
     team=excluded.team, jira_key=excluded.jira_key, default_status=excluded.default_status, sort_order=excluded.sort_order`);
 
-const insEpicCache = db.prepare('INSERT OR REPLACE INTO epics_cache(project_id,jira_key,summary,team,status,start_date,end_date,cached_at) VALUES(?,?,?,?,?,?,?,unixepoch())');
+const insEpicCache = db.prepare('INSERT OR REPLACE INTO epics_cache(project_id,jira_key,summary,team,status,start_date,end_date,assignee,reporter,cached_at) VALUES(?,?,?,?,?,?,?,?,?,unixepoch())');
 
 // Full tree-walk auto-discovery from a root LVL2 epic — creates BOTH the workstream list
 // (grouped by team) AND epics_cache. Used only for projects with no Confluence page: once a
@@ -152,7 +153,7 @@ const insEpicCache = db.prepare('INSERT OR REPLACE INTO epics_cache(project_id,j
 async function seedWorkstreamsFromJiraTree(projectId, rootEpic) {
   const epics = await jira.getChildEpics(JIRA_TOKEN, rootEpic);
   epics.forEach((e, i) => {
-    insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end);
+    insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter);
     upsertWorkstreamFromJira.run(projectId, e.deliverable, e.summary, e.team, e.key, i);
   });
   reconcileWorkstreams(projectId, epics.map(e => ({ deliverable: e.deliverable, name: e.summary })));
@@ -167,7 +168,7 @@ async function seedWorkstreamsFromJiraTree(projectId, rootEpic) {
 async function refreshEpicStatuses(projectId, jiraKeyFields) {
   const keys = [...new Set(jiraKeyFields.flatMap(splitJiraKeys))];
   const epics = await jira.getEpicsByKeys(JIRA_TOKEN, keys);
-  epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end));
+  epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter));
   return epics.length;
 }
 
@@ -178,7 +179,7 @@ async function refreshEpicStatuses(projectId, jiraKeyFields) {
 // Confluence-backed project without duplicating or overriding the matrix.
 async function refreshFullEpicTree(projectId, rootEpic, extraKeys = []) {
   const epics = await jira.getPortfolioEpics(JIRA_TOKEN, rootEpic, extraKeys);
-  epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end));
+  epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter));
   return epics.length;
 }
 
@@ -481,6 +482,26 @@ app.get('/projects/:slug', requireAuth, (req, res) => {
   const epicCount= db.prepare('SELECT COUNT(*) as n FROM epics_cache WHERE project_id=?').get(proj.id).n;
   const syncWarning = req.query.syncSource ? [{ source: req.query.syncSource, message: req.query.syncMessage || '' }] : [];
   res.render('project-detail', { proj, reports, wsCount, epicCount, syncWarning, isOwner, userName: req.session.userName, currentWeek: currentWeekStr() });
+});
+
+// ── CLEANUP (tracking-quality check) ─────────────────────────────
+// Read-only, no ownership check — same visibility rule as the project-detail/report views
+// (every authenticated user can see every project). Reads live from epics_cache, which is only
+// as fresh as the last "↻ Refresh"/Generate action (refreshFullEpicTree) — there is no separate
+// sync button here either, by the same rule that removed the standalone Sync Jira/Confluence
+// buttons (see FUNCTIONAL_RULES.md): the Generate/Refresh form is reused as-is on this page.
+app.get('/projects/:slug/cleanup', requireAuth, (req, res) => {
+  const proj = db.prepare('SELECT p.*, u.name as owner_name FROM projects p JOIN users u ON u.id=p.user_id WHERE p.slug=?').get(req.params.slug);
+  if (!proj) return res.status(404).send('Project not found.');
+  const isOwner = proj.user_id === req.session.userId;
+  const epics = db.prepare('SELECT * FROM epics_cache WHERE project_id=? ORDER BY team, jira_key').all(proj.id);
+  const lastSynced = epics.reduce((max, e) => Math.max(max, e.cached_at || 0), 0) || null;
+  const result = qualityCheck.runQualityCheck(epics);
+  res.render('cleanup', {
+    proj, isOwner, result, lastSynced, formatDate,
+    issueUrl: qualityCheck.jiraIssueUrl, keysJqlUrl: qualityCheck.jiraKeysJqlUrl,
+    userName: req.session.userName, currentWeek: currentWeekStr()
+  });
 });
 
 // ── REPORT GENERATION ────────────────────────────────────────────

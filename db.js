@@ -74,6 +74,10 @@ function ensureColumn(table, column, ddl) {
 }
 ensureColumn('projects', 'confluence_space', 'confluence_space TEXT');
 ensureColumn('projects', 'confluence_page', 'confluence_page TEXT');
+// Needed for the Cleanup view's "no assignee" check — every epics_cache writer (getChildEpics,
+// getEpicsByKeys, getPortfolioEpics) now fetches both, so all three keep this column populated.
+ensureColumn('epics_cache', 'assignee', 'assignee TEXT');
+ensureColumn('epics_cache', 'reporter', 'reporter TEXT');
 ensureColumn('reports', 'exec_summary', 'exec_summary TEXT');
 // Space/comma-separated Jira keys pinned to Planning regardless of the automatic portfolio
 // walk from jira_root_epic — for epics/features that live under a different LVL2 root entirely

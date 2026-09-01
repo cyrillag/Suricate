@@ -62,7 +62,7 @@ function mapStatus(jiraStatus) {
 
 async function getChildEpics(token, rootEpic) {
   // customfield_10110/10111 = "Start date"/"End date" (BigPicture Gantt fields, authoritative).
-  const EPIC_FIELDS = 'summary,status,customfield_10110,customfield_10111,issuetype';
+  const EPIC_FIELDS = 'summary,status,assignee,reporter,customfield_10110,customfield_10111,issuetype';
 
   const notCancelled = i => {
     const s = (i.fields.status?.name || '').toLowerCase();
@@ -74,6 +74,8 @@ async function getChildEpics(token, rootEpic) {
     team:       extractTeam(i.key),
     deliverable,
     status:     i.fields.status?.name || 'To Do',
+    assignee:   i.fields.assignee?.displayName || null,
+    reporter:   i.fields.reporter?.displayName || null,
     // No fallback to duedate/created/resolutiondate: an epic with no Start/End date filled in
     // on its Gantt fields is left with no date at all rather than an invented one — the
     // report simply omits it from the Planning timeline (see report-gen's epics filter).
@@ -120,7 +122,7 @@ async function getChildEpics(token, rootEpic) {
 // callers are responsible for validating each key against /^[A-Z][A-Z0-9]*-\d+$/ before it
 // reaches this JQL string.
 async function getPortfolioEpics(token, rootEpic, extraKeys = []) {
-  const EPIC_FIELDS = 'summary,status,customfield_10110,customfield_10111,issuetype';
+  const EPIC_FIELDS = 'summary,status,assignee,reporter,customfield_10110,customfield_10111,issuetype';
   let jql = `(issuekey in (${rootEpic}) OR issueFunction in portfolioChildrenOf("issuekey in (${rootEpic})")) and issuetype = Epic`;
   if (extraKeys.length) jql = `(${jql} OR issuekey in (${extraKeys.join(',')}))`;
   // Jira workflows in this instance use both the British ("Cancelled") and American ("Canceled")
@@ -129,12 +131,14 @@ async function getPortfolioEpics(token, rootEpic, extraKeys = []) {
   jql += ' and status not in (Cancelled, Canceled)';
   const data = await api(token, '/search', { jql, fields: EPIC_FIELDS, maxResults: 300 });
   return data.issues.map(i => ({
-    key:     i.key,
-    summary: i.fields.summary,
-    team:    extractTeam(i.key),
-    status:  i.fields.status?.name || 'To Do',
-    start:   i.fields.customfield_10110 || null,
-    end:     i.fields.customfield_10111 || null
+    key:      i.key,
+    summary:  i.fields.summary,
+    team:     extractTeam(i.key),
+    status:   i.fields.status?.name || 'To Do',
+    assignee: i.fields.assignee?.displayName || null,
+    reporter: i.fields.reporter?.displayName || null,
+    start:    i.fields.customfield_10110 || null,
+    end:      i.fields.customfield_10111 || null
   }));
 }
 
@@ -155,7 +159,7 @@ async function getRootEpicMeta(token, epicKey) {
 async function getEpicsByKeys(token, keys) {
   const uniqueKeys = [...new Set(keys.filter(Boolean))];
   if (!uniqueKeys.length) return [];
-  const EPIC_FIELDS = 'summary,status,customfield_10110,customfield_10111,issuetype';
+  const EPIC_FIELDS = 'summary,status,assignee,reporter,customfield_10110,customfield_10111,issuetype';
   const results = [];
   // Jira JQL "in" clauses have a practical size limit — chunk to be safe.
   for (let i = 0; i < uniqueKeys.length; i += 50) {
@@ -166,16 +170,18 @@ async function getEpicsByKeys(token, keys) {
       maxResults: chunk.length
     });
     data.issues.forEach(i => results.push({
-      key:     i.key,
-      summary: i.fields.summary,
-      team:    extractTeam(i.key),
-      status:  i.fields.status?.name || 'To Do',
+      key:      i.key,
+      summary:  i.fields.summary,
+      team:     extractTeam(i.key),
+      status:   i.fields.status?.name || 'To Do',
+      assignee: i.fields.assignee?.displayName || null,
+      reporter: i.fields.reporter?.displayName || null,
       // Same "no invented dates" rule as getChildEpics — leave blank if unset.
-      start:   i.fields.customfield_10110 || null,
-      end:     i.fields.customfield_10111 || null
+      start:    i.fields.customfield_10110 || null,
+      end:      i.fields.customfield_10111 || null
     }));
   }
   return results;
 }
 
-module.exports = { getMe, findUserByEmail, getChildEpics, getPortfolioEpics, getEpicsByKeys, getRootEpicMeta, mapStatus };
+module.exports = { getMe, findUserByEmail, getChildEpics, getPortfolioEpics, getEpicsByKeys, getRootEpicMeta, mapStatus, BASE };

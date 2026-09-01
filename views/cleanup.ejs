@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="<%= lang %>">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title><%= proj.name %> — Cleanup — Suricate</title>
+<link rel="stylesheet" href="/app.css">
+<link rel="icon" type="image/png" href="/favicon-32.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+</head>
+<body>
+<%- include('_nav', { userName }) %>
+<div class="app-body">
+  <div class="page-header">
+    <div>
+      <a href="/projects/<%= proj.slug %>" class="back-link">← <%= proj.name %></a>
+      <h1 class="page-title"><%= t('cleanup.title') %></h1>
+      <p class="page-sub">
+        <span class="tag"><%= t('cleanup.epics_checked', { count: result.totalEpics }) %></span>
+        <span class="tag"><%= t('cleanup.last_synced', { when: lastSynced ? new Date(lastSynced * 1000).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : t('cleanup.never_synced') }) %></span>
+      </p>
+      <p class="page-sub" style="margin-top:-6px"><%= t('cleanup.subtitle') %></p>
+      <% if (isOwner) { %>
+      <p class="page-sub" style="margin-top:-6px"><%= t('cleanup.refresh_hint', { action: t('detail.generate_report') }) %></p>
+      <% } %>
+    </div>
+  </div>
+
+  <%
+    const RULE_LABEL = {
+      no_assignee: 'cleanup.rule_no_assignee',
+      no_start:    'cleanup.rule_no_start',
+      no_end:      'cleanup.rule_no_end'
+    };
+    function detailFor(item) {
+      if (item.rule === 'overdue')            return t('cleanup.detail_overdue', { days: item.days, date: item.date });
+      if (item.rule === 'due_soon')           return t('cleanup.detail_due_soon', { days: item.days, date: item.date });
+      if (item.rule === 'not_started')        return t('cleanup.detail_not_started', { days: item.days, date: item.date });
+      if (item.rule === 'date_inconsistent')  return t('cleanup.detail_date_inconsistent', { start: item.start, end: item.end });
+      return '';
+    }
+    function contactText(c) {
+      if (!c) return t('cleanup.contact_none');
+      if (c.isReporter) return t('cleanup.contact_reporter_fallback', { name: c.name });
+      return c.name;
+    }
+  %>
+
+  <% if (!result.high.length && !result.upcoming.length && !result.mediumByTeam.size) { %>
+  <div class="section-card">
+    <div class="empty-state-inline"><%= t('cleanup.no_issues') %></div>
+  </div>
+  <% } %>
+
+  <% if (result.high.length) { %>
+  <div class="section-card" style="border-top-color:var(--blk)">
+    <div class="section-card-header" style="color:var(--blk)">🔴 <%= t('cleanup.high_priority') %> (<%= result.high.length %>)</div>
+    <table class="simple-table">
+      <tbody>
+      <% result.high.forEach(item => { %>
+      <tr>
+        <td style="white-space:nowrap"><a href="<%= issueUrl(item.epic.jira_key) %>" target="_blank" rel="noopener"><strong><%= item.epic.jira_key %></strong></a></td>
+        <td><%= item.epic.summary %><br><span class="page-sub" style="margin:0"><%= detailFor(item) %></span></td>
+        <td style="white-space:nowrap;text-align:right"><%= contactText(item.contact) %></td>
+      </tr>
+      <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <% } %>
+
+  <% if (result.upcoming.length) { %>
+  <div class="section-card">
+    <div class="section-card-header">📅 <%= t('cleanup.upcoming') %> (<%= result.upcoming.length %>) — <span style="text-transform:none;font-weight:400;color:var(--tx2)"><%= t('cleanup.upcoming_hint') %></span></div>
+    <table class="simple-table">
+      <tbody>
+      <% result.upcoming.forEach(item => { %>
+      <tr>
+        <td style="white-space:nowrap"><a href="<%= issueUrl(item.epic.jira_key) %>" target="_blank" rel="noopener"><strong><%= item.epic.jira_key %></strong></a></td>
+        <td><%= item.epic.summary %><br><span class="page-sub" style="margin:0"><%= detailFor(item) %></span></td>
+        <td style="white-space:nowrap;text-align:right"><%= contactText(item.contact) %></td>
+      </tr>
+      <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <% } %>
+
+  <% if (result.mediumByTeam.size) { %>
+  <div class="section-card">
+    <div class="section-card-header">🟡 <%= t('cleanup.remaining') %></div>
+    <table class="simple-table">
+      <thead><tr><th>Team</th><th></th><th></th></tr></thead>
+      <tbody>
+      <% [...result.mediumByTeam.entries()].sort((a,b) => a[0].localeCompare(b[0])).forEach(([team, bucket]) => { %>
+      <tr>
+        <td><strong><%= team %></strong></td>
+        <td><%= t('cleanup.epic_count', { count: bucket.keys.size }) %> —
+          <%= [...bucket.ruleCounts.entries()].map(([rule, count]) => `${t(RULE_LABEL[rule])} (${count})`).join(', ') %>
+        </td>
+        <td style="text-align:right"><a href="<%= keysJqlUrl([...bucket.keys]) %>" target="_blank" rel="noopener"><%= t('cleanup.view_in_jira') %></a></td>
+      </tr>
+      <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <% } %>
+</div>
+</body>
+</html>
