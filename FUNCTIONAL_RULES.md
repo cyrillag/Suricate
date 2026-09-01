@@ -93,12 +93,35 @@ to be re-applied here by hand rather than resolved by merging code:
 
 ## Report export
 
-- There is no PDF export. A "⬇ Export PDF" button existed, using the browser's native
-  print-to-PDF (`window.print()` driven by `@page`/`@media print` CSS on the report document) —
-  removed because the rendered output wasn't good enough to keep. If this comes back as a request,
-  don't just re-add the same print-CSS approach without addressing why it looked bad first; a
-  server-side renderer (headless Chromium) is the likely alternative, at the cost of that dependency
-  shipping in the production image.
+- **PDF export (re-added) renders the exact live report page server-side, never a separate
+  print-CSS template.** The first "⬇ Export PDF" attempt used the browser's native print-to-PDF
+  (`window.print()` + `@page`/`@media print` CSS) and was removed — a print stylesheet is a
+  *second* layout to keep in sync with the real one, and it drifted (broken page breaks, a
+  half-drawn donut chart). The current approach: `GET /projects/:slug/:yearweek/pdf` (server.js)
+  launches a headless Chromium (`puppeteer-core`) and navigates it, over loopback, to the app's own
+  live report URL — carrying the requesting user's session cookie so that internal request still
+  goes through the same `requireAuth`/visibility rules as any other view — then calls `page.pdf()`.
+  Because it's the same route and the same `buildReportHtml()` the browser renders, the PDF cannot
+  structurally drift from the on-screen report the way a parallel print template could.
+- Available to any viewer, not just the project owner — exporting is a read, same visibility rule
+  as viewing the report itself (see "Visibility & permissions"). Not available for a week with no
+  report row at all (404) — there's nothing to export, and it deliberately doesn't trigger a
+  generate-on-demand the way visiting the HTML report page does.
+- The donut chart and the Planning/Gantt timeline both draw themselves via a page-load `<script>`
+  (canvas + a `requestAnimationFrame` sweep-in animation) — `page.goto`'s `networkidle0` fires
+  before that animation settles, so the PDF route waits an extra fixed delay after navigation
+  before calling `page.pdf()`, or it would capture a half-drawn chart.
+- **Known fidelity gap: fonts.** `report-gen.js`'s `@font-face` rules use `local('Source Sans
+  Pro')` — they only resolve to the true typeface if it happens to be installed on the *viewing*
+  machine, falling back to `'Segoe UI', Arial, sans-serif` otherwise (true for most viewers
+  already, since Source Sans Pro isn't a common OS-bundled font). Alpine's headless Chromium (see
+  Dockerfile: `chromium` + `ttf-freefont`/`font-noto` packages, no glibc/Puppeteer-bundled
+  Chromium — that binary doesn't run on this musl-based image) has neither Source Sans Pro nor
+  Segoe UI available, so it falls back one level further to a generic Linux sans-serif. The PDF is
+  therefore not always byte-identical in typeface to what a given viewer sees on their own screen
+  — layout/content fidelity is exact, font *substitution* can differ slightly. Self-hosting actual
+  Source Sans Pro font files (instead of relying on `local()`) would close this gap for the live
+  page too, not just PDF export, but is a separate change, not bundled into this one.
 
 ## Risks
 

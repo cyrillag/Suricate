@@ -141,6 +141,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
       <p class="page-sub">Weekly Status Report · ${esc(dateLabel)} · ${esc(pmName || project.name)}</p>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:flex-end">
+      <a href="/projects/${esc(project.slug)}/${yearWeek}/pdf" class="btn-ghost btn-sm">⬇ Export PDF</a>
       ${isOwner && isCurrentWeek ? `<form method="POST" action="/projects/${esc(project.slug)}/reports/generate" style="display:inline">
         <input type="hidden" name="week" value="${yearWeek}">
         <button type="submit" class="btn-primary btn-sm">↻ Refresh</button>
