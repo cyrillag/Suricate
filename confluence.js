@@ -11,6 +11,16 @@ async function confluenceFetch(url, token) {
   }
   if (!res.ok) {
     const body = await res.text().catch(() => '');
+    // Confluence returns a 404 — not a 401/403 — when the caller isn't authorized to even see a
+    // space/page exists (a deliberate security-through-obscurity choice: don't confirm to an
+    // unauthorized caller that something exists at all), marked by "authorized":false in its own
+    // response body. Seen in practice as a short-lived blip (auth cache/session hiccup, resolves
+    // on its own within minutes) rather than a genuinely wrong/moved page, so it gets its own
+    // retry-first message instead of sending the PM to second-guess their project's URL over
+    // what's usually transient.
+    if (res.status === 404 && /"authorized"\s*:\s*false/.test(body)) {
+      throw new AppError('confluence_auth_blip', `Confluence 404 (authorized:false): ${body.slice(0, 200)}`);
+    }
     throw new AppError(httpErrorCode('confluence', res.status), `Confluence ${res.status}: ${body.slice(0, 200)}`);
   }
   return res.json();

@@ -254,6 +254,15 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   to a user. Every caught error is classified (`AppError` + a stable code) and translated into an
   actionable sentence in the user's language; anything unclassified falls back to a generic
   apologetic message. The raw error is still logged server-side.
+- **A Confluence 404 with `"authorized":false` in its own response body gets a distinct,
+  retry-first message (`confluence_auth_blip`), not the generic "check your URL/rights"
+  (`confluence_not_found`).** Confluence returns 404 — not 401/403 — when the service token isn't
+  authorized to even see a space/page exists, a security-through-obscurity choice on Confluence's
+  side. Observed in production (Managed Backup for VMware, 2026-08-31) as a burst of ~14 identical
+  failures within a 90-second window that then fully resolved on its own — a short-lived
+  auth/session blip, not a wrong or moved page. Telling the PM to go re-check their project's
+  Confluence URL over what's usually transient sent them chasing a non-problem; the message now
+  says to just retry, and only suggests checking access rights if it keeps happening.
 
 ## Internationalization
 
