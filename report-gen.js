@@ -544,6 +544,12 @@ const CSS = `
   }
   @media(max-width:480px){.identity-grid{grid-template-columns:1fr}}
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+  /* PDF export (puppeteer's page.pdf() emulates print media by default) and a browser's own
+     Ctrl+P both use this — nothing here is actionable on a static page, so it's noise rather
+     than a broken control. Purely cosmetic (visibility only) — never touches layout/page-break
+     rules, which is exactly the kind of print-specific logic that caused the earlier PDF attempt
+     to drift from the real page (see FUNCTIONAL_RULES.md "Report export"). */
+  @media print{.week-nav,.nav-user,a[href$="/pdf"],form[action$="/reports/generate"]{display:none!important}}
 `;
 
 module.exports = generateReport;
