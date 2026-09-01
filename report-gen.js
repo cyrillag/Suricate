@@ -548,8 +548,10 @@ const CSS = `
      Ctrl+P both use this — nothing here is actionable on a static page, so it's noise rather
      than a broken control. Purely cosmetic (visibility only) — never touches layout/page-break
      rules, which is exactly the kind of print-specific logic that caused the earlier PDF attempt
-     to drift from the real page (see FUNCTIONAL_RULES.md "Report export"). */
-  @media print{.week-nav,.nav-user,a[href$="/pdf"],form[action$="/reports/generate"]{display:none!important}}
+     to drift from the real page (see FUNCTIONAL_RULES.md "Report export"). Only the prev/next
+     arrows are hidden here, not the whole .week-nav — .ref-week (the "W35 · 2026" label) is the
+     one piece of that widget that's informational rather than an action, and must stay. */
+  @media print{.week-arrow,.nav-user,a[href$="/pdf"],form[action$="/reports/generate"]{display:none!important}}
 `;
 
 module.exports = generateReport;
