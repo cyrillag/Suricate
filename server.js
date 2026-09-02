@@ -679,7 +679,7 @@ function buildReportHtml(proj, report, year, week, isOwner, lang, userName) {
   // thing, so a slip gets its own badge state rather than being folded into "At Risk". Delayed
   // takes precedence when both are true: a confirmed slip is more informative than a risk signal.
   const health = etaDelayed ? 'delayed'
-    : (stats.blk > 0 || stats.ts > stats.total * 0.6 || hasHighRisk) ? 'at-risk'
+    : (stats.blk > 0 || hasHighRisk) ? 'at-risk'
     : 'on-track';
   let etaDelayedFrom = null;
   if (etaDelayed) {

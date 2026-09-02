@@ -138,8 +138,11 @@ to be re-applied here by hand rather than resolved by merging code:
 ## Project health badge (On Track / At Risk / Delayed)
 
 - **At Risk and Delayed are not the same thing and must not be merged.** At Risk is a projection —
-  workstream progress (any Blocked workstream, or more than 60% still "To Start") or the risk
-  register (any risk at level `high`) suggesting the target date *might* slip. Delayed is a fact —
+  any Blocked workstream, or the risk register carrying a risk at level `high`, suggesting the
+  target date *might* slip. (A "more than 60% of workstreams still To Start" rule used to also
+  trigger At Risk — dropped: too many projects are legitimately mostly-not-started early on
+  without that meaning anything is actually at risk, and it fired with an empty risk register and
+  nothing blocked, which read as unexplained.) Delayed is a fact —
   the root epic's End date has *already* moved later than the previous existing report's own
   frozen date. A confirmed slip is strictly more informative than a risk signal, so **Delayed takes
   precedence over At Risk** when both would otherwise apply; it is never downgraded to "At Risk"
