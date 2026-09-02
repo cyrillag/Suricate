@@ -68,6 +68,7 @@ const DICT = {
   },
   detail: {
     owner:     { fr: 'Responsable : {{name}}',    en: 'Owner: {{name}}' },
+    cleanup_link: { fr: '🩺 Cleanup',             en: '🩺 Cleanup' },
     edit:      { fr: '✎ Modifier',                en: '✎ Edit' },
     generate_report: { fr: 'Générer le rapport',  en: 'Generate report' },
     week_input_title: { fr: 'AAAA-Wss',           en: 'YYYY-Www' },
@@ -114,6 +115,37 @@ const DICT = {
     err_jira_http_error: { fr: 'Jira a renvoyé une erreur inattendue pendant la synchronisation. Réessaie, et contacte un administrateur si le problème persiste.', en: 'Jira returned an unexpected error during sync. Try again, and contact an administrator if this persists.' },
     err_generic: { fr: 'Une erreur inattendue est survenue pendant la synchronisation. Réessaie, et contacte un administrateur si le problème persiste.', en: 'An unexpected error occurred during sync. Try again, and contact an administrator if this persists.' },
     err_pdf_export: { fr: 'La génération du PDF a échoué. Réessaie, et contacte un administrateur si le problème persiste.', en: 'PDF generation failed. Try again, and contact an administrator if this persists.' }
+  },
+
+  // Cleanup: tracking-quality check over the same epics_cache data behind the Planning/Gantt
+  // section — sibling naming/severity model to the "JIRA Cleanup" Webex bot (jira-hygiene-report).
+  cleanup: {
+    title:    { fr: 'Cleanup',                    en: 'Cleanup' },
+    subtitle: { fr: 'Anomalies de suivi sur les epics de ce projet — mêmes données que la section Planning.', en: 'Tracking issues across this project’s epics — same data as the Planning section.' },
+    epics_checked: { fr: '{{count}} epics vérifiées', en: '{{count}} epics checked' },
+    last_synced: { fr: 'Dernière synchro Jira : {{when}}', en: 'Last Jira sync: {{when}}' },
+    never_synced: { fr: 'jamais',                 en: 'never' },
+    refresh_hint: { fr: 'Utilise «{{action}}» sur la page du projet pour rafraîchir ces données.', en: 'Use “{{action}}” on the project page to refresh this data.' },
+    no_issues: { fr: 'Aucune anomalie détectée. 🎉', en: 'No issues found. 🎉' },
+
+    high_priority: { fr: 'Priorité haute',        en: 'High priority' },
+    upcoming: { fr: 'Échéances à venir',          en: 'Upcoming deadlines' },
+    upcoming_hint: { fr: 'Pas une anomalie de suivi — juste un rappel.', en: 'Not a tracking issue — just a heads-up.' },
+    remaining: { fr: 'Reste à traiter, par équipe', en: 'Remaining, by team' },
+
+    rule_no_assignee: { fr: 'sans assignee',      en: 'no assignee' },
+    rule_no_start:    { fr: 'sans start date',    en: 'no start date' },
+    rule_no_end:      { fr: 'sans end date',      en: 'no end date' },
+
+    detail_overdue:  { fr: 'End date dépassée depuis {{days}} j ({{date}}).', en: 'End date passed {{days}}d ago ({{date}}).' },
+    detail_due_soon: { fr: 'Échéance dans {{days}} j ({{date}}).', en: 'Due in {{days}}d ({{date}}).' },
+    detail_not_started: { fr: 'Start date dépassée depuis {{days}} j ({{date}}), toujours pas démarrée.', en: 'Start date passed {{days}}d ago ({{date}}), not started yet.' },
+    detail_date_inconsistent: { fr: 'Start date ({{start}}) postérieure à la end date ({{end}}).', en: 'Start date ({{start}}) is after the end date ({{end}}).' },
+
+    epic_count: { fr: '{{count}} epic(s)',        en: '{{count}} epic(s)' },
+    contact_reporter_fallback: { fr: '{{name}} (reporter, pas d’assignee)', en: '{{name}} (reporter, no assignee)' },
+    contact_none: { fr: 'non identifié',          en: 'unidentified' },
+    view_in_jira: { fr: 'Voir dans Jira →',       en: 'View in Jira →' }
   }
 };
 

@@ -287,6 +287,42 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   Confluence URL over what's usually transient sent them chasing a non-problem; the message now
   says to just retry, and only suggests checking access rights if it keeps happening.
 
+## Cleanup (tracking-quality check)
+
+- **Cleanup checks the same epic data that feeds Planning, on purpose.** It reads live from
+  `epics_cache`, which only holds real Jira "Start date"/"End date" (no baseline/duedate
+  fallback — see Report generation's Planning rule) and is only as fresh as the last
+  "↻ Refresh"/Generate action (`refreshFullEpicTree`, i.e. `getPortfolioEpics` — the same
+  exhaustive, arbitrary-depth portfolio walk Planning uses, already excluding
+  Cancelled/Canceled epics). Fixing what Cleanup flags therefore also fixes what Planning
+  and the Deliverable matrix show — that's the whole point of putting it here rather than as
+  a separate standalone tool.
+- **No separate sync button.** Same reasoning as the Sync Jira/Sync Confluence buttons that
+  were removed project-wide (see Project onboarding & editing) — Cleanup reuses the existing
+  Generate/Refresh form as-is (shown on the Cleanup page too when the viewer is the owner)
+  instead of introducing its own refresh action.
+- **Three severity tiers**, mirroring the sibling "JIRA Cleanup" Webex bot
+  (jira-hygiene-report): 🔴 High priority (overdue; not started despite a past start date;
+  inconsistent dates — actual tracking problems, always listed individually) is distinct
+  from 📅 Upcoming deadlines (due within 14 days — not a problem, a perfectly healthy epic
+  can land here purely because it's closing soon; kept in its own section so it never reads
+  as something broken) and from 🟡 Remaining (missing assignee/start/end date — real hygiene
+  debt, but not urgent, so it's collapsed to a per-team count + a live Jira JQL link rather
+  than listed epic-by-epic).
+- **Missing-metadata checks (🟡) are skipped once an epic's `mapStatus` bucket is `done`** —
+  closed work doesn't need its dates or assignee backfilled. This reuses `jira.mapStatus`'s
+  own done/in-progress/blocked/to-start buckets (the same ones driving the Deliverable
+  matrix and health badge) rather than Jira's raw status, so paused/on-hold epics keep this
+  app's already-agreed semantics instead of a generically re-derived one.
+- **The "responsible" contact shown is the assignee, falling back to the reporter** when the
+  assignee is empty — but the "no assignee" finding itself always fires on a genuinely empty
+  assignee, regardless of that display fallback (a reporter existing does not hide the
+  finding — the fallback is only about who to show as a contact, not whether the epic has an
+  anomaly).
+- **Visible to every authenticated user, no ownership check** — same rule as the
+  project-detail and report-view pages (see Visibility & permissions): it's read-only, and a
+  weekly report is routinely shared with people who don't own the project.
+
 ## Internationalization
 
 - French is the default language; an FR/EN toggle persists the choice via a cookie.
