@@ -696,6 +696,12 @@ function buildReportHtml(proj, report, year, week, isOwner, lang, userName) {
   // than falling back to the live (and by now likely wrong) value.
   const etaDisplay = formatDate(report.eta_snapshot);
 
+  // Not every project is Confluence-backed (a "Jira tree" project has neither field set) — no
+  // link to show in that case, never a broken one built from half-empty values.
+  const confluenceUrl = (proj.confluence_space && proj.confluence_page)
+    ? confluenceUrlFor(proj.confluence_space, proj.confluence_page)
+    : null;
+
   return genReport({
     project: proj, year, week,
     pmName: proj.pm_name,
@@ -707,7 +713,7 @@ function buildReportHtml(proj, report, year, week, isOwner, lang, userName) {
     stats, health, isOwner,
     backfilled: !!report.backfilled,
     generatedAt: formatDate(new Date(report.created_at * 1000).toISOString()),
-    lang, userName
+    lang, userName, confluenceUrl
   });
 }
 

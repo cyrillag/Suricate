@@ -1,6 +1,6 @@
 const { translate } = require('./i18n');
 
-function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, epics, stats, health, isOwner, etaDelayed, etaDelayedFrom, etaDisplay, lang, userName, backfilled, generatedAt }) {
+function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, epics, stats, health, isOwner, etaDelayed, etaDelayedFrom, etaDisplay, lang, userName, backfilled, generatedAt, confluenceUrl = null }) {
   const weekStr = `W${String(week).padStart(2, '0')}`;
   const yearWeek = `${year}-${weekStr}`;
   const dateLabel = isoWeekMonday(year, week);
@@ -138,7 +138,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
     <div>
       <a href="/projects/${esc(project.slug)}" class="back-link">← All reports</a>
       <h1 class="page-title">${esc(project.name)}</h1>
-      <p class="page-sub">Weekly Status Report · ${esc(dateLabel)} · ${esc(pmName || project.name)}</p>
+      <p class="page-sub">Weekly Status Report · ${esc(dateLabel)} · ${esc(pmName || project.name)}${confluenceUrl ? `<span class="confluence-link-wrap"> · <a href="${esc(confluenceUrl)}" target="_blank" rel="noopener" class="confluence-link">Confluence ↗</a></span>` : ''}</p>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:flex-end">
       <a href="/projects/${esc(project.slug)}/${yearWeek}/pdf" class="btn-ghost btn-sm">⬇ Export PDF</a>
@@ -551,7 +551,12 @@ const CSS = `
      to drift from the real page (see FUNCTIONAL_RULES.md "Report export"). Only the prev/next
      arrows are hidden here, not the whole .week-nav — .ref-week (the "W35 · 2026" label) is the
      one piece of that widget that's informational rather than an action, and must stay. */
-  @media print{.week-arrow,.nav-user,a[href$="/pdf"],form[action$="/reports/generate"]{display:none!important}}
+  @media print{.week-arrow,.nav-user,a[href$="/pdf"],form[action$="/reports/generate"],.confluence-link-wrap{display:none!important}}
+  /* Deliberately subtle — a secondary way to reach more detail, not a primary action next to
+     Refresh/Export PDF. Underline-on-hover only, inherits the muted .page-sub text color rather
+     than getting its own accent treatment. */
+  .confluence-link{color:inherit;text-decoration:none;border-bottom:1px dotted var(--tx3)}
+  .confluence-link:hover{color:var(--cobalt);border-color:var(--cobalt)}
 `;
 
 module.exports = generateReport;
