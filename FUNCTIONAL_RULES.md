@@ -317,6 +317,14 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   own done/in-progress/blocked/to-start buckets (the same ones driving the Deliverable
   matrix and health badge) rather than Jira's raw status, so paused/on-hold epics keep this
   app's already-agreed semantics instead of a generically re-derived one.
+- **A Cancelled or Rejected epic is skipped from every check, not just the 🟡 ones** — same
+  treatment as a Done epic (no overdue/not-started/inconsistent-dates/missing-metadata
+  findings). `mapStatus` has no bucket for "irrelevant, stop checking" (it falls through to
+  `ts`, the same bucket as a genuinely not-yet-started epic), so this is checked against
+  Jira's raw status text directly instead — same idea as the Cancelled exclusion Planning
+  already applies, extended here to also cover Rejected. Without this, a cancelled epic with
+  a stale past end date read as an active, overdue tracking problem (seen in production:
+  NCC-2865 and CLDAPI-2009, both Cancelled, both flagged 🔴 overdue/not-started).
 - **The "responsible" contact shown is the assignee, falling back to the reporter** when the
   assignee is empty — but the "no assignee" finding itself always fires on a genuinely empty
   assignee, regardless of that display fallback (a reporter existing does not hide the

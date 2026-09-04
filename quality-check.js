@@ -26,10 +26,19 @@ function daysBetween(a, b) {
 // epics_cache, and this app already has its own considered status vocabulary (see
 // FUNCTIONAL_RULES.md: paused → in-progress, on hold → blocked, etc.) that a generic
 // new/indeterminate/done split would just re-derive worse.
+// A Cancelled/Rejected epic is no longer real work — every check below skips it exactly like an
+// already-Done one. mapStatus's own done/in-progress/blocked/to-start vocabulary (built for the
+// Deliverable matrix's visible status pill) has no bucket for "irrelevant, stop checking" — a
+// cancelled epic falls through to its default 'ts', which is how an overdue/never-started
+// cancelled epic used to get flagged as a live tracking problem. Checked against Jira's raw
+// status text instead, same idea as server.js's identical Cancelled exclusion for Planning,
+// extended here to also cover Rejected.
+const TERMINAL_STATUS = /^(cancel(l)?ed|rejected)$/i;
+
 function checkEpic(epic, today) {
   const findings = [];
   const bucket = mapStatus(epic.status);
-  const isDone = bucket === 'done';
+  const isDone = bucket === 'done' || TERMINAL_STATUS.test((epic.status || '').trim());
   const { start_date: start, end_date: end } = epic;
 
   if (!isDone) {
@@ -44,12 +53,12 @@ function checkEpic(epic, today) {
     else if (diff <= DUE_SOON_DAYS) findings.push({ rule: 'due_soon', severity: 'upcoming', days: diff, date: end });
   }
 
-  if (start && bucket === 'ts') {
+  if (start && bucket === 'ts' && !isDone) {
     const diff = daysBetween(new Date(start), today);
     if (diff > 0) findings.push({ rule: 'not_started', severity: 'high', days: diff, date: start });
   }
 
-  if (start && end && new Date(start) > new Date(end)) {
+  if (start && end && !isDone && new Date(start) > new Date(end)) {
     findings.push({ rule: 'date_inconsistent', severity: 'high', start, end });
   }
 
