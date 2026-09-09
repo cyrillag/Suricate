@@ -90,6 +90,27 @@ to be re-applied here by hand rather than resolved by merging code:
 - Planning epics are ordered purely chronologically by end date (ascending), across all teams —
   never grouped by team first, never alphabetical/key order. Epics with no end date sort last.
   A timeline view must read top-to-bottom as earliest-to-latest.
+- **The Gantt draws dependency arrows from real Jira issue links, not every link type Jira has.**
+  Only two carry actual scheduling meaning: **Blocks** (outward "blocks" / inward "is blocked
+  by") and **Gantt End to Start** (outward "has to be done before" / inward "has to be done
+  after") — both mean the outward side comes first, so they're treated identically. **Gantt End
+  to End** ("has to be finished together with") is symmetric — both epics finish together, drawn
+  dashed with no arrowhead rather than implying an order. Every other link type observed in this
+  instance (Cloners, Relates, Duplicate, "Treatment") is structural or domain-specific, not
+  sequencing, and is never drawn.
+  - `jira.js`'s `extractDependencies` also drops a link whose other side isn't itself an Epic (a
+    Task/Story cloned from an epic, say) — an arrow only ever connects two epics.
+  - An edge is only drawn when **both** epics are present in *this* report's own Gantt with real
+    Start/End dates — an edge to an epic outside this project's portfolio (a genuine cross-project
+    dependency, seen in production) or to a "No dates yet" epic has no bar to anchor to and would
+    be a dangling arrow, so it's silently dropped rather than drawn incorrectly or crashing.
+  - Reciprocal Jira links (epic A's own issuelinks says "blocks" B; B's own issuelinks
+    independently says "is blocked by" A) collapse to one edge (`report-gen.js`'s
+    `buildDependencyEdges`), keyed so either side reporting the same relationship produces the
+    same canonical edge.
+  - Frozen at generation time like the rest of Planning — `deps_json` is cached per-epic
+    (`epics_cache`) exactly like start/end/status, and flows into `epics_snapshot_json` the same
+    way, so a past week's report shows the dependency graph as it was then, not as it is now.
 
 ## Report export
 
