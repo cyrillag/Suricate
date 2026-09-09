@@ -78,6 +78,11 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
   // indistinguishable from (this used to be checked here against a 'cancel' bucket that
   // mapStatus can never actually produce, so it silently never filtered anything).
   const ganttEpics = epics;
+  // Deduplicated, both-ends-resolved dependency edges for the Gantt arrows — computed server-side
+  // from this report's own frozen epic list, so the client script only has to draw them, not
+  // re-derive/dedupe them itself.
+  const depEdges = buildDependencyEdges(ganttEpics);
+  const hasDeps = depEdges.length > 0;
 
   // Donut data
   const donutJSON = JSON.stringify([
@@ -241,6 +246,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
       <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#A6D64D"></div>Done</div>
       <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#0050D5"></div>In Progress</div>
       <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#BEC0C6;border:1px dashed #C8CAD4"></div>To Start</div>
+      ${hasDeps ? `<div class="gantt-leg-item"><svg width="18" height="10" style="flex-shrink:0"><line x1="0" y1="5" x2="14" y2="5" stroke="#636369" stroke-width="1.5"/><polygon points="14,1.5 18,5 14,8.5" fill="#636369"/></svg>Dependency (from Jira)</div>` : ''}
     </div>
   </div>` : ''}
 
@@ -287,13 +293,45 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
   }
   requestAnimationFrame(step);
 })();
-${ganttEpics.length ? GANTT_JS(ganttEpics) : ''}
+${ganttEpics.length ? GANTT_JS(ganttEpics, depEdges) : ''}
 </script>
 </body>
 </html>`;
 }
 
-function GANTT_JS(epics) {
+// Reduces every epic's own raw `deps` (as seen from its own Jira issuelinks — see jira.js's
+// extractDependencies) into one deduplicated, directional edge list: {from, to} means "from must
+// finish before to starts" (kind 'seq'), {from, to, kind:'together'} means both finish at the same
+// time. Only kept when BOTH ends are epics actually in *this* Gantt with real dates — an edge to
+// an epic outside this project's portfolio, or one with "No dates yet", has no bar to draw to/from
+// and would just be a dangling arrow. Reciprocal entries (epic A's outward "blocks" B, and B's own
+// inward "is blocked by" A) collapse to the same edge via the canonical key below.
+function buildDependencyEdges(epics) {
+  const byKey = new Map(epics.map(e => [e.key, e]));
+  const hasBar = e => e && e.start && e.end;
+  const edges = new Map();
+  epics.forEach(epic => {
+    (epic.deps || []).forEach(dep => {
+      const other = byKey.get(dep.key);
+      if (!hasBar(epic) || !hasBar(other)) return;
+      let from, to, kind;
+      if (dep.dir === 'together') {
+        // Symmetric — sort the pair so both epics' own copies of the same relationship collapse
+        // to one edge regardless of which side it's read from.
+        [from, to] = [epic.key, dep.key].sort();
+        kind = 'together';
+      } else {
+        from = dep.dir === 'before' ? epic.key : dep.key;
+        to   = dep.dir === 'before' ? dep.key : epic.key;
+        kind = 'seq';
+      }
+      edges.set(`${kind}:${from}>${to}`, { from, to, kind });
+    });
+  });
+  return [...edges.values()];
+}
+
+function GANTT_JS(epics, depEdges) {
   const datedStarts = epics.map(e => e.start).filter(Boolean);
   const TSTART_DATE = datedStarts.length ? datedStarts.reduce((m, s) => s < m ? s : m) : '2025-09-01';
   const tstart = new Date(Math.min(new Date(TSTART_DATE), new Date('2025-09-01')));
@@ -316,6 +354,8 @@ function GANTT_JS(epics) {
   ];
   var TEAM_BG={NSE:'#0050D5',NSA:'#147DE8',NCC:'#000E9C',CLDAPI:'#4AB0F5',PUBM:'#636369',USRE:'#7BB73C',Manager:'#87878C'};
   var EPICS=${JSON.stringify(epics.map(e => ({ ...e, team: esc(e.team), key: esc(e.key), label: esc(e.label) })))};
+  var EDGES=${JSON.stringify(depEdges)};
+  var ROW_H=24,POS={};
   MONTHS.forEach(function(m){
     var c=document.createElement('div');c.className='gantt-mcell'+(m.q?' qs':'');
     if(m.q){var q=document.createElement('span');q.className='gantt-mqtr';q.textContent=m.q;c.appendChild(q);}
@@ -331,7 +371,7 @@ function GANTT_JS(epics) {
     v.appendChild(sp);body.appendChild(v);
   }
   mkV('vtoday','today','#ED733D','${new Date().toISOString().slice(0,10)}');
-  EPICS.forEach(function(e){
+  EPICS.forEach(function(e,idx){
     var lr=document.createElement('div');lr.className='gantt-lrow';
     var bg=TEAM_BG[e.team]||'#636369',tx=(e.team==='CLDAPI')?'#00185E':'#fff';
     lr.innerHTML='<span class="g-team" style="background:'+bg+';color:'+tx+'">'+e.team+'</span>'
@@ -346,12 +386,53 @@ function GANTT_JS(epics) {
       bar.style.left=l.toFixed(2)+'%';bar.style.width=w.toFixed(2)+'%';
       bar.title=e.key+' — '+e.label+'\\n'+e.start+' → '+e.end;
       row.appendChild(bar);
+      POS[e.key]={row:idx,left:l,right:l+w};
     }else{
       var nd=document.createElement('span');nd.className='gantt-nodates';nd.textContent='No dates yet';
       row.appendChild(nd);
     }
     body.appendChild(row);
   });
+  // Dependency arrows — an SVG overlay drawn once every bar/row is in the DOM, so real pixel
+  // widths are known (bars themselves are positioned in %, but an elbow connector needs actual
+  // pixels to look right at any container width). One <path> per edge, End-to-Start edges arrow
+  // from the predecessor's right edge to the successor's left edge; End-to-End edges connect both
+  // right edges instead (dashed, no direction implied — they finish together, neither leads).
+  if(EDGES.length){
+    var W=body.clientWidth,H=EPICS.length*ROW_H;
+    var svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    svg.setAttribute('class','gantt-dep-svg');
+    svg.setAttribute('width',W);svg.setAttribute('height',H);
+    svg.innerHTML='<defs><marker id="dep-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#636369"/></marker></defs>';
+    function rowY(i){return i*ROW_H+ROW_H/2;}
+    function px(p){return p/100*W;}
+    EDGES.forEach(function(ed){
+      var a=POS[ed.from],b=POS[ed.to];
+      if(!a||!b)return;
+      var path=document.createElementNS('http://www.w3.org/2000/svg','path'),d;
+      if(ed.kind==='together'){
+        var x1=px(a.right),x2=px(b.right),y1=rowY(a.row),y2=rowY(b.row);
+        var midX=Math.max(x1,x2)+10;
+        d='M'+x1+','+y1+' L'+midX+','+y1+' L'+midX+','+y2+' L'+x2+','+y2;
+        path.setAttribute('stroke-dasharray','3,3');
+      }else{
+        var x1=px(a.right),y1=rowY(a.row),x2=px(b.left),y2=rowY(b.row);
+        var midX=x1+10;
+        if(x2<midX+6)midX=x2-10;
+        d='M'+x1+','+y1+' L'+midX+','+y1+' L'+midX+','+y2+' L'+(x2-6)+','+y2;
+        path.setAttribute('marker-end','url(#dep-arrow)');
+      }
+      path.setAttribute('d',d);
+      path.setAttribute('fill','none');
+      path.setAttribute('stroke','#636369');
+      path.setAttribute('stroke-width','1.5');
+      var title=document.createElementNS('http://www.w3.org/2000/svg','title');
+      title.textContent=ed.from+(ed.kind==='together'?' finishes together with ':' → ')+ed.to;
+      path.appendChild(title);
+      svg.appendChild(path);
+    });
+    body.appendChild(svg);
+  }
 })();`;
 }
 
@@ -517,6 +598,7 @@ const CSS = `
   .gantt-mqtr{font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.45)}
   .gantt-mname{font-size:12.5px;color:rgba(255,255,255,.9);font-weight:600}
   .gantt-body{position:relative}
+  .gantt-dep-svg{position:absolute;top:0;left:0;pointer-events:none;z-index:3}
   .gantt-row{height:24px;border-bottom:1px solid var(--bd2);position:relative;overflow:visible}
   .gantt-row:nth-child(odd){background:var(--gnd)}
   .gantt-row:last-child{border-bottom:none}

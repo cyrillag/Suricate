@@ -78,6 +78,11 @@ ensureColumn('projects', 'confluence_page', 'confluence_page TEXT');
 // getEpicsByKeys, getPortfolioEpics) now fetches both, so all three keep this column populated.
 ensureColumn('epics_cache', 'assignee', 'assignee TEXT');
 ensureColumn('epics_cache', 'reporter', 'reporter TEXT');
+// Raw dependency edges as seen from this epic's own Jira issuelinks — [{key, dir}], dir one of
+// 'before'/'after'/'together' (see jira.js's extractDependencies). Stored per-epic rather than as
+// a project-level table since each epic's own issuelinks fetch is what produces it; the Gantt
+// dependency arrows (report-gen.js) reduce these into a deduplicated edge list at render time.
+ensureColumn('epics_cache', 'deps_json', 'deps_json TEXT');
 ensureColumn('reports', 'exec_summary', 'exec_summary TEXT');
 // Space/comma-separated Jira keys pinned to Planning regardless of the automatic portfolio
 // walk from jira_root_epic — for epics/features that live under a different LVL2 root entirely

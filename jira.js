@@ -44,6 +44,27 @@ function extractTeam(key) {
   return TEAM_MAP[proj] || proj;
 }
 
+// Only these two Jira link types express an actual scheduling dependency for the Gantt — everyone
+// else observed in this instance (Cloners, Relates, Duplicate, "Treatment") is a structural or
+// domain-specific relation with no bearing on sequencing, and would be noise as an arrow.
+// "Blocks" (outward "blocks" / inward "is blocked by") and "Gantt End to Start" (outward "has to
+// be done before" / inward "has to be done after") both mean the same thing for our purposes —
+// the outward side comes first — so they're treated identically. "Gantt End to End" ("has to be
+// finished together with") is symmetric: both ends finish together, not one-before-the-other.
+function extractDependencies(issuelinks) {
+  const deps = [];
+  for (const l of (issuelinks || [])) {
+    const other = l.outwardIssue || l.inwardIssue;
+    if (!other || other.fields.issuetype?.name !== 'Epic') continue;
+    let dir;
+    if (l.type.name === 'Gantt End to End') dir = 'together';
+    else if (l.type.name === 'Blocks' || l.type.name === 'Gantt End to Start') dir = l.outwardIssue ? 'before' : 'after';
+    else continue;
+    deps.push({ key: other.key, dir });
+  }
+  return deps;
+}
+
 function mapStatus(jiraStatus) {
   if (!jiraStatus) return 'ts';
   const s = jiraStatus.toLowerCase();
@@ -62,7 +83,7 @@ function mapStatus(jiraStatus) {
 
 async function getChildEpics(token, rootEpic) {
   // customfield_10110/10111 = "Start date"/"End date" (BigPicture Gantt fields, authoritative).
-  const EPIC_FIELDS = 'summary,status,assignee,reporter,customfield_10110,customfield_10111,issuetype';
+  const EPIC_FIELDS = 'summary,status,assignee,reporter,customfield_10110,customfield_10111,issuetype,issuelinks';
 
   const notCancelled = i => {
     const s = (i.fields.status?.name || '').toLowerCase();
@@ -80,7 +101,8 @@ async function getChildEpics(token, rootEpic) {
     // on its Gantt fields is left with no date at all rather than an invented one — the
     // report simply omits it from the Planning timeline (see report-gen's epics filter).
     start:      i.fields.customfield_10110 || null,
-    end:        i.fields.customfield_10111 || null
+    end:        i.fields.customfield_10111 || null,
+    deps:       extractDependencies(i.fields.issuelinks)
   });
 
   // Level 1: direct children (any type)
@@ -122,7 +144,7 @@ async function getChildEpics(token, rootEpic) {
 // callers are responsible for validating each key against /^[A-Z][A-Z0-9]*-\d+$/ before it
 // reaches this JQL string.
 async function getPortfolioEpics(token, rootEpic, extraKeys = []) {
-  const EPIC_FIELDS = 'summary,status,assignee,reporter,customfield_10110,customfield_10111,issuetype';
+  const EPIC_FIELDS = 'summary,status,assignee,reporter,customfield_10110,customfield_10111,issuetype,issuelinks';
   let jql = `(issuekey in (${rootEpic}) OR issueFunction in portfolioChildrenOf("issuekey in (${rootEpic})")) and issuetype = Epic`;
   if (extraKeys.length) jql = `(${jql} OR issuekey in (${extraKeys.join(',')}))`;
   // Jira workflows in this instance use both the British ("Cancelled") and American ("Canceled")
@@ -138,7 +160,8 @@ async function getPortfolioEpics(token, rootEpic, extraKeys = []) {
     assignee: i.fields.assignee?.displayName || null,
     reporter: i.fields.reporter?.displayName || null,
     start:    i.fields.customfield_10110 || null,
-    end:      i.fields.customfield_10111 || null
+    end:      i.fields.customfield_10111 || null,
+    deps:     extractDependencies(i.fields.issuelinks)
   }));
 }
 
@@ -159,7 +182,7 @@ async function getRootEpicMeta(token, epicKey) {
 async function getEpicsByKeys(token, keys) {
   const uniqueKeys = [...new Set(keys.filter(Boolean))];
   if (!uniqueKeys.length) return [];
-  const EPIC_FIELDS = 'summary,status,assignee,reporter,customfield_10110,customfield_10111,issuetype';
+  const EPIC_FIELDS = 'summary,status,assignee,reporter,customfield_10110,customfield_10111,issuetype,issuelinks';
   const results = [];
   // Jira JQL "in" clauses have a practical size limit — chunk to be safe.
   for (let i = 0; i < uniqueKeys.length; i += 50) {
@@ -178,7 +201,8 @@ async function getEpicsByKeys(token, keys) {
       reporter: i.fields.reporter?.displayName || null,
       // Same "no invented dates" rule as getChildEpics — leave blank if unset.
       start:    i.fields.customfield_10110 || null,
-      end:      i.fields.customfield_10111 || null
+      end:      i.fields.customfield_10111 || null,
+      deps:     extractDependencies(i.fields.issuelinks)
     }));
   }
   return results;

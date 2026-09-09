@@ -145,7 +145,8 @@ function resolveWorkstreamsAndEpics(projectId, legacyStatusOverrides) {
     .filter(e => !/^cancel(l)?ed$/i.test((e.status || '').trim()))
     .map(e => ({
       key: e.jira_key, label: e.summary, team: e.team,
-      status: jira.mapStatus(e.status), start: e.start_date, end: e.end_date
+      status: jira.mapStatus(e.status), start: e.start_date, end: e.end_date,
+      deps: JSON.parse(e.deps_json || '[]')
     }));
   return { resolvedWs, epics };
 }
@@ -160,7 +161,7 @@ const upsertWorkstreamFromConfluence = db.prepare(`
   ON CONFLICT(project_id,deliverable,name) DO UPDATE SET
     team=excluded.team, jira_key=excluded.jira_key, default_status=excluded.default_status, sort_order=excluded.sort_order`);
 
-const insEpicCache = db.prepare('INSERT OR REPLACE INTO epics_cache(project_id,jira_key,summary,team,status,start_date,end_date,assignee,reporter,cached_at) VALUES(?,?,?,?,?,?,?,?,?,unixepoch())');
+const insEpicCache = db.prepare('INSERT OR REPLACE INTO epics_cache(project_id,jira_key,summary,team,status,start_date,end_date,assignee,reporter,deps_json,cached_at) VALUES(?,?,?,?,?,?,?,?,?,?,unixepoch())');
 
 // Full tree-walk auto-discovery from a root LVL2 epic — creates BOTH the workstream list
 // (grouped by team) AND epics_cache. Used only for projects with no Confluence page: once a
@@ -170,7 +171,7 @@ const insEpicCache = db.prepare('INSERT OR REPLACE INTO epics_cache(project_id,j
 async function seedWorkstreamsFromJiraTree(projectId, rootEpic) {
   const epics = await jira.getChildEpics(JIRA_TOKEN, rootEpic);
   epics.forEach((e, i) => {
-    insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter);
+    insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter, JSON.stringify(e.deps || []));
     upsertWorkstreamFromJira.run(projectId, e.deliverable, e.summary, e.team, e.key, i);
   });
   reconcileWorkstreams(projectId, epics.map(e => ({ deliverable: e.deliverable, name: e.summary })));
@@ -185,7 +186,7 @@ async function seedWorkstreamsFromJiraTree(projectId, rootEpic) {
 async function refreshEpicStatuses(projectId, jiraKeyFields) {
   const keys = [...new Set(jiraKeyFields.flatMap(splitJiraKeys))];
   const epics = await jira.getEpicsByKeys(JIRA_TOKEN, keys);
-  epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter));
+  epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter, JSON.stringify(e.deps || [])));
   return epics.length;
 }
 
@@ -196,7 +197,7 @@ async function refreshEpicStatuses(projectId, jiraKeyFields) {
 // Confluence-backed project without duplicating or overriding the matrix.
 async function refreshFullEpicTree(projectId, rootEpic, extraKeys = []) {
   const epics = await jira.getPortfolioEpics(JIRA_TOKEN, rootEpic, extraKeys);
-  epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter));
+  epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter, JSON.stringify(e.deps || [])));
   return epics.length;
 }
 
