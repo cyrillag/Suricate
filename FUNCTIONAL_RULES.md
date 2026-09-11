@@ -390,6 +390,15 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   scrolling a chart sideways inside a page that also scrolls vertically is a poor mobile
   experience) or hiding it behind an expand toggle (a collapsed Gantt still isn't usable once
   opened on a phone, so there's nothing gained by making it reachable).
+- **The Gantt's month-header row and quarter gridlines are generated dynamically from the same
+  `tstart`/`tend` the bar/marker positions (`pct()`) are computed from** (`buildGanttMonths()` in
+  `report-gen.js`), never a fixed list. This was a real, shipped bug once: the header was a
+  hardcoded 15-column list always assumed to span Sep 2025→Nov 2026, while `tstart` actually floors
+  at the *earliest epic start date* if any epic starts before Sep 2025 — so for a project with an
+  epic starting e.g. March 2025, the header silently desynced from the true coordinate space and
+  the "Today" marker (and every bar) rendered under the wrong month label. Quarter labels/gridlines
+  follow OVHcloud's fiscal year (starts September; "FYxx" = 2-digit year in which August of that FY
+  falls) computed from the calendar month, not hardcoded dates either.
 - The exec summary is truncated to 4 lines with a "Read more" toggle below 700px, but only when it
   exceeds 240 characters — a short summary is shown in full with no button, since there's nothing
   to truncate and an inert "Read more" that expands nothing would just be confusing.
