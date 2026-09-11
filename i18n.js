@@ -133,7 +133,6 @@ const DICT = {
     upcoming_hint: { fr: 'Pas une anomalie de suivi — juste un rappel.', en: 'Not a tracking issue — just a heads-up.' },
     remaining: { fr: 'Reste à traiter, par équipe', en: 'Remaining, by team' },
 
-    rule_no_assignee: { fr: 'sans assignee',      en: 'no assignee' },
     rule_no_start:    { fr: 'sans start date',    en: 'no start date' },
     rule_no_end:      { fr: 'sans end date',      en: 'no end date' },
 

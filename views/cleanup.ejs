@@ -28,9 +28,8 @@
 
   <%
     const RULE_LABEL = {
-      no_assignee: 'cleanup.rule_no_assignee',
-      no_start:    'cleanup.rule_no_start',
-      no_end:      'cleanup.rule_no_end'
+      no_start: 'cleanup.rule_no_start',
+      no_end:   'cleanup.rule_no_end'
     };
     function detailFor(item) {
       if (item.rule === 'overdue')            return t('cleanup.detail_overdue', { days: item.days, date: item.date });
