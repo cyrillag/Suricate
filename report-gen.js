@@ -293,6 +293,28 @@ ${ganttEpics.length ? GANTT_JS(ganttEpics) : ''}
 </html>`;
 }
 
+// OVHcloud's fiscal year starts in September (Q1=Sep/Oct/Nov ... Q4=Jun/Jul/Aug); "FYxx" is the
+// 2-digit calendar year in which August of that fiscal year falls (e.g. Sep25→Aug26 = FY26).
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function buildGanttMonths(tstart, tend) {
+  const months = [];
+  const quarterLines = [];
+  let cur = new Date(Date.UTC(tstart.getUTCFullYear(), tstart.getUTCMonth(), 1));
+  const end = new Date(Date.UTC(tend.getUTCFullYear(), tend.getUTCMonth(), 1));
+  while (cur <= end) {
+    const cy = cur.getUTCFullYear(), cm = cur.getUTCMonth();
+    const fiscalMonthIndex = (cm - 8 + 12) % 12; // 0=Sep...11=Aug
+    const isQuarterStart = fiscalMonthIndex % 3 === 0;
+    const quarterInFY = Math.floor(fiscalMonthIndex / 3) + 1;
+    const fyYear = cm >= 8 ? cy + 1 : cy; // Sep-Dec belong to the FY ending the following year
+    months.push({ m: MONTH_NAMES[cm], y: String(cy).slice(-2), q: isQuarterStart ? `Q${quarterInFY} FY${String(fyYear).slice(-2)}` : '' });
+    // No gridline at the very first column (position 0%) — nothing to divide there.
+    if (isQuarterStart && months.length > 1) quarterLines.push(`${cy}-${String(cm + 1).padStart(2, '0')}-01`);
+    cur = new Date(Date.UTC(cy, cm + 1, 1));
+  }
+  return { months, quarterLines };
+}
+
 function GANTT_JS(epics) {
   const datedStarts = epics.map(e => e.start).filter(Boolean);
   const TSTART_DATE = datedStarts.length ? datedStarts.reduce((m, s) => s < m ? s : m) : '2025-09-01';
@@ -300,6 +322,7 @@ function GANTT_JS(epics) {
   const tend   = new Date('2026-11-30');
   const ts = tstart.toISOString().slice(0, 10);
   const te = tend.toISOString().slice(0, 10);
+  const { months, quarterLines } = buildGanttMonths(tstart, tend);
 
   return `
 (function(){
@@ -307,13 +330,7 @@ function GANTT_JS(epics) {
   if(!lcol||!months||!body)return;
   var TSTART=new Date('${ts}'),TEND=new Date('${te}'),TTOTAL=TEND-TSTART;
   function pct(d){return Math.max(0,Math.min(100,(new Date(d)-TSTART)/TTOTAL*100));}
-  var MONTHS=[
-    {m:'Sep',y:'25',q:'Q1 FY26'},{m:'Oct',y:'25',q:''},{m:'Nov',y:'25',q:''},
-    {m:'Dec',y:'25',q:'Q2 FY26'},{m:'Jan',y:'26',q:''},{m:'Feb',y:'26',q:''},
-    {m:'Mar',y:'26',q:'Q3 FY26'},{m:'Apr',y:'26',q:''},{m:'May',y:'26',q:''},
-    {m:'Jun',y:'26',q:'Q4 FY26'},{m:'Jul',y:'26',q:''},{m:'Aug',y:'26',q:''},
-    {m:'Sep',y:'26',q:'Q1 FY27'},{m:'Oct',y:'26',q:''},{m:'Nov',y:'26',q:''}
-  ];
+  var MONTHS=${JSON.stringify(months)};
   var TEAM_BG={NSE:'#0050D5',NSA:'#147DE8',NCC:'#000E9C',CLDAPI:'#4AB0F5',PUBM:'#636369',USRE:'#7BB73C',Manager:'#87878C'};
   var EPICS=${JSON.stringify(epics.map(e => ({ ...e, team: esc(e.team), key: esc(e.key), label: esc(e.label) })))};
   MONTHS.forEach(function(m){
@@ -322,7 +339,7 @@ function GANTT_JS(epics) {
     var mn=document.createElement('span');mn.className='gantt-mname';mn.textContent=m.m+' '+m.y;c.appendChild(mn);
     months.appendChild(c);
   });
-  ['2025-12-01','2026-03-01','2026-06-01','2026-09-01'].forEach(function(d){
+  ${JSON.stringify(quarterLines)}.forEach(function(d){
     var l=document.createElement('div');l.className='gantt-vline qtr';l.style.left=pct(d).toFixed(2)+'%';body.appendChild(l);
   });
   function mkV(cls,label,color,date){
