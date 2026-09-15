@@ -91,6 +91,49 @@ to be re-applied here by hand rather than resolved by merging code:
   never grouped by team first, never alphabetical/key order. Epics with no end date sort last.
   A timeline view must read top-to-bottom as earliest-to-latest.
 
+## Milestones
+
+A project's LVL2 epic often isn't one flat delivery — it's an aggregate of several milestones
+(Beta, GA, a new geographic region...), each of which can need its own subset of
+deliverables/workstreams (a Beta doesn't necessarily need an SLA workstream; a GA needs T&Cs). This
+is a grouping layer *above* deliverable, not a replacement for it: Project → Milestone →
+Deliverable → Workstream.
+
+- A milestone is discovered structurally, never configured by hand. For a **Jira-tree project**
+  (no Confluence page), it's a non-Epic direct child of the root LVL2 epic that itself groups a set
+  of child Epics (`jira.js`'s `getChildEpics`, "Case B" — this grouping already existed for the
+  deliverable/matrix generation before milestones did; it's now also surfaced as its own entity
+  with its own key/status/dates instead of being flattened straight into a deliverable string). For
+  a **Confluence-backed project**, an `<h2>` heading inside the "Deliverables status" section
+  starts a new milestone's own deliverable-matrix table (`confluence.js`'s `parseMilestoneBlocks`) —
+  everything up to the next `<h2>` (or the section's end) belongs to it. A page with no `<h2>` at
+  all in that section — every page written before this existed, and any project simple enough not
+  to need it — parses exactly as before: one flat, un-grouped matrix, and the report shows no
+  milestone grouping at all. **This must stay true for every existing project with zero changes to
+  their Confluence page or report layout** — milestones are additive, never required.
+- A milestone's name/status/dates are Jira-authoritative whenever a Jira key is known (the
+  Confluence heading convention is `Name (LVL2-1234)` — same "Jira overrides the source text"
+  precedence a workstream's own `jira_key` already gets over a manually-typed Confluence status). A
+  milestone named in a Confluence heading with **no** Jira key gets no automatic date — same
+  "no manual authoring" rule as the rest of this app (see server.js's `generateReportRow` comment):
+  nothing here is ever typed in by hand, so a key-less milestone shows "TBD" rather than inventing
+  a date, or worse, silently trusting free text a PM typed in the heading.
+- Milestone status/dates are cached (`milestones_cache` table, mirroring `epics_cache`) and then
+  **frozen into the report row at generation time** (`reports.milestones_snapshot_json`), exactly
+  like the workstream/epic snapshot — a past week's report must never silently change because a
+  milestone's Jira dates moved after that week was generated. A legacy report row from before this
+  existed shows no milestone data rather than reaching for today's live state.
+- The Deliverable matrix groups its rows by milestone (a full-width header row per milestone,
+  naming it and its end date) **only when at least one workstream actually carries a milestone
+  tag** — a project with none renders byte-for-byte the same flat matrix as before this feature
+  existed (`hasMilestones` gate in report-gen.js).
+- Project Identity shows a compact one-line-per-milestone end-date summary (name + date, or "TBD")
+  when the project has any — a quick "what's coming and when" view without reading the whole
+  matrix. Hidden entirely for a project with no milestones.
+- The Planning/Gantt section stays global/ungrouped by milestone for now — the "program" case
+  (several LVL2 root epics aggregated into one project) is explicitly deferred; this milestone
+  layer applies to a single root epic's own feature hierarchy.
+
 ## Report export
 
 - **PDF export (re-added) renders the exact live report page server-side, never a separate
