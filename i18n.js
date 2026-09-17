@@ -64,7 +64,10 @@ const DICT = {
     err_confluence_url: { fr: 'Une URL de page Confluence valide est requise — colle-la depuis la barre d’adresse de ton navigateur en visitant la page (ex : https://confluence.ovhcloud.tools/display/SPACE/Titre, ou un lien avec pageId=).', en: 'A valid Confluence page URL is required — paste it from your browser’s address bar while viewing the page (e.g. https://confluence.ovhcloud.tools/display/SPACE/Page+Title, or a pageId= link).' },
     extra_epics_label: { fr: 'Epics additionnels pour le Planning', en: 'Extra epics for Planning' },
     extra_epics_optional: { fr: '(optionnel)', en: '(optional)' },
-    extra_epics_hint: { fr: 'Clés Jira séparées par une virgule ou un espace, à toujours inclure dans la section Planning — utile pour des epics rattachés à un autre programme LVL2 et donc invisibles pour la détection automatique. N’affecte pas la matrice des deliverables.', en: 'Comma- or space-separated Jira keys to always include in the Planning section — useful for epics that belong to a different LVL2 program and so aren’t reachable by automatic detection. Does not affect the deliverable matrix.' }
+    extra_epics_hint: { fr: 'Clés Jira séparées par une virgule ou un espace, à toujours inclure dans la section Planning — utile pour des epics rattachés à un autre programme LVL2 et donc invisibles pour la détection automatique. N’affecte pas la matrice des deliverables.', en: 'Comma- or space-separated Jira keys to always include in the Planning section — useful for epics that belong to a different LVL2 program and so aren’t reachable by automatic detection. Does not affect the deliverable matrix.' },
+    milestones_label: { fr: 'Jalons du projet', en: 'Project milestones' },
+    milestones_optional: { fr: '(optionnels)', en: '(optional)' },
+    milestones_hint: { fr: 'Clé Jira de l’epic Alpha / Beta / GA, si le projet a ces étapes — chacune ajoute sa date de fin (lue depuis Jira) dans l’identité du projet.', en: 'Jira key of the Alpha / Beta / GA epic, if the project has those phases — each adds its End date (read from Jira) to the project identity.' }
   },
   detail: {
     owner:     { fr: 'Responsable : {{name}}',    en: 'Owner: {{name}}' },

@@ -108,46 +108,40 @@ to be re-applied here by hand rather than resolved by merging code:
 
 ## Milestones
 
-A project's LVL2 epic often isn't one flat delivery — it's an aggregate of several milestones
-(Beta, GA, a new geographic region...), each of which can need its own subset of
-deliverables/workstreams (a Beta doesn't necessarily need an SLA workstream; a GA needs T&Cs). This
-is a grouping layer *above* deliverable, not a replacement for it: Project → Milestone →
-Deliverable → Workstream.
+Some projects (not all) have distinct phases with their own target dates — typically Alpha / Beta /
+GA. Project Identity can show one end date per phase a project actually has.
 
-- A milestone is discovered structurally, never configured by hand. For a **Jira-tree project**
-  (no Confluence page), it's a non-Epic direct child of the root LVL2 epic that itself groups a set
-  of child Epics (`jira.js`'s `getChildEpics`, "Case B" — this grouping already existed for the
-  deliverable/matrix generation before milestones did; it's now also surfaced as its own entity
-  with its own key/status/dates instead of being flattened straight into a deliverable string). For
-  a **Confluence-backed project**, an `<h2>` heading inside the "Deliverables status" section
-  starts a new milestone's own deliverable-matrix table (`confluence.js`'s `parseMilestoneBlocks`) —
-  everything up to the next `<h2>` (or the section's end) belongs to it. A page with no `<h2>` at
-  all in that section — every page written before this existed, and any project simple enough not
-  to need it — parses exactly as before: one flat, un-grouped matrix, and the report shows no
-  milestone grouping at all. **This must stay true for every existing project with zero changes to
-  their Confluence page or report layout** — milestones are additive, never required.
-- A milestone's name/status/dates are Jira-authoritative whenever a Jira key is known (the
-  Confluence heading convention is `Name (LVL2-1234)` — same "Jira overrides the source text"
-  precedence a workstream's own `jira_key` already gets over a manually-typed Confluence status). A
-  milestone named in a Confluence heading with **no** Jira key gets no automatic date — same
-  "no manual authoring" rule as the rest of this app (see server.js's `generateReportRow` comment):
-  nothing here is ever typed in by hand, so a key-less milestone shows "TBD" rather than inventing
-  a date, or worse, silently trusting free text a PM typed in the heading.
-- Milestone status/dates are cached (`milestones_cache` table, mirroring `epics_cache`) and then
-  **frozen into the report row at generation time** (`reports.milestones_snapshot_json`), exactly
-  like the workstream/epic snapshot — a past week's report must never silently change because a
-  milestone's Jira dates moved after that week was generated. A legacy report row from before this
-  existed shows no milestone data rather than reaching for today's live state.
-- The Deliverable matrix groups its rows by milestone (a full-width header row per milestone,
-  naming it and its end date) **only when at least one workstream actually carries a milestone
-  tag** — a project with none renders byte-for-byte the same flat matrix as before this feature
-  existed (`hasMilestones` gate in report-gen.js).
-- Project Identity shows a compact one-line-per-milestone end-date summary (name + date, or "TBD")
-  when the project has any — a quick "what's coming and when" view without reading the whole
-  matrix. Hidden entirely for a project with no milestones.
-- The Planning/Gantt section stays global/ungrouped by milestone for now — the "program" case
-  (several LVL2 root epics aggregated into one project) is explicitly deferred; this milestone
-  layer applies to a single root epic's own feature hierarchy.
+- **Manually configured, never auto-discovered.** A project optionally names up to 3 fixed epics —
+  `milestone_alpha`/`milestone_beta`/`milestone_ga` (Edit page, "Project milestones") — each a
+  single Jira key, all independently optional since not every project has all three phases (or any
+  of them). A first version tried auto-discovering an arbitrary-named, arbitrary-count set of
+  milestones from the Jira epic hierarchy (a non-Epic "New Feature" child of the root epic) or a
+  Confluence `<h2>` heading convention, and used that to also group the Deliverable matrix by
+  milestone. **Retired**: tested against a real project (BGP), the Jira hierarchy it relied on
+  didn't actually separate the phases a PM has in mind — nearly every epic sat under a single
+  "beta"-named parent regardless of which real phase it belonged to — so the auto-detected grouping
+  was unreliable, and no project had adopted the Confluence heading convention it would have needed
+  instead. Three fixed, explicitly-named fields are simpler and don't depend on a Jira hierarchy
+  shape that doesn't reliably hold.
+- Each milestone's own End date is read from Jira (same `getRootEpicMeta` call the root epic's own
+  Target ETA already uses) and **frozen into the report row at generation time**
+  (`reports.milestone_alpha_end`/`_beta_end`/`_ga_end`), exactly like `eta_snapshot` — a past week's
+  report must never silently change because one of these dates moved in Jira after the fact. A
+  report generated before these columns existed just has NULL in all three, so it shows no
+  milestone chips rather than reaching for today's live dates.
+- A milestone chip is shown only for a field the project actually set (`proj.milestone_alpha` etc.
+  non-null) — the ones left blank never appear, not even as "TBD". If the field is set but Jira had
+  no End date on that epic (or the read failed), the chip still shows with "TBD" — same "no
+  fabricated fallback, but don't hide something the PM explicitly configured" logic as the rest of
+  this app. One edge case accepted as-is: a PM changing or clearing one of these 3 fields changes
+  which chips appear on *every* past report too, not just future ones (whether a chip appears at
+  all is read live from `projects`, only the date shown per chip is frozen) — unlike the rest of
+  this app's frozen-snapshot fields, since which phases a project tracks is closer to a project
+  identity fact than a weekly status.
+- The Deliverable matrix is always flat, never grouped by milestone — the retired auto-grouping
+  attempt tried this and it's not part of the current design; regrouping it around these 3 fixed
+  fields wouldn't actually solve the problem that got the old mechanism retired (see above), since
+  the underlying Jira hierarchy still doesn't separate the phases either way.
 
 ## Report export
 
