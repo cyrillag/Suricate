@@ -129,19 +129,31 @@ GA. Project Identity can show one end date per phase a project actually has.
   was unreliable, and no project had adopted the Confluence heading convention it would have needed
   instead. Three fixed, explicitly-named fields are simpler and don't depend on a Jira hierarchy
   shape that doesn't reliably hold.
+- The Edit page field for each accepts either the bare key (`LVL2-9493`) or a full Jira issue URL
+  pasted straight from the browser's address bar (`parseMilestoneEpic` in server.js strips it down
+  to the trailing key) — same convenience the Confluence page URL field already offers.
 - Each milestone's own End date is read from Jira (same `getRootEpicMeta` call the root epic's own
   Target ETA already uses) and **frozen into the report row at generation time**
   (`reports.milestone_alpha_end`/`_beta_end`/`_ga_end`), exactly like `eta_snapshot` — a past week's
   report must never silently change because one of these dates moved in Jira after the fact. A
-  report generated before these columns existed just has NULL in all three, so it shows no
-  milestone chips rather than reaching for today's live dates.
-- A milestone chip is shown only for a field the project actually set (`proj.milestone_alpha` etc.
+  report generated before these columns existed just has NULL in all three, so it shows the plain
+  Target ETA instead, same as a project with no milestones configured at all.
+- **Milestones replace the Target ETA display, they don't sit alongside it.** When a project has
+  any milestone set, the "Target ETA" identity-cell shows one line per phase (`Alpha — 28 Nov 2025`,
+  in the exact same `.f-value` styling the single date used — plain text, no background/border) in
+  place of the single date; a project with none shows the single date exactly as before. An earlier
+  version showed the single date AND a separate row of bordered/shaded chips underneath it — this
+  was rejected as visual noise duplicating the same information twice in two different styles for
+  no reason. The `eta-delayed-note`/health-dot underneath are unaffected either way — they track the
+  *root epic's own* End date (`eta_snapshot`/`eta_delayed`), a separate concern from which phase
+  dates are being displayed above them.
+- A milestone line is shown only for a field the project actually set (`proj.milestone_alpha` etc.
   non-null) — the ones left blank never appear, not even as "TBD". If the field is set but Jira had
-  no End date on that epic (or the read failed), the chip still shows with "TBD" — same "no
+  no End date on that epic (or the read failed), the line still shows with "TBD" — same "no
   fabricated fallback, but don't hide something the PM explicitly configured" logic as the rest of
   this app. One edge case accepted as-is: a PM changing or clearing one of these 3 fields changes
-  which chips appear on *every* past report too, not just future ones (whether a chip appears at
-  all is read live from `projects`, only the date shown per chip is frozen) — unlike the rest of
+  which lines appear on *every* past report too, not just future ones (whether a line appears at
+  all is read live from `projects`, only the date shown per line is frozen) — unlike the rest of
   this app's frozen-snapshot fields, since which phases a project tracks is closer to a project
   identity fact than a weekly status.
 - The Deliverable matrix is always flat, never grouped by milestone — the retired auto-grouping

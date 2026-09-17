@@ -64,7 +64,7 @@ const DICT = {
     err_confluence_url: { fr: 'Une URL de page Confluence valide est requise — colle-la depuis la barre d’adresse de ton navigateur en visitant la page (ex : https://confluence.ovhcloud.tools/display/SPACE/Titre, ou un lien avec pageId=).', en: 'A valid Confluence page URL is required — paste it from your browser’s address bar while viewing the page (e.g. https://confluence.ovhcloud.tools/display/SPACE/Page+Title, or a pageId= link).' },
     milestones_label: { fr: 'Jalons du projet', en: 'Project milestones' },
     milestones_optional: { fr: '(optionnels)', en: '(optional)' },
-    milestones_hint: { fr: 'Clé Jira de l’epic Alpha / Beta / GA, si le projet a ces étapes — chacune ajoute sa date de fin (lue depuis Jira) dans l’identité du projet.', en: 'Jira key of the Alpha / Beta / GA epic, if the project has those phases — each adds its End date (read from Jira) to the project identity.' }
+    milestones_hint: { fr: 'Clé Jira ou URL de l’epic Alpha / Beta / GA, si le projet a ces étapes — remplace la Target ETA par une date par étape dans l’identité du projet.', en: 'Jira key or URL of the Alpha / Beta / GA epic, if the project has those phases — replaces the Target ETA with one date per phase in the project identity.' }
   },
   detail: {
     owner:     { fr: 'Responsable : {{name}}',    en: 'Owner: {{name}}' },

@@ -41,13 +41,17 @@ function getBrowser() {
 }
 process.on('SIGTERM', async () => { if (browserPromise) (await browserPromise).close(); });
 
-// A single optional milestone epic key (Alpha/Beta/GA — see FUNCTIONAL_RULES.md "Milestones").
-// Blank or malformed input both just mean "not set" rather than a validation error, since these
-// fields are always optional. Same well-formed-key check as the JQL-safety checks elsewhere —
-// this also reaches a JQL string (jira.getRootEpicMeta), so a project owner can't smuggle
-// arbitrary JQL into a query run with the shared service token.
+// A single optional milestone epic key (Alpha/Beta/GA — see FUNCTIONAL_RULES.md "Milestones") —
+// accepts either the bare key ("LVL2-9493") or a full Jira issue URL (e.g.
+// "https://jira.ovhcloud.tools/browse/LVL2-9493"), pasted straight from the browser's address bar
+// like the Confluence URL field already allows. Blank or malformed input both just mean "not set"
+// rather than a validation error, since these fields are always optional — this also reaches a
+// REST path segment (jira.getRootEpicMeta), so validating the shape still matters even though
+// there's no error path for a bad one.
 function parseMilestoneEpic(raw) {
-  const key = (raw || '').trim().toUpperCase();
+  const trimmed = (raw || '').trim().replace(/\/+$/, '');
+  const keyMatch = trimmed.match(/([A-Z][A-Z0-9]*-\d+)$/i);
+  const key = (keyMatch ? keyMatch[1] : trimmed).toUpperCase();
   return /^[A-Z][A-Z0-9]*-\d+$/.test(key) ? key : null;
 }
 

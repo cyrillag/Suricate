@@ -176,7 +176,9 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
       <div class="identity-cell"><div class="f-label">Project Manager</div><div class="f-value">${esc(pmName || '')}</div></div>
       <div class="identity-cell">
         <div class="f-label">Target ETA</div>
-        <div class="f-value">${esc(etaDisplay || 'TBD')}</div>
+        ${milestones.length
+          ? `<div class="f-value-list">${milestones.map(m => `<div class="f-value">${esc(m.name)} — ${m.end ? formatShortDate(m.end) : 'TBD'}</div>`).join('')}</div>`
+          : `<div class="f-value">${esc(etaDisplay || 'TBD')}</div>`}
         ${etaDelayed ? `<div class="eta-delayed-note">${etaDelayedFrom ? `⚠ Previous date: ${esc(etaDelayedFrom)}` : '⚠ Delayed'}</div>` : ''}
         <div class="health ${health} health-sub"><div class="health-dot"></div>${health === 'delayed' ? 'Delayed' : health === 'at-risk' ? 'At Risk' : 'On Track'}</div>
       </div>
@@ -185,14 +187,6 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
         <div class="f-value mono"><a class="jtag" href="https://jira.ovhcloud.tools/browse/${esc(project.jira_root_epic)}" target="_blank" rel="noopener">${esc(project.jira_root_epic)}</a></div>
       </div>
     </div>
-    ${milestones.length ? `
-    <div class="milestones-row">
-      ${milestones.map(m => `
-        <div class="milestone-chip">
-          <span class="ms-name">${esc(m.name || m.key || 'Milestone')}</span>
-          <span class="ms-date">${m.end ? formatShortDate(m.end) : 'TBD'}</span>
-        </div>`).join('')}
-    </div>` : ''}
   </div>
 
   <div class="doc-section doc-section--abc">
@@ -483,10 +477,7 @@ const CSS = `
   .f-label{font-size:12.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--tx3);margin-bottom:5px}
   .f-value{font-size:13px;font-weight:600;color:var(--tx);line-height:1.3}
   .f-value.mono{font-family:var(--fm);font-size:13px;font-weight:400;color:var(--cobalt)}
-  .milestones-row{display:flex;flex-wrap:wrap;gap:8px;padding:0 20px 16px}
-  .milestone-chip{display:flex;align-items:center;gap:7px;padding:5px 10px;background:var(--gnd);border:1px solid var(--bd2);border-radius:2px}
-  .ms-name{font-size:12.5px;font-weight:700;color:var(--tx)}
-  .ms-date{font-size:12.5px;color:var(--tx3)}
+  .f-value-list{display:flex;flex-direction:column;gap:3px}
   .eta-delayed-note{font-size:12px;font-weight:600;color:var(--blk-c);margin-top:4px}
   .health{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
   .health-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
