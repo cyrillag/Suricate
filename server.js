@@ -20,6 +20,14 @@ if (!JIRA_TOKEN) console.warn('WARNING: JIRA_SERVICE_TOKEN not set — Jira API 
 const CONFLUENCE_TOKEN = process.env.CONFLUENCE_SERVICE_TOKEN;
 if (!CONFLUENCE_TOKEN) console.warn('WARNING: CONFLUENCE_SERVICE_TOKEN not set — Confluence sync will be unavailable.');
 
+// Prod and preview run identical code/branches on the same host, distinguished on the outside
+// only by port number — too easy to lose track of which tab is which (see FUNCTIONAL_RULES.md
+// "Environment badge"). Set locally, uncommitted, in the preview host's own docker-compose.yml
+// only — never in the tracked file, so this can never accidentally ship to prod through a normal
+// branch merge/deploy (the same way that file's port number is already a permanent local diff,
+// never committed, so switching branches never touches it).
+const IS_PREVIEW = process.env.APP_ENV === 'preview';
+
 // No fallback: a hardcoded default here would let anyone who reads this (public) source forge
 // session cookies for any deployment that forgot to set the real secret.
 const SESSION_SECRET = process.env.SESSION_SECRET;
@@ -310,6 +318,7 @@ app.use((req, res, next) => {
   res.locals.lang = req.lang;
   res.locals.t = (key, vars) => translate(req.lang, key, vars);
   res.locals.tPlural = (count, oneKey, otherKey) => pluralize(req.lang, count, oneKey, otherKey);
+  res.locals.isPreview = IS_PREVIEW;
   next();
 });
 app.get('/lang/:code', (req, res) => {
@@ -713,7 +722,7 @@ function buildReportHtml(proj, report, year, week, isOwner, lang, userName) {
     stats, health, isOwner,
     backfilled: !!report.backfilled,
     generatedAt: formatDate(new Date(report.created_at * 1000).toISOString()),
-    lang, userName, confluenceUrl
+    lang, userName, confluenceUrl, isPreview: IS_PREVIEW
   });
 }
 

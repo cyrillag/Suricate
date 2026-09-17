@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title><%= lang === 'fr' ? 'Connexion' : 'Sign in' %> — Suricate</title>
+<title><%= isPreview ? '[PREVIEW] ' : '' %><%= lang === 'fr' ? 'Connexion' : 'Sign in' %> — Suricate</title>
 <link rel="stylesheet" href="/app.css">
 <link rel="icon" type="image/png" href="/favicon-32.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -25,6 +25,7 @@
       <h1 class="auth-title"><%= t('nav.brand') %></h1>
       <p class="auth-tagline"><%= t('nav.tagline') %></p>
     </div>
+    <% if (isPreview) { %><span class="env-badge">Preview</span><% } %>
   </div>
   <p class="auth-sub"><%= t('login.subtitle') %></p>
   <% if (error) { %><div class="auth-error"><%= error %></div><% } %>

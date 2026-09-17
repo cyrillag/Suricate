@@ -1,6 +1,6 @@
 const { translate } = require('./i18n');
 
-function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, epics, stats, health, isOwner, etaDelayed, etaDelayedFrom, etaDisplay, lang, userName, backfilled, generatedAt, confluenceUrl = null }) {
+function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, epics, stats, health, isOwner, etaDelayed, etaDelayedFrom, etaDisplay, lang, userName, backfilled, generatedAt, confluenceUrl = null, isPreview = false }) {
   const weekStr = `W${String(week).padStart(2, '0')}`;
   const yearWeek = `${year}-${weekStr}`;
   const dateLabel = isoWeekMonday(year, week);
@@ -100,14 +100,14 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${esc(project.name)} — Weekly Report ${weekStr}/${year}</title>
+<title>${isPreview ? '[PREVIEW] ' : ''}${esc(project.name)} — Weekly Report ${weekStr}/${year}</title>
 <link rel="stylesheet" href="/app.css">
 <link rel="icon" type="image/png" href="/favicon-32.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>${CSS}</style>
 </head>
 <body>
-<nav class="app-nav">
+<nav class="app-nav${isPreview ? ' is-preview' : ''}">
   <svg class="nav-deco" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 56" preserveAspectRatio="none">
     <polygon points="300,0 300,56 180,56" fill="rgba(255,255,255,0.04)"/>
     <polygon points="300,0 300,32 230,0" fill="rgba(255,255,255,0.05)"/>
@@ -120,6 +120,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
       <span class="nav-brand-name">${brandName}</span>
       <span class="nav-brand-tagline">${tagline}</span>
     </span>
+    ${isPreview ? '<span class="env-badge">Preview</span>' : ''}
   </a>
   <div class="nav-user">
     <div class="lang-switch">

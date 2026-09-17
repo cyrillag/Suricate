@@ -1,4 +1,4 @@
-<nav class="app-nav">
+<nav class="app-nav<%= isPreview ? ' is-preview' : '' %>">
   <svg class="nav-deco" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 56" preserveAspectRatio="none">
     <polygon points="300,0 300,56 180,56" fill="rgba(255,255,255,0.04)"/>
     <polygon points="300,0 300,32 230,0" fill="rgba(255,255,255,0.05)"/>
@@ -11,6 +11,7 @@
       <span class="nav-brand-name"><%= t('nav.brand') %></span>
       <span class="nav-brand-tagline"><%= t('nav.tagline') %></span>
     </span>
+    <% if (isPreview) { %><span class="env-badge">Preview</span><% } %>
   </a>
   <div class="nav-user">
     <div class="lang-switch">
