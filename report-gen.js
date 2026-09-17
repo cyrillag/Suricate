@@ -637,12 +637,35 @@ const CSS = `
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
   /* PDF export (puppeteer's page.pdf() emulates print media by default) and a browser's own
      Ctrl+P both use this — nothing here is actionable on a static page, so it's noise rather
-     than a broken control. Purely cosmetic (visibility only) — never touches layout/page-break
-     rules, which is exactly the kind of print-specific logic that caused the earlier PDF attempt
-     to drift from the real page (see FUNCTIONAL_RULES.md "Report export"). Only the prev/next
-     arrows are hidden here, not the whole .week-nav — .ref-week (the "W35 · 2026" label) is the
-     one piece of that widget that's informational rather than an action, and must stay. */
+     than a broken control. Only the prev/next arrows are hidden here, not the whole .week-nav —
+     .ref-week (the "W35 · 2026" label) is the one piece of that widget that's informational rather
+     than an action, and must stay. */
   @media print{.week-arrow,.nav-user,a[href$="/pdf"],form[action$="/reports/generate"],.confluence-link-wrap{display:none!important}}
+  /* Page-break control — still the exact same stylesheet as the live page, not a second print
+     layout to keep in sync (see FUNCTIONAL_RULES.md "Report export"); these rules only tell
+     Chromium's paginator which small units may never be sliced by a page boundary. Deliberately
+     scoped to small, meaningful units (a row, a card, a bullet) — never a large container like
+     .matrix-section/.gantt-outer/.doc-section itself, which legitimately spans several pages;
+     forcing one of those whole to a single page would just trade a mid-row cut for a large blank
+     gap at the bottom of the previous page instead. */
+  @media print{
+    .mx tr{break-inside:avoid}
+    /* A deliverable spanning several workstreams merges into one rowspan'd cell (see
+       FUNCTIONAL_RULES.md's rowspan rule) — avoiding a break *inside* a row doesn't stop the
+       paginator breaking *between* two rows of the same group, which would orphan the spanned
+       "Core"-style label on the previous page. Forbidding a break immediately before every
+       continuation row of a group (everything but the row that starts it, and not a milestone
+       header row, which starts its own new group) transitively keeps the whole group together. */
+    .mx tbody tr:not(.del-first):not(.mx-milestone-row){break-before:avoid}
+    .mx-milestone-row{break-after:avoid}
+    .risk-item{break-inside:avoid}
+    .abc-items li{break-inside:avoid}
+    .identity-cell{break-inside:avoid}
+    .milestones-row{break-inside:avoid}
+    .milestone-chip{break-inside:avoid}
+    .gantt-lrow,.gantt-row{break-inside:avoid}
+    .section-label{break-after:avoid}
+  }
   /* Deliberately subtle — a secondary way to reach more detail, not a primary action next to
      Refresh/Export PDF. Underline-on-hover only, inherits the muted .page-sub text color rather
      than getting its own accent treatment. */
