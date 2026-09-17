@@ -108,6 +108,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
   // indistinguishable from (this used to be checked here against a 'cancel' bucket that
   // mapStatus can never actually produce, so it silently never filtered anything).
   const ganttEpics = epics;
+  const hasPartialDates = ganttEpics.some(e => (e.start && !e.end) || (!e.start && e.end));
 
   // Donut data
   const donutJSON = JSON.stringify([
@@ -278,7 +279,9 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
     <div class="gantt-legend">
       <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#A6D64D"></div>Done</div>
       <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#0050D5"></div>In Progress</div>
+      <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#ED733D"></div>Blocked</div>
       <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#BEC0C6;border:1px dashed #C8CAD4"></div>To Start</div>
+      ${hasPartialDates ? '<div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:linear-gradient(to right,transparent,#87878C)"></div>Only one date known (hover for detail)</div>' : ''}
     </div>
   </div>` : ''}
 
@@ -400,6 +403,25 @@ function GANTT_JS(epics) {
       bar.className='gantt-bar '+e.status;
       bar.style.left=l.toFixed(2)+'%';bar.style.width=w.toFixed(2)+'%';
       bar.title=e.key+' — '+e.label+'\\n'+e.start+' → '+e.end;
+      row.appendChild(bar);
+    }else if(e.end||e.start){
+      // Only one endpoint known (e.g. an End date with no Start date — see
+      // FUNCTIONAL_RULES.md "Planning / Gantt"). Still sorted correctly on whichever date it has.
+      // A fixed-width bar anchored on the known date, fading to transparent toward the unknown
+      // one, reads as "duration open-ended in that direction" — a point marker (tried first) read
+      // instead as a precise one-day milestone, which is wrong: we don't know it's one day, we
+      // just don't know the other end.
+      var isEndOnly=!!e.end, PARTIAL_W=6;
+      var bar=document.createElement('div');
+      bar.className='gantt-bar '+e.status+' '+(isEndOnly?'fade-left':'fade-right');
+      if(isEndOnly){
+        var r=pct(e.end), l=Math.max(0,r-PARTIAL_W);
+        bar.style.left=l.toFixed(2)+'%';bar.style.width=(r-l).toFixed(2)+'%';
+      }else{
+        var l=pct(e.start), r=Math.min(100,l+PARTIAL_W);
+        bar.style.left=l.toFixed(2)+'%';bar.style.width=(r-l).toFixed(2)+'%';
+      }
+      bar.title=e.key+' — '+e.label+'\\n'+(isEndOnly?('No start date — ends '+e.end):('No end date — starts '+e.start));
       row.appendChild(bar);
     }else{
       var nd=document.createElement('span');nd.className='gantt-nodates';nd.textContent='No dates yet';
@@ -586,8 +608,13 @@ const CSS = `
   .gantt-row:last-child{border-bottom:none}
   .gantt-bar{position:absolute;top:4px;height:16px;border-radius:2px;min-width:2px;cursor:default}
   .gantt-bar:hover{filter:brightness(1.15);z-index:4}
-  .gantt-bar.done{background:var(--done-s)}.gantt-bar.prog{background:var(--cobalt)}.gantt-bar.ts{background:var(--sgr);border:1px dashed var(--bd)}
+  .gantt-bar.done{background:var(--done-s)}.gantt-bar.prog{background:var(--cobalt)}.gantt-bar.ts{background:var(--sgr);border:1px dashed var(--bd)}.gantt-bar.blk{background:var(--blk-s)}
   .gantt-nodates{position:absolute;left:8px;top:0;bottom:0;display:flex;align-items:center;font-size:12px;font-style:italic;color:var(--tx3)}
+  /* A bar built from only one known date (see the JS above) fades toward whichever side the
+     missing date would be on — a mask-image works on top of any of the four status colors/border
+     above without needing its own duplicate palette. */
+  .gantt-bar.fade-left{-webkit-mask-image:linear-gradient(to right,transparent 0%,#000 100%);mask-image:linear-gradient(to right,transparent 0%,#000 100%)}
+  .gantt-bar.fade-right{-webkit-mask-image:linear-gradient(to left,transparent 0%,#000 100%);mask-image:linear-gradient(to left,transparent 0%,#000 100%)}
   .gantt-vline{position:absolute;top:0;bottom:0;width:1px;pointer-events:none;z-index:2}
   .gantt-vline.qtr{background:var(--bd2);z-index:1}
   .gantt-vline.vtoday{background:var(--orange);z-index:3;width:2px}

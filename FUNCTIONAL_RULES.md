@@ -83,6 +83,21 @@ to be re-applied here by hand rather than resolved by merging code:
   baseline dates). It still gets a row in Planning (name, team, status) so it stays visible and
   "exhaustive" holds — it just has no bar drawn on the Gantt timeline, since there's nothing to
   plot without real dates.
+- **An epic with only ONE of Start/End set** (seen in practice: an End date filled in with no
+  Start date) still sorts correctly — the ordering rule above is keyed on End date alone, and this
+  epic has one. It gets a fixed-width bar anchored on that one known date, fading to transparent
+  toward the unknown side (`.gantt-bar.fade-left`/`.fade-right`, a `mask-image` over the normal
+  status color) — colored by status like a normal bar, hover for which date is actually known. A
+  point/diamond marker was tried first and rejected: it reads as "a milestone at one precise date
+  (1-day duration)", which overclaims — we don't know the epic is one day long, we just don't know
+  where the other end is, and a fade communicates "open-ended in this direction" instead. This is
+  different from having *no* date at all, which still shows the plain "No dates yet" text with no
+  bar. A real bug shipped here once: both cases showed identical "No dates yet" text, making an
+  End-dated-but-no-Start epic look like it had no dates at all even though it was correctly sorted
+  by the date it did have — confusing to read even though the sort itself was correct.
+- **`.gantt-bar` must define a color for all four status buckets** (done/prog/blk/ts) — `blk`
+  (Blocked) had no color rule for a while, making a blocked epic's bar invisible (browser default =
+  transparent) even though its row/label still showed normally.
 - A sync (Confluence or Jira) must reconcile the workstream/epic list, not just add/update: any
   row the current parse/query no longer produces is deleted. An upsert-only sync would let stale
   rows outlive whatever created them (e.g. a since-fixed parser bug, or an epic removed from a
