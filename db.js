@@ -65,6 +65,23 @@ db.exec(`
     cached_at   INTEGER DEFAULT (unixepoch()),
     UNIQUE(project_id, jira_key)
   );
+
+  -- A milestone (Beta / GA / a new region...) groups several deliverables/workstreams under one
+  -- target date — see FUNCTIONAL_RULES.md "Milestones". jira_key is null for a Confluence
+  -- milestone heading with no Jira key attached (no automatic date/status in that case, same
+  -- "no manual authoring" rule as everything else this app pulls from source systems). Rewritten
+  -- wholesale on every sync (see writeMilestonesCache in server.js) rather than upserted, since a
+  -- key-less milestone has nothing stable to upsert against.
+  CREATE TABLE IF NOT EXISTS milestones_cache (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id  INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    jira_key    TEXT,
+    name        TEXT    NOT NULL,
+    status      TEXT,
+    start_date  TEXT,
+    end_date    TEXT,
+    cached_at   INTEGER DEFAULT (unixepoch())
+  );
 `);
 
 // ── Migrations (idempotent: add columns introduced after initial deploy) ──
@@ -114,6 +131,16 @@ ensureColumn('reports', 'eta_delayed', 'eta_delayed INTEGER DEFAULT 0');
 // column, which is the safe default (no false "this was backfilled" claim on old normal reports).
 ensureColumn('reports', 'backfilled', 'backfilled INTEGER DEFAULT 0');
 
+// Milestone grouping for a workstream (see the milestones_cache comment above). milestone_key
+// defaults to '' rather than NULL specifically so the UNIQUE index rebuilt just below still
+// dedupes correctly for the (overwhelming majority of) projects with no milestones at all — a
+// SQLite UNIQUE index treats every NULL as distinct from every other NULL, which would silently
+// stop ON CONFLICT upserts from matching existing "no milestone" rows against themselves and
+// start duplicating them on every sync instead.
+ensureColumn('workstreams', 'milestone_key', "milestone_key TEXT NOT NULL DEFAULT ''");
+ensureColumn('workstreams', 'milestone_name', 'milestone_name TEXT');
+ensureColumn('reports', 'milestones_snapshot_json', 'milestones_snapshot_json TEXT');
+
 // workstreams had no UNIQUE constraint pre-v2, so every "Sync Jira" click duplicated all rows.
 // Rebuild the table with UNIQUE(project_id,deliverable,name) so syncs upsert instead of duplicating.
 // Safe to do unconditionally at startup: reports.workstream_statuses_json (keyed by workstream id)
@@ -137,6 +164,35 @@ if (wsInfo.length && !hasUnique) {
       SELECT id,project_id,deliverable,name,team,jira_key,sort_order FROM workstreams;
     DROP TABLE workstreams;
     ALTER TABLE workstreams_new RENAME TO workstreams;
+  `);
+}
+
+// Widen the uniqueness to (project_id, milestone_key, deliverable, name) — the same deliverable
+// name (e.g. "Core") can legitimately repeat under two different milestones (Beta and GA both
+// having one), and without milestone_key in the key, syncing one would silently overwrite the
+// other's row instead of the two staying distinct. Same table-rebuild pattern as the migration
+// just above, since SQLite can't ALTER an existing UNIQUE constraint in place.
+const wsUniqueIdx = db.prepare(`PRAGMA index_list(workstreams)`).all().find(ix => ix.unique && ix.origin === 'u');
+const wsUniqueCols = wsUniqueIdx ? db.prepare(`PRAGMA index_info(${wsUniqueIdx.name})`).all().map(c => c.name) : [];
+if (wsUniqueIdx && !wsUniqueCols.includes('milestone_key')) {
+  db.exec(`
+    CREATE TABLE workstreams_ms (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id     INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      deliverable    TEXT    NOT NULL,
+      name           TEXT    NOT NULL,
+      team           TEXT,
+      jira_key       TEXT,
+      default_status TEXT,
+      milestone_key  TEXT    NOT NULL DEFAULT '',
+      milestone_name TEXT,
+      sort_order     INTEGER DEFAULT 0,
+      UNIQUE(project_id, milestone_key, deliverable, name)
+    );
+    INSERT INTO workstreams_ms(id,project_id,deliverable,name,team,jira_key,default_status,milestone_key,milestone_name,sort_order)
+      SELECT id,project_id,deliverable,name,team,jira_key,default_status,milestone_key,milestone_name,sort_order FROM workstreams;
+    DROP TABLE workstreams;
+    ALTER TABLE workstreams_ms RENAME TO workstreams;
   `);
 }
 

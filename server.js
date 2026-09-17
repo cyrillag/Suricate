@@ -132,6 +132,7 @@ function resolveWorkstreamsAndEpics(projectId, legacyStatusOverrides) {
 
   const resolvedWs = workstreams.map(ws => ({
     ...ws,
+    milestone_key: ws.milestone_key || null,
     status: (legacyStatusOverrides && legacyStatusOverrides[ws.id])
       || (ws.jira_key ? (aggregateEpicStatus(ws.jira_key, epicsByKey) || 'ts') : (ws.default_status || 'ts')),
     endDate: ws.jira_key ? aggregateEpicEndDate(ws.jira_key, epicsByKey) : null
@@ -150,15 +151,33 @@ function resolveWorkstreamsAndEpics(projectId, legacyStatusOverrides) {
   return { resolvedWs, epics };
 }
 
+// Milestones live in their own cache table (see db.js), rewritten wholesale on every sync rather
+// than upserted — a key-less milestone (a Confluence heading with no Jira key) has nothing stable
+// to upsert against, and the set of milestones for a project can shrink (a heading removed) just
+// as easily as grow, which a pure upsert would never clean up on its own.
+const delMilestonesCache = db.prepare('DELETE FROM milestones_cache WHERE project_id=?');
+const insMilestoneCache  = db.prepare('INSERT INTO milestones_cache(project_id,jira_key,name,status,start_date,end_date,cached_at) VALUES(?,?,?,?,?,?,unixepoch())');
+function writeMilestonesCache(projectId, milestones) {
+  delMilestonesCache.run(projectId);
+  milestones.forEach(m => insMilestoneCache.run(projectId, m.key || null, m.name, m.status || null, m.start || null, m.end || null));
+}
+// Same "resolve from DB at report time" pattern as resolveWorkstreamsAndEpics above — ordered
+// soonest-first, nulls last, so Project Identity's quick-view list reads naturally left to right.
+function resolveMilestones(projectId) {
+  return db.prepare(`SELECT jira_key as key, name, status, start_date as start, end_date as end
+    FROM milestones_cache WHERE project_id=? ORDER BY (end_date IS NULL), end_date`).all(projectId);
+}
+
 const upsertWorkstreamFromJira = db.prepare(`
-  INSERT INTO workstreams(project_id,deliverable,name,team,jira_key,sort_order) VALUES(?,?,?,?,?,?)
-  ON CONFLICT(project_id,deliverable,name) DO UPDATE SET
-    team=excluded.team, jira_key=excluded.jira_key, sort_order=excluded.sort_order`);
+  INSERT INTO workstreams(project_id,deliverable,name,team,jira_key,milestone_key,milestone_name,sort_order) VALUES(?,?,?,?,?,?,?,?)
+  ON CONFLICT(project_id,milestone_key,deliverable,name) DO UPDATE SET
+    team=excluded.team, jira_key=excluded.jira_key, milestone_name=excluded.milestone_name, sort_order=excluded.sort_order`);
 
 const upsertWorkstreamFromConfluence = db.prepare(`
-  INSERT INTO workstreams(project_id,deliverable,name,team,jira_key,default_status,sort_order) VALUES(?,?,?,?,?,?,?)
-  ON CONFLICT(project_id,deliverable,name) DO UPDATE SET
-    team=excluded.team, jira_key=excluded.jira_key, default_status=excluded.default_status, sort_order=excluded.sort_order`);
+  INSERT INTO workstreams(project_id,deliverable,name,team,jira_key,default_status,milestone_key,milestone_name,sort_order) VALUES(?,?,?,?,?,?,?,?,?)
+  ON CONFLICT(project_id,milestone_key,deliverable,name) DO UPDATE SET
+    team=excluded.team, jira_key=excluded.jira_key, default_status=excluded.default_status,
+    milestone_name=excluded.milestone_name, sort_order=excluded.sort_order`);
 
 const insEpicCache = db.prepare('INSERT OR REPLACE INTO epics_cache(project_id,jira_key,summary,team,status,start_date,end_date,assignee,reporter,cached_at) VALUES(?,?,?,?,?,?,?,?,?,unixepoch())');
 
@@ -168,12 +187,15 @@ const insEpicCache = db.prepare('INSERT OR REPLACE INTO epics_cache(project_id,j
 // source of truth instead (otherwise the two sources produce different (deliverable,name)
 // groupings for the same tickets and end up duplicated side by side).
 async function seedWorkstreamsFromJiraTree(projectId, rootEpic) {
-  const epics = await jira.getChildEpics(JIRA_TOKEN, rootEpic);
+  const { epics, milestones } = await jira.getChildEpics(JIRA_TOKEN, rootEpic);
+  const milestonesByKey = new Map(milestones.map(m => [m.key, m]));
   epics.forEach((e, i) => {
     insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter);
-    upsertWorkstreamFromJira.run(projectId, e.deliverable, e.summary, e.team, e.key, i);
+    const ms = e.milestoneKey ? milestonesByKey.get(e.milestoneKey) : null;
+    upsertWorkstreamFromJira.run(projectId, e.deliverable, e.summary, e.team, e.key, e.milestoneKey || '', ms ? ms.name : null, i);
   });
-  reconcileWorkstreams(projectId, epics.map(e => ({ deliverable: e.deliverable, name: e.summary })));
+  reconcileWorkstreams(projectId, epics.map(e => ({ milestone_key: e.milestoneKey || '', deliverable: e.deliverable, name: e.summary })));
+  writeMilestonesCache(projectId, milestones);
   return epics.length;
 }
 
@@ -205,12 +227,40 @@ async function refreshFullEpicTree(projectId, rootEpic, extraKeys = []) {
 // removed on the source, or a stale row left behind by a since-fixed parser bug, would
 // otherwise sit in the table forever instead of the sync actually reconciling to the source.
 function reconcileWorkstreams(projectId, currentWorkstreams) {
-  const survivors = new Set(currentWorkstreams.map(ws => `${ws.deliverable}|||${ws.name}`));
-  const existing = db.prepare('SELECT id, deliverable, name FROM workstreams WHERE project_id=?').all(projectId);
-  const staleIds = existing.filter(w => !survivors.has(`${w.deliverable}|||${w.name}`)).map(w => w.id);
+  const survivors = new Set(currentWorkstreams.map(ws => `${ws.milestone_key || ''}|||${ws.deliverable}|||${ws.name}`));
+  const existing = db.prepare('SELECT id, milestone_key, deliverable, name FROM workstreams WHERE project_id=?').all(projectId);
+  const staleIds = existing.filter(w => !survivors.has(`${w.milestone_key || ''}|||${w.deliverable}|||${w.name}`)).map(w => w.id);
   if (staleIds.length) {
     db.prepare(`DELETE FROM workstreams WHERE id IN (${staleIds.map(() => '?').join(',')})`).run(...staleIds);
   }
+}
+
+// Dedups the milestone headings a Confluence page's workstreams were tagged with (see
+// confluence.js's parseMilestoneBlocks) into one row per milestone, then — for any that named a
+// Jira key — fetches its authoritative name/status/dates the same way a workstream's own jira_key
+// already overrides a manual Confluence status. A key-less milestone keeps only what the heading
+// itself said (a name, no date — "no manual authoring" applies here too, see FUNCTIONAL_RULES.md).
+async function resolveMilestonesFromWorkstreams(workstreams) {
+  const defs = [];
+  const seen = new Set();
+  workstreams.forEach(ws => {
+    if (!ws.milestone_name && !ws.milestone_key) return;
+    const dedupeKey = ws.milestone_key || `name:${ws.milestone_name}`;
+    if (seen.has(dedupeKey)) return;
+    seen.add(dedupeKey);
+    defs.push({ key: ws.milestone_key || null, name: ws.milestone_name });
+  });
+  if (!defs.length) return [];
+  const keys = defs.filter(d => d.key).map(d => d.key);
+  let jiraByKey = new Map();
+  if (keys.length) {
+    try { jiraByKey = new Map((await jira.getEpicsByKeys(JIRA_TOKEN, keys)).map(m => [m.key, m])); }
+    catch (err) { console.warn(`Milestone status refresh failed: ${err.message}`); }
+  }
+  return defs.map(d => {
+    const j = d.key ? jiraByKey.get(d.key) : null;
+    return { key: d.key, name: j ? j.summary : d.name, status: j ? j.status : null, start: j ? j.start : null, end: j ? j.end : null };
+  });
 }
 
 async function syncConfluenceProject(projectId, spaceKey, page) {
@@ -226,13 +276,16 @@ async function syncConfluenceProject(projectId, spaceKey, page) {
   workstreams.forEach((ws, i) => {
     upsertWorkstreamFromConfluence.run(
       projectId, ws.deliverable, ws.name, ws.team, ws.jira_key,
-      ws.manual_status ? jira.mapStatus(ws.manual_status) : null, i
+      ws.manual_status ? jira.mapStatus(ws.manual_status) : null,
+      ws.milestone_key || '', ws.milestone_name || null, i
     );
   });
   reconcileWorkstreams(projectId, workstreams);
   try { await refreshEpicStatuses(projectId, workstreams.map(w => w.jira_key)); }
   catch (err) { console.warn(`Epic status refresh failed for project ${projectId}: ${err.message}`); }
-  return { version: pageData.version, workstreams };
+  const milestones = await resolveMilestonesFromWorkstreams(workstreams);
+  writeMilestonesCache(projectId, milestones);
+  return { version: pageData.version, workstreams, milestones };
 }
 
 // ISO week helpers
@@ -545,6 +598,7 @@ async function generateReportRow(proj, year, week) {
   // "current" data. From here on, viewing this week must never depend on what workstreams/
   // epics_cache look like later (see FUNCTIONAL_RULES.md).
   const { resolvedWs, epics } = resolveWorkstreamsAndEpics(proj.id);
+  const milestones = resolveMilestones(proj.id);
 
   // Re-read the root epic's own End date from Jira here too (not just on project create/edit) —
   // otherwise it would only ever change when someone happens to re-save the project, and a
@@ -570,17 +624,18 @@ async function generateReportRow(proj, year, week) {
   // regenerated at all — but the intent is "set once at creation", not "recomputed every write").
   const backfilled = isPastWeek(year, week) ? 1 : 0;
 
-  db.prepare(`INSERT INTO reports(project_id,year,week,exec_summary,highlights_json,risks_json,workstream_statuses_json,workstreams_snapshot_json,epics_snapshot_json,eta_snapshot,eta_delayed,backfilled,updated_at)
-    VALUES(?,?,?,?,?,?,'{}',?,?,?,?,?,unixepoch())
+  db.prepare(`INSERT INTO reports(project_id,year,week,exec_summary,highlights_json,risks_json,workstream_statuses_json,workstreams_snapshot_json,epics_snapshot_json,milestones_snapshot_json,eta_snapshot,eta_delayed,backfilled,updated_at)
+    VALUES(?,?,?,?,?,?,'{}',?,?,?,?,?,?,unixepoch())
     ON CONFLICT(project_id,year,week) DO UPDATE SET
       exec_summary=excluded.exec_summary,
       highlights_json=excluded.highlights_json,
       risks_json=excluded.risks_json,
       workstreams_snapshot_json=excluded.workstreams_snapshot_json,
       epics_snapshot_json=excluded.epics_snapshot_json,
+      milestones_snapshot_json=excluded.milestones_snapshot_json,
       eta_snapshot=excluded.eta_snapshot,
       eta_delayed=excluded.eta_delayed,
-      updated_at=unixepoch()`).run(proj.id, year, week, execSummary, JSON.stringify(highlights), JSON.stringify(risks), JSON.stringify(resolvedWs), JSON.stringify(epics), etaIso, etaDelayed ? 1 : 0, backfilled);
+      updated_at=unixepoch()`).run(proj.id, year, week, execSummary, JSON.stringify(highlights), JSON.stringify(risks), JSON.stringify(resolvedWs), JSON.stringify(epics), JSON.stringify(milestones), etaIso, etaDelayed ? 1 : 0, backfilled);
 }
 
 app.post('/projects/:slug/reports/generate', requireAuth, async (req, res) => {
@@ -656,15 +711,19 @@ function buildReportHtml(proj, report, year, week, isOwner, lang, userName) {
   // week was generated used to silently show up in that old week too). Only a legacy row from
   // before this existed falls back to live data, seeded with whatever the old per-ID status
   // override map still applies to.
-  let resolvedWs, epicsForView;
+  let resolvedWs, epicsForView, milestonesForView;
   if (report.workstreams_snapshot_json) {
     resolvedWs = JSON.parse(report.workstreams_snapshot_json);
     epicsForView = report.epics_snapshot_json ? JSON.parse(report.epics_snapshot_json) : [];
+    // Legacy row generated before milestones existed — nothing frozen to show, same "TBD" spirit
+    // as the eta_snapshot fallback below rather than reaching for today's live milestone state.
+    milestonesForView = report.milestones_snapshot_json ? JSON.parse(report.milestones_snapshot_json) : [];
   } else {
     const legacyOverrides = JSON.parse(report.workstream_statuses_json || '{}');
     const live = resolveWorkstreamsAndEpics(proj.id, legacyOverrides);
     resolvedWs = live.resolvedWs;
     epicsForView = live.epics;
+    milestonesForView = resolveMilestones(proj.id);
   }
 
   const stats = { done:0, prog:0, blk:0, ts:0, total: resolvedWs.length };
@@ -709,6 +768,7 @@ function buildReportHtml(proj, report, year, week, isOwner, lang, userName) {
     highlights:  JSON.parse(report.highlights_json),
     risks, etaDelayed, etaDelayedFrom, etaDisplay,
     workstreams: resolvedWs,
+    milestones: milestonesForView,
     epics: epicsForView,
     stats, health, isOwner,
     backfilled: !!report.backfilled,
