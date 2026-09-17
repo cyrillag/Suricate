@@ -663,7 +663,17 @@ const CSS = `
     .identity-cell{break-inside:avoid}
     .milestones-row{break-inside:avoid}
     .milestone-chip{break-inside:avoid}
+    /* The 4-row status-overview legend (Done/In Progress/Blocked/To Start) is always exactly 4
+       short rows — always safe to force together as one unit, unlike a variable-length list. */
+    .chart-legend{break-inside:avoid}
     .gantt-lrow,.gantt-row{break-inside:avoid}
+    /* The Gantt's month-header row isn't a real <thead> (see GANTT_JS — it's built client-side as
+       plain flex markup), so it can't repeat on every page the way .mx's real <thead> does. This
+       at least stops it being orphaned alone at the bottom of a page with every data row pushed to
+       the next one, which is worse: no header at all above the bars until the reader scrolls back.
+       A very long Gantt spanning 3+ pages still won't repeat the header past the first — a real fix
+       needs the Gantt built as an actual table, out of scope here. */
+    .gantt-months,.gantt-lhdr{break-after:avoid}
     .section-label{break-after:avoid}
   }
   /* Deliberately subtle — a secondary way to reach more detail, not a primary action next to
