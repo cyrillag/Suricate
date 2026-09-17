@@ -38,9 +38,22 @@
         <input class="field-input" type="url" id="confluence_url" name="confluence_url" value="<%= confluenceUrl %>" required>
       </div>
       <div class="field-group">
-        <label class="field-label" for="extra_epics"><%= t('editProject.extra_epics_label') %> <span class="optional"><%= t('editProject.extra_epics_optional') %></span></label>
-        <input class="field-input" type="text" id="extra_epics" name="extra_epics" value="<%= proj.extra_epics || '' %>" placeholder="LVL2-23950, LVL2-23951">
-        <p class="field-hint"><%= t('editProject.extra_epics_hint') %></p>
+        <label class="field-label"><%= t('editProject.milestones_label') %> <span class="optional"><%= t('editProject.milestones_optional') %></span></label>
+        <p class="field-hint"><%= t('editProject.milestones_hint') %></p>
+        <div class="milestone-fields">
+          <div>
+            <label class="field-hint" for="milestone_alpha">Alpha</label>
+            <input class="field-input" type="text" id="milestone_alpha" name="milestone_alpha" value="<%= proj.milestone_alpha || '' %>" placeholder="LVL2-9493">
+          </div>
+          <div>
+            <label class="field-hint" for="milestone_beta">Beta</label>
+            <input class="field-input" type="text" id="milestone_beta" name="milestone_beta" value="<%= proj.milestone_beta || '' %>" placeholder="LVL2-9494">
+          </div>
+          <div>
+            <label class="field-hint" for="milestone_ga">GA</label>
+            <input class="field-input" type="text" id="milestone_ga" name="milestone_ga" value="<%= proj.milestone_ga || '' %>" placeholder="LVL2-9510">
+          </div>
+        </div>
       </div>
       <div class="form-actions">
         <a href="/projects/<%= proj.slug %>" class="btn-ghost"><%= t('editProject.cancel') %></a>

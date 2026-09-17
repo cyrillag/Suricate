@@ -60,10 +60,6 @@ function mapStatus(jiraStatus) {
   return 'ts';
 }
 
-// A milestone (Beta / GA / a new region...) is a non-Epic child of the root LVL2 epic (a "New
-// Feature", or similarly-typed issue depending on the project) that itself groups a set of child
-// Epics — see FUNCTIONAL_RULES.md "Milestones". Its own Start/End date and status come from the
-// same Gantt fields as an epic, since it's just another Jira issue.
 async function getChildEpics(token, rootEpic) {
   // customfield_10110/10111 = "Start date"/"End date" (BigPicture Gantt fields, authoritative).
   const EPIC_FIELDS = 'summary,status,assignee,reporter,customfield_10110,customfield_10111,issuetype';
@@ -72,12 +68,11 @@ async function getChildEpics(token, rootEpic) {
     const s = (i.fields.status?.name || '').toLowerCase();
     return s !== 'canceled' && s !== 'cancelled';
   };
-  const mapEpic = (i, deliverable, milestoneKey) => ({
+  const mapEpic = (i, deliverable) => ({
     key:        i.key,
     summary:    i.fields.summary,
     team:       extractTeam(i.key),
     deliverable,
-    milestoneKey: milestoneKey || null,
     status:     i.fields.status?.name || 'To Do',
     assignee:   i.fields.assignee?.displayName || null,
     reporter:   i.fields.reporter?.displayName || null,
@@ -96,49 +91,36 @@ async function getChildEpics(token, rootEpic) {
   });
 
   const results = [];
-  const milestones = [];
   const directEpics  = level1.issues.filter(i => i.fields.issuetype.name === 'Epic');
   const nonEpics     = level1.issues.filter(i => i.fields.issuetype.name !== 'Epic');
 
-  // Case A: direct epics → deliverable = team name (e.g. Private boot M1), no milestone grouping
+  // Case A: direct epics → deliverable = team name (e.g. Private boot M1)
   directEpics.filter(notCancelled).forEach(i => {
-    results.push(mapEpic(i, extractTeam(i.key), null));
+    results.push(mapEpic(i, extractTeam(i.key)));
   });
 
-  // Case B: non-epics (New Features) are themselves the milestone — get their Epic children one
-  // level down, tagged with which milestone they belong to.
+  // Case B: non-epics (New Features) → get their Epic children one level down
   for (const nf of nonEpics.filter(notCancelled)) {
-    milestones.push({
-      key:    nf.key,
-      name:   nf.fields.summary,
-      status: nf.fields.status?.name || 'To Do',
-      start:  nf.fields.customfield_10110 || null,
-      end:    nf.fields.customfield_10111 || null
-    });
     const sub = await api(token, '/search', {
       jql: `cf[16100]=${nf.key} AND issuetype=Epic`,
       fields: EPIC_FIELDS,
       maxResults: 50
     });
     sub.issues.filter(notCancelled).forEach(i => {
-      results.push(mapEpic(i, nf.fields.summary, nf.key));
+      results.push(mapEpic(i, nf.fields.summary));
     });
   }
 
-  return { epics: results, milestones };
+  return results;
 }
 
 // Exhaustive epic set for the Planning/Gantt section. portfolioChildrenOf walks the full
 // Advanced Roadmaps/BigPicture portfolio hierarchy at any depth, unlike getChildEpics' manual
 // cf[16100] walk above (kept as-is for matrix generation on Confluence-less projects) which only
-// ever looks 2 levels down. extraKeys are epics/features pinned in even though they sit under a
-// completely different LVL2 root with no hierarchy link to derive them from automatically —
-// callers are responsible for validating each key against /^[A-Z][A-Z0-9]*-\d+$/ before it
-// reaches this JQL string.
-async function getPortfolioEpics(token, rootEpic, extraKeys = []) {
+// ever looks 2 levels down.
+async function getPortfolioEpics(token, rootEpic) {
   const EPIC_FIELDS = 'summary,status,assignee,reporter,customfield_10110,customfield_10111,issuetype';
   let jql = `(issuekey in (${rootEpic}) OR issueFunction in portfolioChildrenOf("issuekey in (${rootEpic})")) and issuetype = Epic`;
-  if (extraKeys.length) jql = `(${jql} OR issuekey in (${extraKeys.join(',')}))`;
   // Jira workflows in this instance use both the British ("Cancelled") and American ("Canceled")
   // spelling depending on the project — excluding only one lets the other slip straight through
   // (see getChildEpics' notCancelled below, which already had to check both).

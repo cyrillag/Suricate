@@ -209,80 +209,51 @@ function parseWeekSummary(html, week) {
   return null;
 }
 
-// A milestone (Beta / GA / a new region...) is an optional grouping layer above "deliverable" —
-// see FUNCTIONAL_RULES.md "Milestones". Convention: an <h2> heading inside the "Deliverables
-// status" section starts a new milestone's own deliverable-matrix table; everything up to the
-// next <h2> (or the end of the section) belongs to it. The heading text is the milestone name,
-// with an optional trailing "(LVL2-1234)" naming the Jira issue whose own dates/status are then
-// authoritative (same "Jira overrides Confluence" precedence as a workstream's own jira_key).
-// A page with no <h2> at all in this section — every page written before this existed, and any
-// project simple enough not to need it — parses exactly as before: one flat, un-grouped matrix.
-function parseMilestoneBlocks(sectionHtml) {
-  const re = /<h2[^>]*>([\s\S]*?)<\/h2>([\s\S]*?)(?=<h2[^>]*>|$)/gi;
-  const blocks = [];
-  let m;
-  while ((m = re.exec(sectionHtml))) {
-    const headingText = stripTags(m[1]);
-    const km = headingText.match(/^(.*?)\s*\(([A-Z][A-Z0-9]*-\d+)\)\s*$/);
-    blocks.push({
-      milestoneName: km ? km[1].trim() : headingText,
-      milestoneKey:  km ? km[2] : null,
-      html: m[2]
-    });
-  }
-  return blocks.length ? blocks : [{ milestoneName: null, milestoneKey: null, html: sectionHtml }];
-}
-
 // ── Deliverables status → workstreams ────────────────────────────────
 function parseDeliverables(html) {
   const section = extractSection(html, 'Deliverables status');
-  const blocks = parseMilestoneBlocks(section);
+  const tables = extractTables(section);
+  if (!tables.length) return [];
+  const rows = extractRows(tables[0]);
   const workstreams = [];
+  let currentDeliverable = null;
   let sortOrder = 0;
-  for (const block of blocks) {
-    const tables = extractTables(block.html);
-    if (!tables.length) continue;
-    const rows = extractRows(tables[0]);
-    let currentDeliverable = null;
-    let headerColCount = null;
-    for (const row of rows) {
-      const cells = extractCells(row);
-      if (!cells.length) continue;
-      if (cells.every(c => c.type === 'th')) { headerColCount = cells.length; continue; } // header row (all-th, no data cells)
-      // A deliverable spanning several workstreams uses `rowspan` on its leading cell, and Confluence
-      // then omits that cell entirely from every following row of the group — so a row still
-      // carrying the full column count is starting a new deliverable, one cell short is another
-      // workstream under the previous one. Some pages additionally mark that leading cell as a
-      // <th> (an older template convention); checked as a fallback since not every page does.
-      let idx = 0;
-      let deliverableJustSet = false;
-      if (cells[0].type === 'th' || (headerColCount != null && cells.length >= headerColCount)) {
-        currentDeliverable = stripTags(cells[0].html); idx = 1; deliverableJustSet = true;
-      }
-      if (!currentDeliverable) continue;
-      // Single-workstream deliverables (e.g. "E2E tests") sometimes leave the workstream-name
-      // cell blank, relying on the deliverable label itself — fall back to it in that case.
-      const wsName = (cells[idx] ? stripTags(cells[idx].html) : null) || (deliverableJustSet ? currentDeliverable : null);
-      const team   = cells[idx + 1] ? stripTags(cells[idx + 1].html) : null;
-      const jiraCellHtml = cells[idx + 2] ? cells[idx + 2].html : '';
-      // The matrix must mirror the Confluence table exactly — one row in, one row out — but a cell
-      // embedding more than one {jira} macro (a workstream backed by several epics) still needs
-      // every one of them to drive the row's status, not just the first. jira_key stores all keys
-      // comma-joined; the caller aggregates their statuses (done only if ALL are done, etc.).
-      const jiraKeys = jiraKeysFromCell(jiraCellHtml);
-      const plainStatusText = stripTags(jiraCellHtml); // e.g. "Done" when no jira macro is used
-      if (!wsName) continue;
-      workstreams.push({
-        deliverable: currentDeliverable,
-        name: wsName,
-        team: team || null,
-        jira_key: jiraKeys.length ? jiraKeys.join(',') : null,
-        manual_status: !jiraKeys.length && plainStatusText ? plainStatusText : null,
-        milestone_name: block.milestoneName,
-        milestone_key: block.milestoneKey,
-        sort_order: sortOrder++
-      });
+  let headerColCount = null;
+  for (const row of rows) {
+    const cells = extractCells(row);
+    if (!cells.length) continue;
+    if (cells.every(c => c.type === 'th')) { headerColCount = cells.length; continue; } // header row (all-th, no data cells)
+    // A deliverable spanning several workstreams uses `rowspan` on its leading cell, and Confluence
+    // then omits that cell entirely from every following row of the group — so a row still
+    // carrying the full column count is starting a new deliverable, one cell short is another
+    // workstream under the previous one. Some pages additionally mark that leading cell as a
+    // <th> (an older template convention); checked as a fallback since not every page does.
+    let idx = 0;
+    let deliverableJustSet = false;
+    if (cells[0].type === 'th' || (headerColCount != null && cells.length >= headerColCount)) {
+      currentDeliverable = stripTags(cells[0].html); idx = 1; deliverableJustSet = true;
     }
+    if (!currentDeliverable) continue;
+    // Single-workstream deliverables (e.g. "E2E tests") sometimes leave the workstream-name
+    // cell blank, relying on the deliverable label itself — fall back to it in that case.
+    const wsName = (cells[idx] ? stripTags(cells[idx].html) : null) || (deliverableJustSet ? currentDeliverable : null);
+    const team   = cells[idx + 1] ? stripTags(cells[idx + 1].html) : null;
+    const jiraCellHtml = cells[idx + 2] ? cells[idx + 2].html : '';
+    // The matrix must mirror the Confluence table exactly — one row in, one row out — but a cell
+    // embedding more than one {jira} macro (a workstream backed by several epics) still needs
+    // every one of them to drive the row's status, not just the first. jira_key stores all keys
+    // comma-joined; the caller aggregates their statuses (done only if ALL are done, etc.).
+    const jiraKeys = jiraKeysFromCell(jiraCellHtml);
+    const plainStatusText = stripTags(jiraCellHtml); // e.g. "Done" when no jira macro is used
+    if (!wsName) continue;
+    workstreams.push({
+      deliverable: currentDeliverable,
+      name: wsName,
+      team: team || null,
+      jira_key: jiraKeys.length ? jiraKeys.join(',') : null,
+      manual_status: !jiraKeys.length && plainStatusText ? plainStatusText : null,
+      sort_order: sortOrder++
+    });
   }
   return workstreams;
 }
