@@ -78,6 +78,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
   // indistinguishable from (this used to be checked here against a 'cancel' bucket that
   // mapStatus can never actually produce, so it silently never filtered anything).
   const ganttEpics = epics;
+  const hasPartialDates = ganttEpics.some(e => (e.start && !e.end) || (!e.start && e.end));
 
   // Donut data
   const donutJSON = JSON.stringify([
@@ -240,7 +241,9 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
     <div class="gantt-legend">
       <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#A6D64D"></div>Done</div>
       <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#0050D5"></div>In Progress</div>
+      <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#ED733D"></div>Blocked</div>
       <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#BEC0C6;border:1px dashed #C8CAD4"></div>To Start</div>
+      ${hasPartialDates ? '<div class="gantt-leg-item"><div class="gantt-leg-swatch gantt-leg-diamond" style="background:#87878C"></div>Only one date known (hover for detail)</div>' : ''}
     </div>
   </div>` : ''}
 
@@ -363,6 +366,18 @@ function GANTT_JS(epics) {
       bar.style.left=l.toFixed(2)+'%';bar.style.width=w.toFixed(2)+'%';
       bar.title=e.key+' — '+e.label+'\\n'+e.start+' → '+e.end;
       row.appendChild(bar);
+    }else if(e.end||e.start){
+      // Only one endpoint known (e.g. an End date with no Start date — see
+      // FUNCTIONAL_RULES.md "Planning / Gantt"). Still sorted correctly on whichever date it has,
+      // but a full-width bar would misleadingly imply the other endpoint too — a small diamond
+      // marker at the one known date, colored by status, makes clear it's a single point, not a
+      // range. Hover for which date is actually known.
+      var isEndOnly=!!e.end, known=isEndOnly?e.end:e.start;
+      var mk=document.createElement('div');
+      mk.className='gantt-marker '+e.status;
+      mk.style.left=pct(known).toFixed(2)+'%';
+      mk.title=e.key+' — '+e.label+'\\n'+(isEndOnly?('No start date — ends '+e.end):('No end date — starts '+e.start));
+      row.appendChild(mk);
     }else{
       var nd=document.createElement('span');nd.className='gantt-nodates';nd.textContent='No dates yet';
       row.appendChild(nd);
@@ -539,8 +554,12 @@ const CSS = `
   .gantt-row:last-child{border-bottom:none}
   .gantt-bar{position:absolute;top:4px;height:16px;border-radius:2px;min-width:2px;cursor:default}
   .gantt-bar:hover{filter:brightness(1.15);z-index:4}
-  .gantt-bar.done{background:var(--done-s)}.gantt-bar.prog{background:var(--cobalt)}.gantt-bar.ts{background:var(--sgr);border:1px dashed var(--bd)}
+  .gantt-bar.done{background:var(--done-s)}.gantt-bar.prog{background:var(--cobalt)}.gantt-bar.ts{background:var(--sgr);border:1px dashed var(--bd)}.gantt-bar.blk{background:var(--blk-s)}
   .gantt-nodates{position:absolute;left:8px;top:0;bottom:0;display:flex;align-items:center;font-size:12px;font-style:italic;color:var(--tx3)}
+  .gantt-marker{position:absolute;top:50%;width:10px;height:10px;transform:translate(-50%,-50%) rotate(45deg);border-radius:2px;cursor:default}
+  .gantt-marker:hover{filter:brightness(1.15);z-index:4}
+  .gantt-marker.done{background:var(--done-s)}.gantt-marker.prog{background:var(--cobalt)}.gantt-marker.blk{background:var(--blk-s)}
+  .gantt-marker.ts{background:var(--sgr);border:1px dashed var(--bd)}
   .gantt-vline{position:absolute;top:0;bottom:0;width:1px;pointer-events:none;z-index:2}
   .gantt-vline.qtr{background:var(--bd2);z-index:1}
   .gantt-vline.vtoday{background:var(--orange);z-index:3;width:2px}
@@ -549,6 +568,7 @@ const CSS = `
   .gantt-mobile-note{display:none}
   .gantt-leg-item{display:flex;align-items:center;gap:5px;font-size:13.5px;color:var(--tx2)}
   .gantt-leg-swatch{width:14px;height:10px;border-radius:1px;flex-shrink:0}
+  .gantt-leg-swatch.gantt-leg-diamond{width:9px;height:9px;transform:rotate(45deg);border-radius:2px}
   .doc-footer{background:var(--mb);color:rgba(255,255,255,.4);text-align:center;padding:18px 32px;font-size:13.5px;letter-spacing:.04em}
   @media(max-width:700px){
     .identity-grid{grid-template-columns:1fr 1fr}
