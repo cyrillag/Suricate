@@ -1,6 +1,13 @@
 const { translate } = require('./i18n');
 
 function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, milestones = [], epics, stats, health, isOwner, etaDelayed, etaDelayedFrom, etaDisplay, lang, userName, backfilled, generatedAt, confluenceUrl = null, isPreview = false }) {
+  // milestones: up to 3 fixed, manually-configured phases (Alpha/Beta/GA — see
+  // FUNCTIONAL_RULES.md "Milestones") as [{name, key, end}], already filtered to only the ones a
+  // project actually set. When non-empty, replaces the single Target ETA value in Project Identity
+  // with one line per phase — the Deliverable matrix is always flat, never grouped by milestone (an
+  // earlier attempt at auto-grouping the matrix by an auto-discovered milestone was retired: on a
+  // real project the Jira hierarchy it relied on didn't actually separate the phases a PM has in
+  // mind).
   const weekStr = `W${String(week).padStart(2, '0')}`;
   const yearWeek = `${year}-${weekStr}`;
   const dateLabel = isoWeekMonday(year, week);
@@ -13,34 +20,12 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
     ? `<span class="week-arrow week-arrow-disabled" aria-disabled="true" title="Not available yet">&#x203A;</span>`
     : `<a class="week-arrow" href="/projects/${esc(project.slug)}/${nextW.year}-W${nextW.weekPad}" aria-label="Next week">&#x203A;</a>`;
 
-  // Group workstreams by deliverable — used for the "N del." stat regardless of milestone
-  // grouping below (a deliverable is still counted once project-wide, whichever milestone(s) it
-  // sits under).
+  // Group workstreams by deliverable
   const deliverables = [];
   const seen = {};
   workstreams.forEach(ws => {
     if (!seen[ws.deliverable]) { seen[ws.deliverable] = []; deliverables.push({ name: ws.deliverable, rows: seen[ws.deliverable] }); }
     seen[ws.deliverable].push(ws);
-  });
-
-  // Milestones (Beta / GA / a new region...) are an optional grouping layer above deliverable —
-  // see FUNCTIONAL_RULES.md "Milestones". A project with none (the overwhelming majority, and
-  // every project as of before this existed) gets exactly one implicit, unlabelled group, which
-  // renders identically to the matrix's pre-milestone markup (hasMilestones gates the one row the
-  // milestone grouping adds — nothing else about the row markup below changed).
-  const hasMilestones = workstreams.some(ws => ws.milestone_key || ws.milestone_name);
-  const milestoneGroups = [];
-  const msSeen = {};
-  workstreams.forEach(ws => {
-    const msDedupeKey = hasMilestones ? (ws.milestone_key || `name:${ws.milestone_name}`) : '';
-    if (!msSeen[msDedupeKey]) {
-      const meta = milestones.find(m => (ws.milestone_key && m.key === ws.milestone_key) || (!ws.milestone_key && m.name === ws.milestone_name)) || null;
-      msSeen[msDedupeKey] = { key: ws.milestone_key || null, name: ws.milestone_name || null, meta, deliverables: [], delSeen: {} };
-      milestoneGroups.push(msSeen[msDedupeKey]);
-    }
-    const grp = msSeen[msDedupeKey];
-    if (!grp.delSeen[ws.deliverable]) { grp.delSeen[ws.deliverable] = []; grp.deliverables.push({ name: ws.deliverable, rows: grp.delSeen[ws.deliverable] }); }
-    grp.delSeen[ws.deliverable].push(ws);
   });
 
   const statusLabel = { done: 'Done', prog: 'In Progress', blk: 'Blocked', ts: 'To Start' };
@@ -52,15 +37,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
     return 'ts';
   };
 
-  const milestoneHeaderRow = grp => {
-    if (!hasMilestones) return '';
-    const label = grp.name || grp.key || 'Other';
-    const keyTag = grp.key ? ` <a class="jtag jtag-sm" href="https://jira.ovhcloud.tools/browse/${esc(grp.key)}" target="_blank" rel="noopener">${esc(grp.key)}</a>` : '';
-    const endDate = grp.meta && grp.meta.end ? formatShortDate(grp.meta.end) : null;
-    return `<tr class="mx-milestone-row"><td colspan="5"><span class="mx-milestone-name">${esc(label)}</span>${keyTag}${endDate ? `<span class="mx-milestone-end">${esc(endDate)}</span>` : ''}</td></tr>`;
-  };
-
-  const matrixRows = milestoneGroups.map(grp => milestoneHeaderRow(grp) + grp.deliverables.map(del => {
+  const matrixRows = deliverables.map(del => {
     const ds = delStatus(del);
     return del.rows.map((ws, i) => {
       const st = ws.status || 'ts';
@@ -75,7 +52,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
           </td>
         </tr>`;
     }).join('');
-  }).join('')).join('');
+  }).join('');
 
   const abcSection = cat => {
     const items = (highlights[cat] || []);
@@ -201,7 +178,9 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
       <div class="identity-cell"><div class="f-label">Project Manager</div><div class="f-value">${esc(pmName || '')}</div></div>
       <div class="identity-cell">
         <div class="f-label">Target ETA</div>
-        <div class="f-value">${esc(etaDisplay || 'TBD')}</div>
+        ${milestones.length
+          ? `<div class="f-value-list">${milestones.map(m => `<div class="f-value">${esc(m.name)} — ${m.end ? formatShortDate(m.end) : 'TBD'}</div>`).join('')}</div>`
+          : `<div class="f-value">${esc(etaDisplay || 'TBD')}</div>`}
         ${etaDelayed ? `<div class="eta-delayed-note">${etaDelayedFrom ? `⚠ Previous date: ${esc(etaDelayedFrom)}` : '⚠ Delayed'}</div>` : ''}
         <div class="health ${health} health-sub"><div class="health-dot"></div>${health === 'delayed' ? 'Delayed' : health === 'at-risk' ? 'At Risk' : 'On Track'}</div>
       </div>
@@ -210,14 +189,6 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
         <div class="f-value mono"><a class="jtag" href="https://jira.ovhcloud.tools/browse/${esc(project.jira_root_epic)}" target="_blank" rel="noopener">${esc(project.jira_root_epic)}</a></div>
       </div>
     </div>
-    ${milestones.length ? `
-    <div class="milestones-row">
-      ${milestones.map(m => `
-        <div class="milestone-chip">
-          <span class="ms-name">${esc(m.name || m.key || 'Milestone')}</span>
-          <span class="ms-date">${m.end ? formatShortDate(m.end) : 'TBD'}</span>
-        </div>`).join('')}
-    </div>` : ''}
   </div>
 
   <div class="doc-section doc-section--abc">
@@ -508,10 +479,7 @@ const CSS = `
   .f-label{font-size:12.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--tx3);margin-bottom:5px}
   .f-value{font-size:13px;font-weight:600;color:var(--tx);line-height:1.3}
   .f-value.mono{font-family:var(--fm);font-size:13px;font-weight:400;color:var(--cobalt)}
-  .milestones-row{display:flex;flex-wrap:wrap;gap:8px;padding:0 20px 16px}
-  .milestone-chip{display:flex;align-items:center;gap:7px;padding:5px 10px;background:var(--gnd);border:1px solid var(--bd2);border-radius:2px}
-  .ms-name{font-size:12.5px;font-weight:700;color:var(--tx)}
-  .ms-date{font-size:12.5px;color:var(--tx3)}
+  .f-value-list{display:flex;flex-direction:column;gap:3px}
   .eta-delayed-note{font-size:12px;font-weight:600;color:var(--blk-c);margin-top:4px}
   .health{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
   .health-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
@@ -584,11 +552,6 @@ const CSS = `
   .st.done{color:var(--done-c)}.st.prog{color:var(--prog-c)}.st.blk{color:var(--blk-c)}.st.ts{color:var(--ts-c)}
   .jtag{font-family:var(--fm);font-size:13.5px;color:var(--cobalt);background:var(--prog-bg);padding:2px 6px;border-radius:2px;text-decoration:none;display:inline-block}
   .jtag:hover{text-decoration:underline}
-  .mx-milestone-row td{background:var(--db)!important;padding:9px 16px;font-size:13px}
-  .mx-milestone-name{color:#fff;font-weight:700;letter-spacing:.03em}
-  .mx-milestone-end{float:right;color:rgba(255,255,255,.75);font-weight:400}
-  .jtag-sm{font-size:11.5px;padding:1px 5px;background:rgba(255,255,255,.18);color:#fff}
-  .jtag-sm:hover{color:#fff}
   .gantt-outer{display:flex;overflow-x:auto}
   .gantt-lcol{flex-shrink:0;width:228px;border-right:1px solid var(--bd2)}
   .gantt-lhdr{height:40px;background:var(--gnd);border-bottom:2px solid var(--bd)}
