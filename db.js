@@ -79,10 +79,6 @@ ensureColumn('projects', 'confluence_page', 'confluence_page TEXT');
 ensureColumn('epics_cache', 'assignee', 'assignee TEXT');
 ensureColumn('epics_cache', 'reporter', 'reporter TEXT');
 ensureColumn('reports', 'exec_summary', 'exec_summary TEXT');
-// Space/comma-separated Jira keys pinned to Planning regardless of the automatic portfolio
-// walk from jira_root_epic — for epics/features that live under a different LVL2 root entirely
-// and so have no hierarchy link to derive them from automatically.
-ensureColumn('projects', 'extra_epics', 'extra_epics TEXT');
 
 // A past report must stay a true frozen snapshot — the matrix/Planning were being recomputed
 // live from the CURRENT workstreams/epics_cache tables on every view, so a workstream added (or
@@ -134,6 +130,15 @@ ensureColumn('reports', 'milestone_ga_end', 'milestone_ga_end TEXT');
 db.exec('DROP TABLE IF EXISTS milestones_cache');
 if (db.prepare(`PRAGMA table_info(reports)`).all().some(c => c.name === 'milestones_snapshot_json')) {
   db.exec('ALTER TABLE reports DROP COLUMN milestones_snapshot_json');
+}
+
+// extra_epics (pinning arbitrary Jira keys into Planning regardless of the automatic portfolio
+// walk) is retired — Planning scope is meant to come directly from BigPicture's own scope
+// definition for the project instead (a future change), making a manually-typed pin list
+// redundant. Not a milestone-related field, but retired at the same time for the same "manual
+// workaround superseded by reading the real source of truth" reason.
+if (db.prepare(`PRAGMA table_info(projects)`).all().some(c => c.name === 'extra_epics')) {
+  db.exec('ALTER TABLE projects DROP COLUMN extra_epics');
 }
 
 // workstreams had no UNIQUE constraint pre-v2, so every "Sync Jira" click duplicated all rows.

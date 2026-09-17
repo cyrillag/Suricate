@@ -69,9 +69,15 @@ to be re-applied here by hand rather than resolved by merging code:
   the project's root LVL2 epic, whether or not each one is listed on the Confluence page. This is
   computed via a recursive portfolio JQL (`portfolioChildrenOf`) that walks the Advanced
   Roadmaps/BigPicture hierarchy at arbitrary depth — not a fixed number of levels.
-- A project can pin extra Jira keys (`extra_epics` field, Edit page) that always appear in
-  Planning even though they belong to a different LVL2 program entirely and have no automatic
-  hierarchy link back to this project's root epic.
+- **Retired**: a project could pin extra Jira keys (`extra_epics` field, Edit page) that always
+  appeared in Planning even though they belonged to a different LVL2 program entirely and had no
+  automatic hierarchy link back to this project's root epic. Removed (field, column, and the JQL
+  `extraKeys` plumbing in `jira.getPortfolioEpics`) once it became clear it was a manual workaround
+  for the same problem a planned future change addresses properly: reading Planning's scope
+  directly from the project's own BigPicture box scope definition (already configured by the team
+  there, e.g. `.../softwareplant-bigpicture/#/box/<BOX-KEY>/settings/tasks/scope-definition`) rather
+  than the current JQL portfolio walk — not yet implemented, but a manual pin list would only get
+  more redundant once it is.
 - **A cancelled epic (Jira status "Cancelled" or "Canceled" — this instance's workflows use both
   spellings depending on the project) never appears in Planning.** Filtered against the raw Jira
   status, not the done/prog/blk/ts bucket `mapStatus` produces — once mapped, a cancelled epic is

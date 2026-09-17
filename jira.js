@@ -117,14 +117,10 @@ async function getChildEpics(token, rootEpic) {
 // Exhaustive epic set for the Planning/Gantt section. portfolioChildrenOf walks the full
 // Advanced Roadmaps/BigPicture portfolio hierarchy at any depth, unlike getChildEpics' manual
 // cf[16100] walk above (kept as-is for matrix generation on Confluence-less projects) which only
-// ever looks 2 levels down. extraKeys are epics/features pinned in even though they sit under a
-// completely different LVL2 root with no hierarchy link to derive them from automatically —
-// callers are responsible for validating each key against /^[A-Z][A-Z0-9]*-\d+$/ before it
-// reaches this JQL string.
-async function getPortfolioEpics(token, rootEpic, extraKeys = []) {
+// ever looks 2 levels down.
+async function getPortfolioEpics(token, rootEpic) {
   const EPIC_FIELDS = 'summary,status,assignee,reporter,customfield_10110,customfield_10111,issuetype';
   let jql = `(issuekey in (${rootEpic}) OR issueFunction in portfolioChildrenOf("issuekey in (${rootEpic})")) and issuetype = Epic`;
-  if (extraKeys.length) jql = `(${jql} OR issuekey in (${extraKeys.join(',')}))`;
   // Jira workflows in this instance use both the British ("Cancelled") and American ("Canceled")
   // spelling depending on the project — excluding only one lets the other slip straight through
   // (see getChildEpics' notCancelled below, which already had to check both).

@@ -41,20 +41,11 @@ function getBrowser() {
 }
 process.on('SIGTERM', async () => { if (browserPromise) (await browserPromise).close(); });
 
-// The raw value reaches a JQL string built server-side (jira.getPortfolioEpics) — only
-// well-formed Jira keys pass through, both for correctness and so a project owner can't smuggle
-// arbitrary JQL into a query run with the shared service token.
-function parseExtraEpics(raw) {
-  return (raw || '')
-    .split(/[\s,]+/)
-    .map(k => k.trim().toUpperCase())
-    .filter(k => /^[A-Z][A-Z0-9]*-\d+$/.test(k));
-}
-
-// A single optional milestone epic key (Alpha/Beta/GA — see FUNCTIONAL_RULES.md "Milestones") —
-// same well-formed-key check as parseExtraEpics, but for one field rather than a pasted list.
+// A single optional milestone epic key (Alpha/Beta/GA — see FUNCTIONAL_RULES.md "Milestones").
 // Blank or malformed input both just mean "not set" rather than a validation error, since these
-// fields are always optional.
+// fields are always optional. Same well-formed-key check as the JQL-safety checks elsewhere —
+// this also reaches a JQL string (jira.getRootEpicMeta), so a project owner can't smuggle
+// arbitrary JQL into a query run with the shared service token.
 function parseMilestoneEpic(raw) {
   const key = (raw || '').trim().toUpperCase();
   return /^[A-Z][A-Z0-9]*-\d+$/.test(key) ? key : null;
@@ -203,8 +194,8 @@ async function refreshEpicStatuses(projectId, jiraKeyFields) {
 // has (yet) added to the Confluence "Deliverables status" table. This walks the full Jira tree
 // and writes epics_cache only, never touching workstreams, so it's safe to run alongside a
 // Confluence-backed project without duplicating or overriding the matrix.
-async function refreshFullEpicTree(projectId, rootEpic, extraKeys = []) {
-  const epics = await jira.getPortfolioEpics(JIRA_TOKEN, rootEpic, extraKeys);
+async function refreshFullEpicTree(projectId, rootEpic) {
+  const epics = await jira.getPortfolioEpics(JIRA_TOKEN, rootEpic);
   epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter));
   return epics.length;
 }
@@ -449,8 +440,8 @@ app.get('/projects/:slug/edit', requireAuth, (req, res) => {
 app.post('/projects/:slug/edit', requireAuth, async (req, res) => {
   const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
   if (!proj) return res.status(404).send('Project not found.');
-  const { name, jira_root_epic, confluence_url, extra_epics, milestone_alpha, milestone_beta, milestone_ga } = req.body;
-  const rerender = error => res.render('project-edit', { proj: { ...proj, name, jira_root_epic, extra_epics, milestone_alpha, milestone_beta, milestone_ga }, confluenceUrl: confluence_url, error, userName: req.session.userName });
+  const { name, jira_root_epic, confluence_url, milestone_alpha, milestone_beta, milestone_ga } = req.body;
+  const rerender = error => res.render('project-edit', { proj: { ...proj, name, jira_root_epic, milestone_alpha, milestone_beta, milestone_ga }, confluenceUrl: confluence_url, error, userName: req.session.userName });
 
   if (!name?.trim() || !jira_root_epic?.trim()) return rerender(res.locals.t('editProject.err_required'));
   const confPage = await confluence.resolvePageUrl(CONFLUENCE_TOKEN, confluence_url);
@@ -461,14 +452,9 @@ app.post('/projects/:slug/edit', requireAuth, async (req, res) => {
   try { eta = formatDate((await jira.getRootEpicMeta(JIRA_TOKEN, epic)).eta); }
   catch (err) { console.warn(`Could not read ETA from ${epic}: ${err.message}`); }
 
-  // Silently drops anything that isn't a well-formed Jira key rather than rejecting the whole
-  // save — this is a convenience field (paste a few keys, possibly with typos or stray text),
-  // not a validated form input.
-  const cleanExtraEpics = parseExtraEpics(extra_epics).join(', ');
-
-  db.prepare(`UPDATE projects SET name=?,jira_root_epic=?,eta=?,confluence_space=?,confluence_page=?,extra_epics=?,
+  db.prepare(`UPDATE projects SET name=?,jira_root_epic=?,eta=?,confluence_space=?,confluence_page=?,
       milestone_alpha=?,milestone_beta=?,milestone_ga=? WHERE id=?`)
-    .run(name.trim(), epic, eta, confPage.space, confPage.page, cleanExtraEpics || null,
+    .run(name.trim(), epic, eta, confPage.space, confPage.page,
       parseMilestoneEpic(milestone_alpha), parseMilestoneEpic(milestone_beta), parseMilestoneEpic(milestone_ga), proj.id);
 
   res.redirect(`/projects/${proj.slug}`);
@@ -644,7 +630,7 @@ app.post('/projects/:slug/reports/generate', requireAuth, async (req, res) => {
   try {
     if (proj.confluence_space && proj.confluence_page) {
       await syncConfluenceProject(proj.id, proj.confluence_space, proj.confluence_page);
-      await refreshFullEpicTree(proj.id, proj.jira_root_epic, parseExtraEpics(proj.extra_epics));
+      await refreshFullEpicTree(proj.id, proj.jira_root_epic);
     } else {
       await seedWorkstreamsFromJiraTree(proj.id, proj.jira_root_epic);
     }
