@@ -395,14 +395,18 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   inconsistent dates — actual tracking problems, always listed individually) is distinct
   from 📅 Upcoming deadlines (due within 14 days — not a problem, a perfectly healthy epic
   can land here purely because it's closing soon; kept in its own section so it never reads
-  as something broken) and from 🟡 Remaining (missing assignee/start/end date — real hygiene
-  debt, but not urgent, so it's collapsed to a per-team count + a live Jira JQL link rather
-  than listed epic-by-epic).
+  as something broken) and from 🟡 Remaining (missing start/end date — real hygiene debt, but
+  not urgent, so it's collapsed to a per-team count + a live Jira JQL link rather than listed
+  epic-by-epic).
+- **No missing-assignee check.** A missing assignee doesn't stop a project moving forward, so
+  it's no longer flagged — only missing start/end date count as 🟡 hygiene debt now. (Dropped
+  after ~2 weeks live; the sibling Webex bot, jira-hygiene-report, still has it — the two
+  tools are allowed to diverge.)
 - **Missing-metadata checks (🟡) are skipped once an epic's `mapStatus` bucket is `done`** —
-  closed work doesn't need its dates or assignee backfilled. This reuses `jira.mapStatus`'s
-  own done/in-progress/blocked/to-start buckets (the same ones driving the Deliverable
-  matrix and health badge) rather than Jira's raw status, so paused/on-hold epics keep this
-  app's already-agreed semantics instead of a generically re-derived one.
+  closed work doesn't need its dates backfilled. This reuses `jira.mapStatus`'s own
+  done/in-progress/blocked/to-start buckets (the same ones driving the Deliverable matrix
+  and health badge) rather than Jira's raw status, so paused/on-hold epics keep this app's
+  already-agreed semantics instead of a generically re-derived one.
 - **A Cancelled or Rejected epic is skipped from every check, not just the 🟡 ones** — same
   treatment as a Done epic (no overdue/not-started/inconsistent-dates/missing-metadata
   findings). `mapStatus` has no bucket for "irrelevant, stop checking" (it falls through to
@@ -411,11 +415,9 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   already applies, extended here to also cover Rejected. Without this, a cancelled epic with
   a stale past end date read as an active, overdue tracking problem (seen in production:
   NCC-2865 and CLDAPI-2009, both Cancelled, both flagged 🔴 overdue/not-started).
-- **The "responsible" contact shown is the assignee, falling back to the reporter** when the
-  assignee is empty — but the "no assignee" finding itself always fires on a genuinely empty
-  assignee, regardless of that display fallback (a reporter existing does not hide the
-  finding — the fallback is only about who to show as a contact, not whether the epic has an
-  anomaly).
+- **The "responsible" contact shown on 🔴/📅 rows is the assignee, falling back to the
+  reporter** when the assignee is empty — purely a display choice now that there's no
+  missing-assignee finding tied to it.
 - **Visible to every authenticated user, no ownership check** — same rule as the
   project-detail and report-view pages (see Visibility & permissions): it's read-only, and a
   weekly report is routinely shared with people who don't own the project.

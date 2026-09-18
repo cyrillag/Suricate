@@ -42,7 +42,6 @@ function checkEpic(epic, today) {
   const { start_date: start, end_date: end } = epic;
 
   if (!isDone) {
-    if (!epic.assignee) findings.push({ rule: 'no_assignee', severity: 'medium' });
     if (!start) findings.push({ rule: 'no_start', severity: 'medium' });
     if (!end) findings.push({ rule: 'no_end', severity: 'medium' });
   }
