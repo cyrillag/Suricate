@@ -89,7 +89,17 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
   // status has already been mapped to done/prog/blk/ts, which a cancelled epic is
   // indistinguishable from (this used to be checked here against a 'cancel' bucket that
   // mapStatus can never actually produce, so it silently never filtered anything).
-  const ganttEpics = epics;
+  // An epic that already ended more than 6 months ago is dropped entirely — long-finished history
+  // cluttering a weekly status view without adding anything a PM needs *now*, and it was also
+  // dragging the timeline's own start further and further into the past the older a project gets.
+  // Evaluated against today (view time), same read-time framing as the "Today" marker itself, not
+  // frozen to the report's own week — an old report viewed later declutters the same way. Never
+  // filters on Start date: an epic still open (no End date) stays regardless of how long ago it
+  // started, since it isn't "history" yet.
+  const historyFloor = new Date();
+  historyFloor.setMonth(historyFloor.getMonth() - 6);
+  const historyFloorIso = historyFloor.toISOString().slice(0, 10);
+  const ganttEpics = epics.filter(e => !e.end || e.end >= historyFloorIso);
   const hasPartialDates = ganttEpics.some(e => (e.start && !e.end) || (!e.start && e.end));
 
   // Donut data
@@ -334,9 +344,19 @@ function buildGanttMonths(tstart, tend) {
 }
 
 function GANTT_JS(epics) {
-  const datedStarts = epics.map(e => e.start).filter(Boolean);
-  const TSTART_DATE = datedStarts.length ? datedStarts.reduce((m, s) => s < m ? s : m) : '2025-09-01';
-  const tstart = new Date(Math.min(new Date(TSTART_DATE), new Date('2025-09-01')));
+  // The timeline's own start is always exactly 6 months before today — same rolling-window rule
+  // ganttEpics is filtered by above (FUNCTIONAL_RULES.md "Planning / Gantt"), applied to the axis
+  // itself rather than just the row list. It no longer extends back to cover an epic's own Start
+  // date the way it briefly did (that was to fix a header/marker misalignment bug, not to show more
+  // history) — an epic starting earlier than the floor still renders, its bar just runs off the
+  // left edge instead of being traceable back to its exact start, which is the intended declutter.
+  // Normalized to the 1st of the month so it lines up exactly with buildGanttMonths' own
+  // month-column boundaries (a mid-month tstart would desync position 0% from the first column).
+  const now = new Date();
+  const tstart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 6, 1));
+  // Still a fixed date, not derived from `now` — unrelated to this change, but worth flagging: once
+  // "today" gets within ~6 months of this, tstart would overtake it. Whoever bumps this later should
+  // check tstart/tend don't invert.
   const tend   = new Date('2026-11-30');
   const ts = tstart.toISOString().slice(0, 10);
   const te = tend.toISOString().slice(0, 10);

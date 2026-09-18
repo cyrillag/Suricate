@@ -69,6 +69,14 @@ to be re-applied here by hand rather than resolved by merging code:
   the project's root LVL2 epic, whether or not each one is listed on the Confluence page. This is
   computed via a recursive portfolio JQL (`portfolioChildrenOf`) that walks the Advanced
   Roadmaps/BigPicture hierarchy at arbitrary depth — not a fixed number of levels.
+- **Exception to "exhaustive": an epic that already ended more than 6 months ago is dropped from
+  Planning entirely** (`report-gen.js`) — long-finished history clutters a weekly status view
+  without helping anyone judge what's happening *now*, and it was also dragging the Gantt's own
+  start date (and so its whole header) further into the past the older a project got. Evaluated
+  against *today*, at view time — same read-time framing as the "Today" marker itself, not frozen
+  to the report's own week, so an old report viewed later declutters the same way a fresh one does.
+  Never filters on Start date alone: an epic with no End date stays regardless of how long ago it
+  started, since without an End date it isn't finished, so it isn't "history" yet either.
 - **Retired**: a project could pin extra Jira keys (`extra_epics` field, Edit page) that always
   appeared in Planning even though they belonged to a different LVL2 program entirely and had no
   automatic hierarchy link back to this project's root epic. Removed (field, column, and the JQL
