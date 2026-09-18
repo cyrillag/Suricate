@@ -1,5 +1,11 @@
 const { translate } = require('./i18n');
 
+// A plain "⚙" (U+2699 GEAR) renders inconsistently across platforms/fonts — on some it reads as a
+// ship's helm/wheel rather than a settings cog. An inline SVG (stroke=currentColor, so it inherits
+// the button's own text color/hover transition for free) is unambiguous everywhere. Feather Icons'
+// "settings" glyph — a well-known, simple outline shape.
+const GEAR_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>';
+
 function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, milestones = [], epics, stats, health, isOwner, etaDelayed, etaDelayedFrom, etaDisplay, lang, userName, backfilled, generatedAt, confluenceUrl = null, isPreview = false }) {
   // milestones: up to 3 fixed, manually-configured phases (Alpha/Beta/GA — see
   // FUNCTIONAL_RULES.md "Milestones") as [{name, key, end}], already filtered to only the ones a
@@ -151,7 +157,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:flex-end">
       <a href="/projects/${esc(project.slug)}/${yearWeek}/pdf" class="btn-ghost btn-sm">⬇ Export PDF</a>
-      ${isOwner ? `<a href="/projects/${esc(project.slug)}/edit" class="btn-ghost btn-sm btn-icon" title="${esc(translate(lang, 'detail.configure'))}" aria-label="${esc(translate(lang, 'detail.configure'))}">⚙</a>` : ''}
+      ${isOwner ? `<a href="/projects/${esc(project.slug)}/edit" class="btn-ghost btn-sm btn-icon" title="${esc(translate(lang, 'detail.configure'))}" aria-label="${esc(translate(lang, 'detail.configure'))}">${GEAR_SVG}</a>` : ''}
       ${isOwner && isCurrentWeek ? `<form method="POST" action="/projects/${esc(project.slug)}/reports/generate" style="display:inline">
         <input type="hidden" name="week" value="${yearWeek}">
         <button type="submit" class="btn-primary btn-sm">↻ Refresh</button>
