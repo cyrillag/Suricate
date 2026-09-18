@@ -1,5 +1,11 @@
 const { translate } = require('./i18n');
 
+// A plain "⚙" (U+2699 GEAR) renders inconsistently across platforms/fonts — on some it reads as a
+// ship's helm/wheel rather than a settings cog. An inline SVG (stroke=currentColor, so it inherits
+// the button's own text color/hover transition for free) is unambiguous everywhere. Feather Icons'
+// "settings" glyph — a well-known, simple outline shape.
+const GEAR_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>';
+
 function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, milestones = [], epics, stats, health, isOwner, etaDelayed, etaDelayedFrom, etaDisplay, lang, userName, backfilled, generatedAt, confluenceUrl = null }) {
   // milestones: up to 3 fixed, manually-configured phases (Alpha/Beta/GA — see
   // FUNCTIONAL_RULES.md "Milestones") as [{name, key, end}], already filtered to only the ones a
@@ -149,6 +155,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:flex-end">
       <a href="/projects/${esc(project.slug)}/${yearWeek}/pdf" class="btn-ghost btn-sm">⬇ Export PDF</a>
+      ${isOwner ? `<a href="/projects/${esc(project.slug)}/edit" class="btn-ghost btn-sm btn-icon" title="${esc(translate(lang, 'detail.configure'))}" aria-label="${esc(translate(lang, 'detail.configure'))}">${GEAR_SVG}</a>` : ''}
       ${isOwner && isCurrentWeek ? `<form method="POST" action="/projects/${esc(project.slug)}/reports/generate" style="display:inline">
         <input type="hidden" name="week" value="${yearWeek}">
         <button type="submit" class="btn-primary btn-sm">↻ Refresh</button>
@@ -177,7 +184,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
       <div class="identity-cell">
         <div class="f-label">Target ETA</div>
         ${milestones.length
-          ? `<div class="f-value-list">${milestones.map(m => `<div class="f-value">${esc(m.name)} — ${m.end ? formatShortDate(m.end) : 'TBD'}</div>`).join('')}</div>`
+          ? `<div class="f-value-list">${milestones.map(m => `<div class="f-value">${esc(m.name)} — ${m.done ? 'DONE' : (m.end ? formatShortDate(m.end) : 'TBD')}</div>`).join('')}</div>`
           : `<div class="f-value">${esc(etaDisplay || 'TBD')}</div>`}
         ${etaDelayed ? `<div class="eta-delayed-note">${etaDelayedFrom ? `⚠ Previous date: ${esc(etaDelayedFrom)}` : '⚠ Delayed'}</div>` : ''}
         <div class="health ${health} health-sub"><div class="health-dot"></div>${health === 'delayed' ? 'Delayed' : health === 'at-risk' ? 'At Risk' : 'On Track'}</div>
@@ -604,7 +611,7 @@ const CSS = `
      to drift from the real page (see FUNCTIONAL_RULES.md "Report export"). Only the prev/next
      arrows are hidden here, not the whole .week-nav — .ref-week (the "W35 · 2026" label) is the
      one piece of that widget that's informational rather than an action, and must stay. */
-  @media print{.week-arrow,.nav-user,a[href$="/pdf"],form[action$="/reports/generate"],.confluence-link-wrap{display:none!important}}
+  @media print{.week-arrow,.nav-user,a[href$="/pdf"],a[href$="/edit"],form[action$="/reports/generate"],.confluence-link-wrap{display:none!important}}
   /* Deliberately subtle — a secondary way to reach more detail, not a primary action next to
      Refresh/Export PDF. Underline-on-hover only, inherits the muted .page-sub text color rather
      than getting its own accent treatment. */

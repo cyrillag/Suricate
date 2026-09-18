@@ -120,6 +120,11 @@ ensureColumn('projects', 'milestone_ga', 'milestone_ga TEXT');
 ensureColumn('reports', 'milestone_alpha_end', 'milestone_alpha_end TEXT');
 ensureColumn('reports', 'milestone_beta_end', 'milestone_beta_end TEXT');
 ensureColumn('reports', 'milestone_ga_end', 'milestone_ga_end TEXT');
+// Raw Jira status alongside each date, frozen the same way — lets a past-dated milestone that's
+// actually done show "DONE" instead of a stale-looking expired date (see FUNCTIONAL_RULES.md).
+ensureColumn('reports', 'milestone_alpha_status', 'milestone_alpha_status TEXT');
+ensureColumn('reports', 'milestone_beta_status', 'milestone_beta_status TEXT');
+ensureColumn('reports', 'milestone_ga_status', 'milestone_ga_status TEXT');
 
 // A first version of "milestones" auto-discovered them from the Jira epic hierarchy / a Confluence
 // heading convention, grouping the Deliverable matrix by whichever ones it found. Retired: on a
