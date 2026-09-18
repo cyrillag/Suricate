@@ -27,7 +27,7 @@
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end">
       <a href="/projects/<%= proj.slug %>/cleanup" class="btn-ghost btn-sm"><%= t('detail.cleanup_link') %></a>
     <% if (isOwner) { %>
-      <a href="/projects/<%= proj.slug %>/edit" class="btn-ghost btn-sm"><%= t('detail.edit') %></a>
+      <a href="/projects/<%= proj.slug %>/edit" class="btn-ghost btn-sm btn-icon" title="<%= t('detail.configure') %>" aria-label="<%= t('detail.configure') %>">⚙</a>
       <form method="POST" action="/projects/<%= proj.slug %>/reports/generate" style="display:flex;gap:6px;align-items:center">
         <input class="field-input" type="text" name="week" value="<%= currentWeek %>" pattern="\d{4}-W\d{2}" style="width:110px" title="<%= t('detail.week_input_title') %>" aria-label="<%= t('detail.week_input_aria') %>">
         <button type="submit" class="btn-primary"><%= t('detail.generate_report') %></button>

@@ -69,7 +69,7 @@ const DICT = {
   detail: {
     owner:     { fr: 'Responsable : {{name}}',    en: 'Owner: {{name}}' },
     cleanup_link: { fr: '🩺 Cleanup',             en: '🩺 Cleanup' },
-    edit:      { fr: '✎ Modifier',                en: '✎ Edit' },
+    configure: { fr: 'Configurer',                en: 'Configure' },
     generate_report: { fr: 'Générer le rapport',  en: 'Generate report' },
     week_input_title: { fr: 'AAAA-Wss',           en: 'YYYY-Www' },
     week_input_aria: { fr: 'Semaine à générer, format AAAA-Wss', en: 'Week to generate, format YYYY-Www' },

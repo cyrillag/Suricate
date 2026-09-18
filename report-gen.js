@@ -151,6 +151,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:flex-end">
       <a href="/projects/${esc(project.slug)}/${yearWeek}/pdf" class="btn-ghost btn-sm">⬇ Export PDF</a>
+      ${isOwner ? `<a href="/projects/${esc(project.slug)}/edit" class="btn-ghost btn-sm btn-icon" title="${esc(translate(lang, 'detail.configure'))}" aria-label="${esc(translate(lang, 'detail.configure'))}">⚙</a>` : ''}
       ${isOwner && isCurrentWeek ? `<form method="POST" action="/projects/${esc(project.slug)}/reports/generate" style="display:inline">
         <input type="hidden" name="week" value="${yearWeek}">
         <button type="submit" class="btn-primary btn-sm">↻ Refresh</button>
@@ -179,7 +180,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
       <div class="identity-cell">
         <div class="f-label">Target ETA</div>
         ${milestones.length
-          ? `<div class="f-value-list">${milestones.map(m => `<div class="f-value">${esc(m.name)} — ${m.end ? formatShortDate(m.end) : 'TBD'}</div>`).join('')}</div>`
+          ? `<div class="f-value-list">${milestones.map(m => `<div class="f-value">${esc(m.name)} — ${m.done ? 'DONE' : (m.end ? formatShortDate(m.end) : 'TBD')}</div>`).join('')}</div>`
           : `<div class="f-value">${esc(etaDisplay || 'TBD')}</div>`}
         ${etaDelayed ? `<div class="eta-delayed-note">${etaDelayedFrom ? `⚠ Previous date: ${esc(etaDelayedFrom)}` : '⚠ Delayed'}</div>` : ''}
         <div class="health ${health} health-sub"><div class="health-dot"></div>${health === 'delayed' ? 'Delayed' : health === 'at-risk' ? 'At Risk' : 'On Track'}</div>
@@ -606,7 +607,7 @@ const CSS = `
      to drift from the real page (see FUNCTIONAL_RULES.md "Report export"). Only the prev/next
      arrows are hidden here, not the whole .week-nav — .ref-week (the "W35 · 2026" label) is the
      one piece of that widget that's informational rather than an action, and must stay. */
-  @media print{.week-arrow,.nav-user,a[href$="/pdf"],form[action$="/reports/generate"],.confluence-link-wrap{display:none!important}}
+  @media print{.week-arrow,.nav-user,a[href$="/pdf"],a[href$="/edit"],form[action$="/reports/generate"],.confluence-link-wrap{display:none!important}}
   /* Deliberately subtle — a secondary way to reach more detail, not a primary action next to
      Refresh/Export PDF. Underline-on-hover only, inherits the muted .page-sub text color rather
      than getting its own accent treatment. */

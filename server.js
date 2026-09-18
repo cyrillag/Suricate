@@ -570,10 +570,16 @@ async function generateReportRow(proj, year, week) {
   // frozen into this report row so a past week's Project Identity chips never silently change if
   // one of these dates moves in Jira after the fact.
   const milestoneEnds = {};
+  const milestoneStatuses = {};
   for (const field of ['milestone_alpha', 'milestone_beta', 'milestone_ga']) {
     milestoneEnds[field] = null;
+    milestoneStatuses[field] = null;
     if (!proj[field]) continue;
-    try { milestoneEnds[field] = (await jira.getRootEpicMeta(JIRA_TOKEN, proj[field])).eta; }
+    try {
+      const meta = await jira.getRootEpicMeta(JIRA_TOKEN, proj[field]);
+      milestoneEnds[field] = meta.eta;
+      milestoneStatuses[field] = meta.status;
+    }
     catch (err) { console.warn(`Could not read End date from ${proj[field]}: ${err.message}`); }
   }
 
@@ -592,8 +598,8 @@ async function generateReportRow(proj, year, week) {
   // regenerated at all — but the intent is "set once at creation", not "recomputed every write").
   const backfilled = isPastWeek(year, week) ? 1 : 0;
 
-  db.prepare(`INSERT INTO reports(project_id,year,week,exec_summary,highlights_json,risks_json,workstream_statuses_json,workstreams_snapshot_json,epics_snapshot_json,eta_snapshot,eta_delayed,milestone_alpha_end,milestone_beta_end,milestone_ga_end,backfilled,updated_at)
-    VALUES(?,?,?,?,?,?,'{}',?,?,?,?,?,?,?,?,unixepoch())
+  db.prepare(`INSERT INTO reports(project_id,year,week,exec_summary,highlights_json,risks_json,workstream_statuses_json,workstreams_snapshot_json,epics_snapshot_json,eta_snapshot,eta_delayed,milestone_alpha_end,milestone_beta_end,milestone_ga_end,milestone_alpha_status,milestone_beta_status,milestone_ga_status,backfilled,updated_at)
+    VALUES(?,?,?,?,?,?,'{}',?,?,?,?,?,?,?,?,?,?,?,unixepoch())
     ON CONFLICT(project_id,year,week) DO UPDATE SET
       exec_summary=excluded.exec_summary,
       highlights_json=excluded.highlights_json,
@@ -605,7 +611,12 @@ async function generateReportRow(proj, year, week) {
       milestone_alpha_end=excluded.milestone_alpha_end,
       milestone_beta_end=excluded.milestone_beta_end,
       milestone_ga_end=excluded.milestone_ga_end,
-      updated_at=unixepoch()`).run(proj.id, year, week, execSummary, JSON.stringify(highlights), JSON.stringify(risks), JSON.stringify(resolvedWs), JSON.stringify(epics), etaIso, etaDelayed ? 1 : 0, milestoneEnds.milestone_alpha, milestoneEnds.milestone_beta, milestoneEnds.milestone_ga, backfilled);
+      milestone_alpha_status=excluded.milestone_alpha_status,
+      milestone_beta_status=excluded.milestone_beta_status,
+      milestone_ga_status=excluded.milestone_ga_status,
+      updated_at=unixepoch()`).run(proj.id, year, week, execSummary, JSON.stringify(highlights), JSON.stringify(risks), JSON.stringify(resolvedWs), JSON.stringify(epics), etaIso, etaDelayed ? 1 : 0,
+      milestoneEnds.milestone_alpha, milestoneEnds.milestone_beta, milestoneEnds.milestone_ga,
+      milestoneStatuses.milestone_alpha, milestoneStatuses.milestone_beta, milestoneStatuses.milestone_ga, backfilled);
 }
 
 app.post('/projects/:slug/reports/generate', requireAuth, async (req, res) => {
@@ -691,15 +702,21 @@ function buildReportHtml(proj, report, year, week, isOwner, lang, userName) {
     resolvedWs = live.resolvedWs;
     epicsForView = live.epics;
   }
-  // Up to 3 fixed milestone chips (Alpha/Beta/GA — see FUNCTIONAL_RULES.md "Milestones"), each
-  // only included if the project actually named that epic. Dates come from this report's own
-  // frozen snapshot columns, same "never silently change on an old week" rule as eta_snapshot — a
-  // legacy row from before these columns existed just has NULL in all three, so nothing shows.
+  // Up to 3 fixed milestone lines (Alpha/Beta/GA — see FUNCTIONAL_RULES.md "Milestones"), each
+  // only included if the project actually named that epic. Dates/statuses come from this report's
+  // own frozen snapshot columns, same "never silently change on an old week" rule as eta_snapshot —
+  // a legacy row from before these columns existed just has NULL in all three, so nothing shows.
+  // "done" is a past-dated milestone whose epic is actually Done — shown as "DONE" instead of a
+  // stale-looking expired date. Evaluated against today (not the report's own week) since it's
+  // read-time framing, same as the Gantt's own "Today" marker.
+  const todayIso = new Date().toISOString().slice(0, 10);
   const milestonesForView = [
-    { name: 'Alpha', key: proj.milestone_alpha, end: report.milestone_alpha_end },
-    { name: 'Beta',  key: proj.milestone_beta,  end: report.milestone_beta_end },
-    { name: 'GA',    key: proj.milestone_ga,    end: report.milestone_ga_end }
-  ].filter(m => m.key);
+    { name: 'Alpha', key: proj.milestone_alpha, end: report.milestone_alpha_end, status: report.milestone_alpha_status },
+    { name: 'Beta',  key: proj.milestone_beta,  end: report.milestone_beta_end,  status: report.milestone_beta_status },
+    { name: 'GA',    key: proj.milestone_ga,    end: report.milestone_ga_end,    status: report.milestone_ga_status }
+  ]
+    .filter(m => m.key)
+    .map(m => ({ ...m, done: !!(m.end && m.end < todayIso && jira.mapStatus(m.status) === 'done') }));
 
   const stats = { done:0, prog:0, blk:0, ts:0, total: resolvedWs.length };
   resolvedWs.forEach(ws => stats[ws.status] = (stats[ws.status]||0)+1);
