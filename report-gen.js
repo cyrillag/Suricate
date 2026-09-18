@@ -83,7 +83,17 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
   // status has already been mapped to done/prog/blk/ts, which a cancelled epic is
   // indistinguishable from (this used to be checked here against a 'cancel' bucket that
   // mapStatus can never actually produce, so it silently never filtered anything).
-  const ganttEpics = epics;
+  // An epic that already ended more than 6 months ago is dropped entirely — long-finished history
+  // cluttering a weekly status view without adding anything a PM needs *now*, and it was also
+  // dragging the timeline's own start further and further into the past the older a project gets.
+  // Evaluated against today (view time), same read-time framing as the "Today" marker itself, not
+  // frozen to the report's own week — an old report viewed later declutters the same way. Never
+  // filters on Start date: an epic still open (no End date) stays regardless of how long ago it
+  // started, since it isn't "history" yet.
+  const historyFloor = new Date();
+  historyFloor.setMonth(historyFloor.getMonth() - 6);
+  const historyFloorIso = historyFloor.toISOString().slice(0, 10);
+  const ganttEpics = epics.filter(e => !e.end || e.end >= historyFloorIso);
   const hasPartialDates = ganttEpics.some(e => (e.start && !e.end) || (!e.start && e.end));
 
   // Donut data
