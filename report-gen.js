@@ -346,9 +346,19 @@ function buildGanttMonths(tstart, tend) {
 }
 
 function GANTT_JS(epics) {
-  const datedStarts = epics.map(e => e.start).filter(Boolean);
-  const TSTART_DATE = datedStarts.length ? datedStarts.reduce((m, s) => s < m ? s : m) : '2025-09-01';
-  const tstart = new Date(Math.min(new Date(TSTART_DATE), new Date('2025-09-01')));
+  // The timeline's own start is always exactly 6 months before today — same rolling-window rule
+  // ganttEpics is filtered by above (FUNCTIONAL_RULES.md "Planning / Gantt"), applied to the axis
+  // itself rather than just the row list. It no longer extends back to cover an epic's own Start
+  // date the way it briefly did (that was to fix a header/marker misalignment bug, not to show more
+  // history) — an epic starting earlier than the floor still renders, its bar just runs off the
+  // left edge instead of being traceable back to its exact start, which is the intended declutter.
+  // Normalized to the 1st of the month so it lines up exactly with buildGanttMonths' own
+  // month-column boundaries (a mid-month tstart would desync position 0% from the first column).
+  const now = new Date();
+  const tstart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 6, 1));
+  // Still a fixed date, not derived from `now` — unrelated to this change, but worth flagging: once
+  // "today" gets within ~6 months of this, tstart would overtake it. Whoever bumps this later should
+  // check tstart/tend don't invert.
   const tend   = new Date('2026-11-30');
   const ts = tstart.toISOString().slice(0, 10);
   const te = tend.toISOString().slice(0, 10);
