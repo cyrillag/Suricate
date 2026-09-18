@@ -52,6 +52,7 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 .btn-ghost:hover{border-color:var(--cobalt);color:var(--cobalt)}
 .btn-ghost.btn-danger:hover{border-color:var(--blk);color:var(--blk)}
 .btn-sm{padding:6px 12px;font-size:12px}
+.btn-icon{padding:6px 9px;font-size:15px;line-height:1}
 .btn-full{width:100%;justify-content:center}
 .btn-remove{background:none;border:none;color:var(--tx2);cursor:pointer;font-size:16px;padding:2px 6px;flex-shrink:0;opacity:.5}
 .btn-remove:hover{opacity:1;color:var(--blk)}

@@ -156,6 +156,14 @@ GA. Project Identity can show one end date per phase a project actually has.
   all is read live from `projects`, only the date shown per line is frozen) — unlike the rest of
   this app's frozen-snapshot fields, since which phases a project tracks is closer to a project
   identity fact than a weekly status.
+- **A milestone whose date has passed AND whose epic is actually Done shows "DONE" instead of the
+  now-stale-looking past date** — a completed Alpha showing e.g. "28 Nov 2025" months later reads
+  as an overdue warning rather than a finished phase. Both the raw Jira status (`milestone_*_status`
+  columns) and the date are frozen per report like everything else here, but "is the date in the
+  past" is evaluated against *today* (real time, at view time) rather than the report's own week —
+  the same read-time framing the Gantt's own "Today" marker already uses, not a frozen fact about
+  that week. A milestone that's Done but whose date is still in the future (an unusual/inconsistent
+  data state) keeps showing the date, not "DONE" — both conditions are required.
 - The Deliverable matrix is always flat, never grouped by milestone — the retired auto-grouping
   attempt tried this and it's not part of the current design; regrouping it around these 3 fixed
   fields wouldn't actually solve the problem that got the old mechanism retired (see above), since
@@ -441,6 +449,13 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   it shares the same logo/divider/name/tagline lockup (`.auth-brand`), sized larger, since this is
   the first screen a new project manager sees and it's meant to read as a landing page, not a bare
   form.
+- **The link to a project's settings (Edit page) is a bare gear icon (⚙, `.btn-icon`)**, not a
+  labelled button — a settings/configure action is common enough across software that the icon
+  alone reads clearly, and it matters here specifically because the report page's header is already
+  crowded (Export PDF, this, Refresh, week-nav all compete for the same row). Still owner-gated like
+  Refresh, and still carries `title`/`aria-label="Configure"` for anyone who needs the text. Present
+  on both the project detail page and the report page itself — added to the latter so a PM
+  reviewing their own report doesn't have to navigate back to project detail first to fix something.
 - **Week navigation (`.week-nav`: previous/current/next) always sits in the same spot — the
   top-right of `.page-header`, next to the back-link — on every week-scoped page**, whether it's an
   actual report or the "No report for this week" page. Both pages link the same shared
