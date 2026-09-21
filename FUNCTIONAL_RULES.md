@@ -188,13 +188,27 @@ path (`refreshFullEpicTree`).
 
 - **Scope comes from BigPicture, not a second, divergent source of truth.** The whole point of this
   feature is that a PM has already configured which Jira sources populate their BigPicture "box" —
-  Planning Light reads that configuration (`bigpicture.js`'s `getScopeDefinition`, the box's
-  `narrowingQuery` JQL plus any individually pinned `manuallyAddedTasks`) and runs it through this
-  app's own plain Jira search (`jira.js`'s `searchByJql`), rather than re-deriving scope from a
-  fixed root epic the way the classic Gantt does. This is also what replaced the retired
-  `extra_epics` manual-pin field (see "Milestones" above's Planning/Gantt section) — the problem
-  `extra_epics` was a workaround for (an epic belonging outside the root epic's own hierarchy) is
-  what BigPicture's own scope config already solves properly.
+  Planning Light reads that configuration (`bigpicture.js`'s `getScopeDefinition`) and runs it
+  through this app's own plain Jira search (`jira.js`'s `searchByJql`), rather than re-deriving
+  scope from a fixed root epic the way the classic Gantt does. This is also what replaced the
+  retired `extra_epics` manual-pin field (see "Milestones" above's Planning/Gantt section) — the
+  problem `extra_epics` was a workaround for (an epic belonging outside the root epic's own
+  hierarchy) is what BigPicture's own scope config already solves properly.
+  - **A box's scope is usually expressed via `scopeDefinitionElements` (a saved Jira filter,
+    project, or Agile board picked in BigPicture's own UI), not via free JQL.** `narrowingQuery` is
+    a separate, optional raw-JQL override some PMs add on top of that, most often left blank —
+    verified empirically against a real box (`HYBR-95`): `narrowingQuery` was `""`, and its actual
+    ~250-issue scope came entirely from one `JIRA_FILTER` element. Each element type maps to its
+    own JQL clause (`JIRA_FILTER` → `filter = <id>`, `JIRA_PROJECT` → `project = <id>`,
+    `JIRA_AGILE_BOARD` → `board = <id>`, the last one unverified end-to-end against a real
+    board-scoped box). The scope-definition endpoint's actual payload also sits under an
+    undocumented `cargo` wrapper (`{currentVersion, latestVersion, cargo: {...}}`), not the response
+    root — the first implementation missed this and every box appeared to have zero scope until it
+    was caught.
+  - **A box's scope is not epic-only.** On that same real box, 246 issues were in scope but only 31
+    were Epics — the rest (mostly Task/Bug) report into their parent Epic via the classic "Epic
+    Link" field (`customfield_10000`), not the portfolio-parent field Epic-and-above levels use
+    (see hierarchy note below). See "granular work items" below for how these are handled.
 - **BigPicture's REST API uses a different base path and a different auth scheme from the rest of
   this app's Jira calls** — `Authorization: APIToken <token>` (env `BIGPICTURE_API_TOKEN`), not the
   `Bearer ${JIRA_TOKEN}` used everywhere else — hence its own module (`bigpicture.js`), same
@@ -203,12 +217,27 @@ path (`refreshFullEpicTree`).
   (`/rest/softwareplant-bigpicture/1.0` vs `/rest/bigpicture/1.0`) — `bpFetch` tries the new one
   first and falls back to the old one on a 404, since neither this app nor whoever configures a
   project's box ID necessarily knows which version the instance is on.
-- **Hierarchy is derived the same way the classic tree-walk already does it** (each issue's own
-  portfolio-parent field, `cf[16100]`/`customfield_16100`) — not from any BigPicture box-to-box
-  endpoint. BigPicture's own dedicated "list tasks in a box" endpoint only returns bare IDs and is
-  Cloud-only (confirmed unavailable for this on-premise instance) — reusing the existing Jira
-  hierarchy mechanism against the BigPicture-scoped issue set was the only viable path, and it also
-  means Planning Light didn't need to learn BigPicture's own internal task model at all.
+- **Hierarchy is derived from Jira's own parent fields, not from any BigPicture box-to-box
+  endpoint.** BigPicture's own dedicated "list tasks in a box" endpoint only returns bare IDs and is
+  Cloud-only (confirmed unavailable for this on-premise instance) — reusing Jira's own hierarchy
+  fields against the BigPicture-scoped issue set was the only viable path, and it also means
+  Planning Light didn't need to learn BigPicture's own internal task model at all. **Two different
+  fields are checked, since which one is populated depends on the issue's own level**: the
+  portfolio-parent field (`cf[16100]`/`customfield_16100` — the field the classic tree-walk already
+  uses) for Epic-and-above levels, and the classic "Epic Link" field (`customfield_10000`) for
+  Task/Bug/Story-level issues pointing at their parent Epic. On the real box tested, only 37 of 246
+  issues had `customfield_16100` set at all — the other 209 all used `customfield_10000` instead.
+  `jira.js`'s `searchByJql` fetches both and merges them into one `parentKey` per issue, since in
+  practice an issue only ever has one of the two populated.
+- **Granular work items (Task/Bug/Story/Sub-task/Improvement) still count toward their parent
+  Epic's rolled-up dates, but never get their own row.** A box's configured scope commonly includes
+  hundreds of these (see above) — rendering every one of them would be the exact opposite of
+  "light". `report-gen.js`'s `flattenPlanningTree` fetches and keeps them in the tree (so the
+  rollup pass in `buildPlanningTree` still sees them) but skips emitting a row for any node whose
+  Jira issue type is in a fixed `GRANULAR_TYPES` set. This is a different mechanism from a PM's
+  manual hide/unhide override — it's always-on and type-based, not stored in
+  `planning_overrides`, so a granular-type item is never individually addressable in Manage mode;
+  only Epic-and-above levels and synthetic groups are.
 - **A parent's Start/End dates are never read from Jira — they're always computed as the MIN start
   / MAX end of their children**, recursively, bottom-up (`buildPlanningTree`'s `rollup`). This
   applies to both a real Jira parent epic and a synthetic aggregate group (see below) — a group has
