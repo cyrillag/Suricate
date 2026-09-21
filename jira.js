@@ -138,15 +138,21 @@ async function getPortfolioEpics(token, rootEpic) {
   }));
 }
 
-// Planning Light (see FUNCTIONAL_RULES.md) — runs a Jira-authored JQL string (a BigPicture box's
-// own narrowingQuery, already configured by the PM inside BigPicture) rather than this file's own
-// portfolioChildrenOf walk, unioning in a set of individually-pinned keys (BigPicture's
-// manuallyAddedTasks) the same way extra_epics used to (the retired feature this replaces).
-// customfield_16100 (portfolio parent, JQL shorthand cf[16100] — same field getChildEpics already
-// walks) is fetched too, for the hierarchy/date-rollup pass against the scoped set.
+// Planning Light (see FUNCTIONAL_RULES.md) — runs the JQL a BigPicture box's own scope definition
+// resolves to (bigpicture.js) rather than this file's own portfolioChildrenOf walk, unioning in a
+// set of individually-pinned keys (BigPicture's manuallyAddedTasks) the same way extra_epics used
+// to (the retired feature this replaces).
+// A box's scope isn't epic-only (verified against a real box: 246 issues — 31 Epics, the rest
+// Task/Bug/Story/etc.) — those lower-level issues carry their parent Epic in the classic "Epic
+// Link" field (customfield_10000), not customfield_16100 (portfolio parent, JQL shorthand
+// cf[16100] — the field Epic-and-above levels use, and the same one getChildEpics already walks).
+// Only 37/246 issues on that real box had customfield_16100 set at all; the other 209 all had
+// customfield_10000 instead. Both are fetched and merged into a single parentKey per issue so the
+// hierarchy/rollup pass (server.js's buildPlanningTree) doesn't need to know which field applies —
+// an issue only ever has one of the two populated in practice.
 async function searchByJql(token, jqlClauses, extraKeys = []) {
   if (!jqlClauses.length && !extraKeys.length) return [];
-  const EPIC_FIELDS = 'summary,status,assignee,reporter,customfield_10110,customfield_10111,customfield_16100,issuetype';
+  const EPIC_FIELDS = 'summary,status,assignee,reporter,customfield_10110,customfield_10111,customfield_16100,customfield_10000,issuetype';
   const parts = jqlClauses.map(q => `(${q})`);
   if (extraKeys.length) parts.push(`issuekey in (${extraKeys.join(',')})`);
   let jql = `(${parts.join(' OR ')}) and status not in (Cancelled, Canceled)`;
@@ -155,12 +161,14 @@ async function searchByJql(token, jqlClauses, extraKeys = []) {
     key:       i.key,
     summary:   i.fields.summary,
     team:      extractTeam(i.key),
+    type:      i.fields.issuetype?.name || null,
     status:    i.fields.status?.name || 'To Do',
     assignee:  i.fields.assignee?.displayName || null,
     reporter:  i.fields.reporter?.displayName || null,
-    // Server sometimes returns this as a plain key string, sometimes as an object with a `.key` —
-    // observed inconsistently across custom field configs; normalize both.
-    parentKey: (i.fields.customfield_16100 && i.fields.customfield_16100.key) || i.fields.customfield_16100 || null,
+    // Server sometimes returns customfield_16100 as a plain key string, sometimes as an object
+    // with a `.key` — observed inconsistently across custom field configs; normalize both.
+    // customfield_10000 (Epic Link) is always a plain key string.
+    parentKey: (i.fields.customfield_16100 && i.fields.customfield_16100.key) || i.fields.customfield_16100 || i.fields.customfield_10000 || null,
     start:     i.fields.customfield_10110 || null,
     end:       i.fields.customfield_10111 || null
   }));

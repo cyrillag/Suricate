@@ -238,7 +238,8 @@ function buildPlanningTree(projectId, epics) {
     const ov = overrideByKey.get(e.key);
     byKey.set(e.key, {
       key: e.key, summary: (ov && ov.summary_override) || e.summary, status: jira.mapStatus(e.status),
-      start: e.start, end: e.end, hidden: !!(ov && ov.hidden),
+      type: e.type, start: e.start, end: e.end, hidden: !!(ov && ov.hidden),
+      groupId: (ov && ov.group_id) || null,
       // A manual group assignment overrides the node's natural Jira parent — moving it under a
       // PM-defined aggregate instead of (not in addition to) where BigPicture's scope put it.
       parentKey: (ov && ov.group_id ? `GROUP:${ov.group_id}` : e.parentKey) || null,

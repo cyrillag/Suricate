@@ -37,19 +37,41 @@ async function bpFetch(token, path) {
 }
 
 // The box's own configured scope — what a PM sees under Box Configuration > Tasks > Scope
-// definition in BigPicture itself. narrowingQuery is a JQL string; running it through the plain
-// Jira search API (jira.js) is how Planning Light gets "the same issues BigPicture shows" without
-// needing to understand BigPicture's own task model at all. manuallyAddedTasks are individually
-// pinned issues the JQL alone wouldn't match, unioned in the same way extra_epics used to be
-// (see jira.js's searchByJql) — the feature this replaces.
+// definition in BigPicture itself. Verified empirically against a real box (HYBR-95): the actual
+// payload is wrapped in a currentVersion/latestVersion/cargo envelope (undocumented anywhere
+// obvious) — the scope data itself is at `cargo`, not the response root. And a box's scope is
+// usually expressed via one or more `scopeDefinitionElements` (a saved Jira filter, project, or
+// Agile board picked in BigPicture's own UI) rather than as free JQL — `narrowingQuery` is a
+// separate, optional raw-JQL override on top, most often left blank (HYBR-95 itself has
+// narrowingQuery:"" with its real ~260-issue scope coming entirely from one JIRA_FILTER element).
 async function getScopeDefinition(token, boxId) {
   const data = await bpFetch(token, `/public/ppm/box/area/task/scope/def/own/${boxId}`);
-  const platforms = data.extPlatformScopeDefinitions || [];
-  // A box can have more than one scope-definition entry (rare, e.g. mixed sources) — every JQL
-  // clause gets OR'd together rather than picking just the first, so nothing configured in
-  // BigPicture silently drops out here.
-  const queries = platforms.map(p => p.narrowingQuery).filter(Boolean);
-  const manualKeys = platforms.flatMap(p => (p.manuallyAddedTasks || []).map(t => t.key || t.externalId).filter(Boolean));
+  const cargo = data.cargo || data;
+  const platforms = cargo.extPlatformScopeDefinitions || [];
+  const queries = [];
+  const manualKeys = [];
+  // A box can have more than one scope-definition entry (rare, e.g. mixed sources), and each entry
+  // can itself have several elements — every clause gets OR'd together (via jira.js's searchByJql)
+  // rather than picking just the first, so nothing configured in BigPicture silently drops out.
+  platforms.forEach(p => {
+    (p.scopeDefinitionElements || []).forEach(el => {
+      // isAvailable/isAccessible false means the referenced filter/project/board no longer exists
+      // or the service account can't see it — skip rather than send Jira a JQL clause referencing
+      // something it will just reject.
+      if (el.isAvailable === false || el.isAccessible === false) return;
+      if (el.type === 'JIRA_FILTER') queries.push(`filter = ${el.value}`);
+      else if (el.type === 'JIRA_PROJECT') queries.push(`project = ${el.value}`);
+      // Unverified against a real board-scoped box — Jira Software's JQL registers `board =` when
+      // the Agile plugin is present, which it is here, but this specific clause hasn't been tested
+      // end-to-end the way JIRA_FILTER has.
+      else if (el.type === 'JIRA_AGILE_BOARD') queries.push(`board = ${el.value}`);
+    });
+    if (p.narrowingQuery) queries.push(p.narrowingQuery);
+    (p.manuallyAddedTasks || []).forEach(t => {
+      const k = t.key || t.externalId;
+      if (k) manualKeys.push(k);
+    });
+  });
   return { queries, manualKeys };
 }
 

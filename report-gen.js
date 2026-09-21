@@ -371,13 +371,26 @@ function buildGanttMonths(tstart, tend) {
 // per visible node with a depth for indentation. Deliberately does NOT skip a hidden node's
 // children (see the comment at planningRows' call site above) — only the hidden node's own row is
 // left for the caller to filter out.
+//
+// A BigPicture box's configured scope isn't epic-only — verified against a real box (HYBR-95):
+// 246 issues in scope, only 31 of them Epics, the rest Task/Bug/Story/etc. reporting into those
+// epics via the classic Epic Link field (see jira.js's searchByJql). Rendering all 246 as rows
+// would be the exact opposite of "light" — GRANULAR_TYPES are still fetched and still count
+// toward their parent's rollup dates (server.js's buildPlanningTree runs before this, over the
+// full set), they just never get their own row here. Not the same mechanism as a PM's manual
+// hide/unhide override (planning_overrides) — this is a fixed, always-on declutter by issue type,
+// so a granular-type row can never be "unhidden" via Manage mode; only Epic-and-above levels (plus
+// synthetic groups) are ever individually addressable there.
+const GRANULAR_TYPES = new Set(['Task', 'Sub-task', 'Subtask', 'Bug', 'Story', 'Improvement']);
 function flattenPlanningTree(tree, depth = 0, out = []) {
   tree.forEach(node => {
-    out.push({
-      key: node.key, summary: node.summary, status: node.status || 'ts',
-      start: node.start, end: node.end, depth, hasChildren: node.children.length > 0,
-      isGroup: node.key.startsWith('GROUP:'), hidden: !!node.hidden, groupId: node.groupId || null
-    });
+    if (!GRANULAR_TYPES.has(node.type)) {
+      out.push({
+        key: node.key, summary: node.summary, status: node.status || 'ts',
+        start: node.start, end: node.end, depth, hasChildren: node.children.length > 0,
+        isGroup: node.key.startsWith('GROUP:'), hidden: !!node.hidden, groupId: node.groupId || null
+      });
+    }
     if (node.children.length) flattenPlanningTree(node.children, depth + 1, out);
   });
   return out;
