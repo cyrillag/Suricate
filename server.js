@@ -4,6 +4,7 @@ const path       = require('path');
 const puppeteer  = require('puppeteer-core');
 const db         = require('./db');
 const jira       = require('./jira');
+const bigpicture = require('./bigpicture');
 const confluence = require('./confluence');
 const genReport  = require('./report-gen');
 const qualityCheck = require('./quality-check');
@@ -19,6 +20,10 @@ const JIRA_TOKEN = process.env.JIRA_SERVICE_TOKEN;
 if (!JIRA_TOKEN) console.warn('WARNING: JIRA_SERVICE_TOKEN not set — Jira API calls will fail.');
 const CONFLUENCE_TOKEN = process.env.CONFLUENCE_SERVICE_TOKEN;
 if (!CONFLUENCE_TOKEN) console.warn('WARNING: CONFLUENCE_SERVICE_TOKEN not set — Confluence sync will be unavailable.');
+// Only needed by projects that opt into Planning Light (projects.bigpicture_box_id) — most
+// projects don't, so this warning is informational, not fatal, unlike the two above.
+const BIGPICTURE_TOKEN = process.env.BIGPICTURE_API_TOKEN;
+if (!BIGPICTURE_TOKEN) console.warn('WARNING: BIGPICTURE_API_TOKEN not set — Planning Light will be unavailable.');
 
 // No fallback: a hardcoded default here would let anyone who reads this (public) source forge
 // session cookies for any deployment that forgot to set the real secret.
@@ -164,7 +169,7 @@ const upsertWorkstreamFromConfluence = db.prepare(`
   ON CONFLICT(project_id,deliverable,name) DO UPDATE SET
     team=excluded.team, jira_key=excluded.jira_key, default_status=excluded.default_status, sort_order=excluded.sort_order`);
 
-const insEpicCache = db.prepare('INSERT OR REPLACE INTO epics_cache(project_id,jira_key,summary,team,status,start_date,end_date,assignee,reporter,cached_at) VALUES(?,?,?,?,?,?,?,?,?,unixepoch())');
+const insEpicCache = db.prepare('INSERT OR REPLACE INTO epics_cache(project_id,jira_key,summary,team,status,start_date,end_date,assignee,reporter,parent_key,cached_at) VALUES(?,?,?,?,?,?,?,?,?,?,unixepoch())');
 
 // Full tree-walk auto-discovery from a root LVL2 epic — creates BOTH the workstream list
 // (grouped by team) AND epics_cache. Used only for projects with no Confluence page: once a
@@ -174,7 +179,7 @@ const insEpicCache = db.prepare('INSERT OR REPLACE INTO epics_cache(project_id,j
 async function seedWorkstreamsFromJiraTree(projectId, rootEpic) {
   const epics = await jira.getChildEpics(JIRA_TOKEN, rootEpic);
   epics.forEach((e, i) => {
-    insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter);
+    insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter, null);
     upsertWorkstreamFromJira.run(projectId, e.deliverable, e.summary, e.team, e.key, i);
   });
   reconcileWorkstreams(projectId, epics.map(e => ({ deliverable: e.deliverable, name: e.summary })));
@@ -189,7 +194,7 @@ async function seedWorkstreamsFromJiraTree(projectId, rootEpic) {
 async function refreshEpicStatuses(projectId, jiraKeyFields) {
   const keys = [...new Set(jiraKeyFields.flatMap(splitJiraKeys))];
   const epics = await jira.getEpicsByKeys(JIRA_TOKEN, keys);
-  epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter));
+  epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter, null));
   return epics.length;
 }
 
@@ -197,11 +202,86 @@ async function refreshEpicStatuses(projectId, jiraKeyFields) {
 // Planning/Gantt section is meant to show every epic under the root LVL2 — including ones no PM
 // has (yet) added to the Confluence "Deliverables status" table. This walks the full Jira tree
 // and writes epics_cache only, never touching workstreams, so it's safe to run alongside a
-// Confluence-backed project without duplicating or overriding the matrix.
+// Confluence-backed project without duplicating or overriding the matrix. Used only for a project
+// with no bigpicture_box_id set — see resolvePlanningTree for the alternative, BigPicture-scoped
+// path (FUNCTIONAL_RULES.md "Planning Light").
 async function refreshFullEpicTree(projectId, rootEpic) {
   const epics = await jira.getPortfolioEpics(JIRA_TOKEN, rootEpic);
-  epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter));
+  epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter, null));
   return epics.length;
+}
+
+// Planning Light (see FUNCTIONAL_RULES.md): the scope comes from BigPicture's own box
+// configuration, not a raw Jira portfolio walk. Fetches the box's narrowingQuery/manuallyAddedTasks
+// (bigpicture.js), runs that JQL through the plain Jira search API (jira.js's searchByJql), caches
+// the result into epics_cache like every other epic-fetching path here, then builds the tree.
+async function resolvePlanningTree(projectId, boxId) {
+  const { queries, manualKeys } = await bigpicture.getScopeDefinition(BIGPICTURE_TOKEN, boxId);
+  const epics = await jira.searchByJql(JIRA_TOKEN, queries, manualKeys);
+  epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter, e.parentKey));
+  return buildPlanningTree(projectId, epics);
+}
+
+// Builds the hierarchy from a freshly-fetched BigPicture-scoped epic set — not re-read from
+// epics_cache, which can carry rows from other sync paths sharing that same table (Confluence
+// Sync Jira, seedWorkstreamsFromJiraTree, refreshFullEpicTree) that have nothing to do with this
+// project's Planning Light scope. Applies the PM's local hide/rename/group overrides, then rolls
+// dates up from leaves to root (a parent's own dates are never used, only computed — see
+// FUNCTIONAL_RULES.md "level above inherits from below").
+function buildPlanningTree(projectId, epics) {
+  const overrides = db.prepare('SELECT * FROM planning_overrides WHERE project_id=?').all(projectId);
+  const overrideByKey = new Map(overrides.map(o => [o.jira_key, o]));
+  const groups = db.prepare('SELECT * FROM planning_groups WHERE project_id=? ORDER BY sort_order').all(projectId);
+
+  const byKey = new Map();
+  epics.forEach(e => {
+    const ov = overrideByKey.get(e.key);
+    byKey.set(e.key, {
+      key: e.key, summary: (ov && ov.summary_override) || e.summary, status: jira.mapStatus(e.status),
+      start: e.start, end: e.end, hidden: !!(ov && ov.hidden),
+      // A manual group assignment overrides the node's natural Jira parent — moving it under a
+      // PM-defined aggregate instead of (not in addition to) where BigPicture's scope put it.
+      parentKey: (ov && ov.group_id ? `GROUP:${ov.group_id}` : e.parentKey) || null,
+      children: []
+    });
+  });
+  // A group is a synthetic node — no Jira data of its own, so no status/dates until rollup below.
+  groups.forEach(g => {
+    const ov = overrideByKey.get(`GROUP:${g.id}`);
+    byKey.set(`GROUP:${g.id}`, {
+      key: `GROUP:${g.id}`, summary: (ov && ov.summary_override) || g.name, status: null,
+      start: null, end: null, hidden: !!(ov && ov.hidden), parentKey: null, children: []
+    });
+  });
+
+  const roots = [];
+  byKey.forEach(node => {
+    if (node.parentKey && byKey.has(node.parentKey)) byKey.get(node.parentKey).children.push(node);
+    else roots.push(node);
+  });
+
+  // Post-order: a hidden node still counts toward its parent's rollup (hiding is a display choice
+  // for the report, not a claim that the work doesn't exist) — only the renderer skips drawing it.
+  function rollup(node) {
+    if (!node.children.length) return node;
+    node.children.forEach(rollup);
+    const starts = node.children.map(c => c.start).filter(Boolean);
+    const ends   = node.children.map(c => c.end).filter(Boolean);
+    node.start = starts.length ? starts.reduce((a, b) => a < b ? a : b) : null;
+    node.end   = ends.length ? ends.reduce((a, b) => a > b ? a : b) : null;
+    if (node.status === null) {
+      // Same worst-of precedence as every other status roll-up in this app (deliverable-level,
+      // multi-epic workstreams): Done only if every child is, otherwise Blocked beats In Progress
+      // beats To Start.
+      const statuses = node.children.map(c => c.status);
+      node.status = statuses.every(s => s === 'done') ? 'done'
+        : statuses.some(s => s === 'blk') ? 'blk'
+        : statuses.some(s => s === 'prog') ? 'prog' : 'ts';
+    }
+    return node;
+  }
+  roots.forEach(rollup);
+  return roots;
 }
 
 // Deletes any workstream row for this project that the current parse no longer produces.
@@ -444,8 +524,8 @@ app.get('/projects/:slug/edit', requireAuth, (req, res) => {
 app.post('/projects/:slug/edit', requireAuth, async (req, res) => {
   const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
   if (!proj) return res.status(404).send('Project not found.');
-  const { name, jira_root_epic, confluence_url, milestone_alpha, milestone_beta, milestone_ga } = req.body;
-  const rerender = error => res.render('project-edit', { proj: { ...proj, name, jira_root_epic, milestone_alpha, milestone_beta, milestone_ga }, confluenceUrl: confluence_url, error, userName: req.session.userName });
+  const { name, jira_root_epic, confluence_url, milestone_alpha, milestone_beta, milestone_ga, bigpicture_box_id } = req.body;
+  const rerender = error => res.render('project-edit', { proj: { ...proj, name, jira_root_epic, milestone_alpha, milestone_beta, milestone_ga, bigpicture_box_id }, confluenceUrl: confluence_url, error, userName: req.session.userName });
 
   if (!name?.trim() || !jira_root_epic?.trim()) return rerender(res.locals.t('editProject.err_required'));
   const confPage = await confluence.resolvePageUrl(CONFLUENCE_TOKEN, confluence_url);
@@ -456,10 +536,15 @@ app.post('/projects/:slug/edit', requireAuth, async (req, res) => {
   try { eta = formatDate((await jira.getRootEpicMeta(JIRA_TOKEN, epic)).eta); }
   catch (err) { console.warn(`Could not read ETA from ${epic}: ${err.message}`); }
 
+  // Free-form (no key-shape validation like the milestone fields get): a BigPicture box ID isn't
+  // always a Jira-issue-shaped key (see FUNCTIONAL_RULES.md "Planning Light") — just trim it to a
+  // plain string, or null out an emptied field.
+  const boxId = (bigpicture_box_id || '').trim() || null;
+
   db.prepare(`UPDATE projects SET name=?,jira_root_epic=?,eta=?,confluence_space=?,confluence_page=?,
-      milestone_alpha=?,milestone_beta=?,milestone_ga=? WHERE id=?`)
+      milestone_alpha=?,milestone_beta=?,milestone_ga=?,bigpicture_box_id=? WHERE id=?`)
     .run(name.trim(), epic, eta, confPage.space, confPage.page,
-      parseMilestoneEpic(milestone_alpha), parseMilestoneEpic(milestone_beta), parseMilestoneEpic(milestone_ga), proj.id);
+      parseMilestoneEpic(milestone_alpha), parseMilestoneEpic(milestone_beta), parseMilestoneEpic(milestone_ga), boxId, proj.id);
 
   res.redirect(`/projects/${proj.slug}`);
 });
@@ -574,6 +659,17 @@ async function generateReportRow(proj, year, week) {
     catch (err) { console.warn(`Could not read End date from ${proj[field]}: ${err.message}`); }
   }
 
+  // Planning Light (see FUNCTIONAL_RULES.md): when a project has opted in via bigpicture_box_id,
+  // the Planning section's tree comes from BigPicture's own configured scope instead of the flat
+  // jira_root_epic walk — resolved and frozen here, same re-read-on-every-generate treatment as
+  // the ETA/milestones above. Left null (rendering falls back to the existing flat epics_snapshot
+  // view) on any failure, so a BigPicture outage doesn't block report generation.
+  let planningTree = null;
+  if (proj.bigpicture_box_id && BIGPICTURE_TOKEN) {
+    try { planningTree = await resolvePlanningTree(proj.id, proj.bigpicture_box_id); }
+    catch (err) { console.warn(`Could not resolve Planning Light tree for box ${proj.bigpicture_box_id}: ${err.message}`); }
+  }
+
   // Delayed = later than the most recent *existing* prior report's own frozen eta_snapshot —
   // not necessarily literally last week, so backfilling a gap still compares against the right
   // baseline. Never true if either side is unknown (no prior report yet, or no End date set).
@@ -589,14 +685,15 @@ async function generateReportRow(proj, year, week) {
   // regenerated at all — but the intent is "set once at creation", not "recomputed every write").
   const backfilled = isPastWeek(year, week) ? 1 : 0;
 
-  db.prepare(`INSERT INTO reports(project_id,year,week,exec_summary,highlights_json,risks_json,workstream_statuses_json,workstreams_snapshot_json,epics_snapshot_json,eta_snapshot,eta_delayed,milestone_alpha_end,milestone_beta_end,milestone_ga_end,milestone_alpha_status,milestone_beta_status,milestone_ga_status,backfilled,updated_at)
-    VALUES(?,?,?,?,?,?,'{}',?,?,?,?,?,?,?,?,?,?,?,unixepoch())
+  db.prepare(`INSERT INTO reports(project_id,year,week,exec_summary,highlights_json,risks_json,workstream_statuses_json,workstreams_snapshot_json,epics_snapshot_json,planning_snapshot_json,eta_snapshot,eta_delayed,milestone_alpha_end,milestone_beta_end,milestone_ga_end,milestone_alpha_status,milestone_beta_status,milestone_ga_status,backfilled,updated_at)
+    VALUES(?,?,?,?,?,?,'{}',?,?,?,?,?,?,?,?,?,?,?,?,unixepoch())
     ON CONFLICT(project_id,year,week) DO UPDATE SET
       exec_summary=excluded.exec_summary,
       highlights_json=excluded.highlights_json,
       risks_json=excluded.risks_json,
       workstreams_snapshot_json=excluded.workstreams_snapshot_json,
       epics_snapshot_json=excluded.epics_snapshot_json,
+      planning_snapshot_json=excluded.planning_snapshot_json,
       eta_snapshot=excluded.eta_snapshot,
       eta_delayed=excluded.eta_delayed,
       milestone_alpha_end=excluded.milestone_alpha_end,
@@ -605,7 +702,7 @@ async function generateReportRow(proj, year, week) {
       milestone_alpha_status=excluded.milestone_alpha_status,
       milestone_beta_status=excluded.milestone_beta_status,
       milestone_ga_status=excluded.milestone_ga_status,
-      updated_at=unixepoch()`).run(proj.id, year, week, execSummary, JSON.stringify(highlights), JSON.stringify(risks), JSON.stringify(resolvedWs), JSON.stringify(epics), etaIso, etaDelayed ? 1 : 0,
+      updated_at=unixepoch()`).run(proj.id, year, week, execSummary, JSON.stringify(highlights), JSON.stringify(risks), JSON.stringify(resolvedWs), JSON.stringify(epics), planningTree ? JSON.stringify(planningTree) : null, etaIso, etaDelayed ? 1 : 0,
       milestoneEnds.milestone_alpha, milestoneEnds.milestone_beta, milestoneEnds.milestone_ga,
       milestoneStatuses.milestone_alpha, milestoneStatuses.milestone_beta, milestoneStatuses.milestone_ga, backfilled);
 }
@@ -645,7 +742,10 @@ app.post('/projects/:slug/reports/generate', requireAuth, async (req, res) => {
   try {
     if (proj.confluence_space && proj.confluence_page) {
       await syncConfluenceProject(proj.id, proj.confluence_space, proj.confluence_page);
-      await refreshFullEpicTree(proj.id, proj.jira_root_epic);
+      // Planning Light projects get their epics_cache population from resolvePlanningTree instead
+      // (called inside generateReportRow, right below) — running both would just double the Jira
+      // calls for a flat epic set the BigPicture-scoped Planning section no longer renders.
+      if (!proj.bigpicture_box_id) await refreshFullEpicTree(proj.id, proj.jira_root_epic);
     } else {
       await seedWorkstreamsFromJiraTree(proj.id, proj.jira_root_epic);
     }
@@ -673,6 +773,70 @@ app.post('/projects/:slug/reports/:yearweek(\\d{4}-W\\d{2})/delete', requireAuth
   res.redirect(`/projects/${proj.slug}`);
 });
 
+// ── PLANNING LIGHT — owner-local declutter/edit ────────────────────
+// Hide/rename/group are Suricate-local only (see FUNCTIONAL_RULES.md "Planning Light") — never
+// written back to Jira (that's the deferred Phase 2). Each route redirects back to whichever
+// report the form was submitted from; a change only actually appears there once that report is
+// next regenerated (frozen-snapshot rule, same as everywhere else in this app) — the report page's
+// Manage-mode hint says so, rather than faking a live preview here.
+function planningRedirect(proj, redirect) {
+  return /^\d{4}-W\d{2}$/.test(redirect || '') ? `/projects/${proj.slug}/${redirect}` : `/projects/${proj.slug}`;
+}
+
+app.post('/projects/:slug/planning/hide', requireAuth, (req, res) => {
+  const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
+  if (!proj) return res.status(404).send('Project not found.');
+  const { jira_key, hidden, redirect } = req.body;
+  if (jira_key) {
+    db.prepare(`INSERT INTO planning_overrides(project_id, jira_key, hidden) VALUES(?,?,?)
+      ON CONFLICT(project_id, jira_key) DO UPDATE SET hidden=excluded.hidden, updated_at=unixepoch()`)
+      .run(proj.id, jira_key, hidden ? 1 : 0);
+  }
+  res.redirect(planningRedirect(proj, redirect));
+});
+
+app.post('/projects/:slug/planning/rename', requireAuth, (req, res) => {
+  const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
+  if (!proj) return res.status(404).send('Project not found.');
+  const { jira_key, summary_override, redirect } = req.body;
+  if (jira_key) {
+    const override = (summary_override || '').trim() || null;
+    db.prepare(`INSERT INTO planning_overrides(project_id, jira_key, summary_override) VALUES(?,?,?)
+      ON CONFLICT(project_id, jira_key) DO UPDATE SET summary_override=excluded.summary_override, updated_at=unixepoch()`)
+      .run(proj.id, jira_key, override);
+  }
+  res.redirect(planningRedirect(proj, redirect));
+});
+
+app.post('/projects/:slug/planning/group/create', requireAuth, (req, res) => {
+  const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
+  if (!proj) return res.status(404).send('Project not found.');
+  const { name, redirect } = req.body;
+  if (name?.trim()) {
+    db.prepare('INSERT INTO planning_groups(project_id, name) VALUES(?,?)').run(proj.id, name.trim());
+  }
+  res.redirect(planningRedirect(proj, redirect));
+});
+
+app.post('/projects/:slug/planning/group/assign', requireAuth, (req, res) => {
+  const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
+  if (!proj) return res.status(404).send('Project not found.');
+  const { jira_key, group_id, redirect } = req.body;
+  if (jira_key) {
+    const gid = group_id ? parseInt(group_id, 10) : null;
+    // A group_id could otherwise come from another project's table row entirely — cheap to check
+    // given how rarely this route fires, and it stops one owner reparenting under a group that
+    // isn't theirs.
+    const validGroup = gid ? db.prepare('SELECT 1 FROM planning_groups WHERE id=? AND project_id=?').get(gid, proj.id) : true;
+    if (validGroup) {
+      db.prepare(`INSERT INTO planning_overrides(project_id, jira_key, group_id) VALUES(?,?,?)
+        ON CONFLICT(project_id, jira_key) DO UPDATE SET group_id=excluded.group_id, updated_at=unixepoch()`)
+        .run(proj.id, jira_key, gid);
+    }
+  }
+  res.redirect(planningRedirect(proj, redirect));
+});
+
 // ── REPORT VIEW ───────────────────────────────────────────────────
 // Shared by the HTML report view and the PDF export route — a report row plus the project/owner/
 // locale context around it is everything genReport() needs, regardless of which one asked for it.
@@ -693,6 +857,11 @@ function buildReportHtml(proj, report, year, week, isOwner, lang, userName) {
     resolvedWs = live.resolvedWs;
     epicsForView = live.epics;
   }
+  // Planning Light's tree (see FUNCTIONAL_RULES.md) — frozen alongside everything else above, so
+  // an old week's report never changes because a PM hid/renamed/regrouped something afterward.
+  // null for every project that hasn't opted in (no bigpicture_box_id) or predates this feature —
+  // report-gen.js falls back to the flat epicsForView list in that case.
+  const planningTree = report.planning_snapshot_json ? JSON.parse(report.planning_snapshot_json) : null;
   // Up to 3 fixed milestone lines (Alpha/Beta/GA — see FUNCTIONAL_RULES.md "Milestones"), each
   // only included if the project actually named that epic. Dates/statuses come from this report's
   // own frozen snapshot columns, same "never silently change on an old week" rule as eta_snapshot —
@@ -753,6 +922,7 @@ function buildReportHtml(proj, report, year, week, isOwner, lang, userName) {
     workstreams: resolvedWs,
     milestones: milestonesForView,
     epics: epicsForView,
+    planningTree,
     stats, health, isOwner,
     backfilled: !!report.backfilled,
     generatedAt: formatDate(new Date(report.created_at * 1000).toISOString()),

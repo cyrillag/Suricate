@@ -6,7 +6,7 @@ const { translate } = require('./i18n');
 // "settings" glyph — a well-known, simple outline shape.
 const GEAR_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>';
 
-function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, milestones = [], epics, stats, health, isOwner, etaDelayed, etaDelayedFrom, etaDisplay, lang, userName, backfilled, generatedAt, confluenceUrl = null }) {
+function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, milestones = [], epics, planningTree = null, stats, health, isOwner, etaDelayed, etaDelayedFrom, etaDisplay, lang, userName, backfilled, generatedAt, confluenceUrl = null }) {
   // milestones: up to 3 fixed, manually-configured phases (Alpha/Beta/GA — see
   // FUNCTIONAL_RULES.md "Milestones") as [{name, key, end}], already filtered to only the ones a
   // project actually set. Drives only the Project Identity quick-view chips below — the
@@ -101,6 +101,29 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
   const historyFloorIso = historyFloor.toISOString().slice(0, 10);
   const ganttEpics = epics.filter(e => !e.end || e.end >= historyFloorIso);
   const hasPartialDates = ganttEpics.some(e => (e.start && !e.end) || (!e.start && e.end));
+
+  // Planning Light (see FUNCTIONAL_RULES.md) — when the project is opted in (planningTree isn't
+  // null), it REPLACES the flat ganttEpics section above rather than sitting alongside it. Same
+  // fixed 6-month-back/fiscal-quarter timeline axis as the classic Gantt, computed server-side
+  // here (not client-side like GANTT_JS below) so the hide/rename/group forms can be rendered as
+  // plain HTML in lockstep with the bars, with no client JS needed beyond collapse/expand.
+  const planningTstart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - 6, 1));
+  const planningTend = new Date('2026-11-30');
+  const pctDate = d => {
+    if (!d) return null;
+    const p = (new Date(d) - planningTstart) / (planningTend - planningTstart) * 100;
+    return Math.max(0, Math.min(100, p));
+  };
+  const planningRows = planningTree ? flattenPlanningTree(planningTree) : null;
+  // Hiding a node only removes that one row — its children still render (at their existing
+  // indent), so hiding a noisy wrapper epic doesn't also erase the informative sub-epics under it
+  // (see FUNCTIONAL_RULES.md). Owners keep hidden rows in the DOM (dimmed, only visible in Manage
+  // mode, so a hidden item can actually be found again to unhide it) — anyone else never receives
+  // them in the markup at all.
+  const visiblePlanningRows = planningRows ? (isOwner ? planningRows : planningRows.filter(r => !r.hidden)) : null;
+  const groupOptions = planningRows ? planningRows.filter(r => r.isGroup).map(r => ({ id: Number(r.key.slice(6)), name: r.summary })) : [];
+  const hasPartialDatesPlanning = visiblePlanningRows ? visiblePlanningRows.some(r => (r.start && !r.end) || (!r.start && r.end)) : false;
+  const { months: planningMonths, quarterLines: planningQuarterLines } = planningTree ? buildGanttMonths(planningTstart, planningTend) : { months: [], quarterLines: [] };
 
   // Donut data
   const donutJSON = JSON.stringify([
@@ -252,7 +275,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
     </div>
   </div>
 
-  ${ganttEpics.length ? `
+  ${planningTree !== null ? renderPlanningSection({ project, yearWeek, isOwner, visiblePlanningRows, groupOptions, hasPartialDatesPlanning, planningMonths, planningQuarterLines, pctDate }) : (ganttEpics.length ? `
   <div class="matrix-section">
     <div class="section-label">Planning — team epics</div>
     <div class="gantt-mobile-note">📊 The planning timeline needs a wider screen — view this report on a desktop or tablet to see it.</div>
@@ -270,7 +293,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
       <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#BEC0C6;border:1px dashed #C8CAD4"></div>To Start</div>
       ${hasPartialDates ? '<div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:linear-gradient(to right,transparent,#87878C)"></div>Only one date known (hover for detail)</div>' : ''}
     </div>
-  </div>` : ''}
+  </div>` : '')}
 
 </div>
 
@@ -315,7 +338,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
   }
   requestAnimationFrame(step);
 })();
-${ganttEpics.length ? GANTT_JS(ganttEpics) : ''}
+${planningTree !== null ? (visiblePlanningRows.length ? PLANNING_COLLAPSE_JS() : '') : (ganttEpics.length ? GANTT_JS(ganttEpics) : '')}
 </script>
 </body>
 </html>`;
@@ -341,6 +364,163 @@ function buildGanttMonths(tstart, tend) {
     cur = new Date(Date.UTC(cy, cm + 1, 1));
   }
   return { months, quarterLines };
+}
+
+// Planning Light (see FUNCTIONAL_RULES.md) — pre-order walk of the frozen, already-overridden
+// tree resolvePlanningTree/buildPlanningTree produced (server.js), turning it into one flat row
+// per visible node with a depth for indentation. Deliberately does NOT skip a hidden node's
+// children (see the comment at planningRows' call site above) — only the hidden node's own row is
+// left for the caller to filter out.
+function flattenPlanningTree(tree, depth = 0, out = []) {
+  tree.forEach(node => {
+    out.push({
+      key: node.key, summary: node.summary, status: node.status || 'ts',
+      start: node.start, end: node.end, depth, hasChildren: node.children.length > 0,
+      isGroup: node.key.startsWith('GROUP:'), hidden: !!node.hidden, groupId: node.groupId || null
+    });
+    if (node.children.length) flattenPlanningTree(node.children, depth + 1, out);
+  });
+  return out;
+}
+
+const PLANNING_STATUS_LABEL = { done: 'Done', prog: 'In Progress', blk: 'Blocked', ts: 'To Start' };
+
+// Same full/fade-left/fade-right/no-date bar logic as GANTT_JS's client-side version, just
+// rendered server-side here (see planningTstart/pctDate at the call site) so it can sit in
+// lockstep with the plain-HTML hide/rename/group forms below without needing a JSON hydration step.
+function planningBarHtml(r, pctDate) {
+  if (r.start && r.end) {
+    const l = pctDate(r.start), w = Math.max(0.5, pctDate(r.end) - l);
+    return `<div class="gantt-bar ${r.status}" style="left:${l.toFixed(2)}%;width:${w.toFixed(2)}%" title="${esc(r.key)} — ${esc(r.summary)}&#10;${r.start} → ${r.end}"></div>`;
+  }
+  if (r.start || r.end) {
+    const isEndOnly = !!r.end, PARTIAL_W = 6;
+    let l, w;
+    if (isEndOnly) { const right = pctDate(r.end); l = Math.max(0, right - PARTIAL_W); w = right - l; }
+    else { l = pctDate(r.start); const right = Math.min(100, l + PARTIAL_W); w = right - l; }
+    const tip = isEndOnly ? `No start date — ends ${r.end}` : `No end date — starts ${r.start}`;
+    return `<div class="gantt-bar ${r.status} ${isEndOnly ? 'fade-left' : 'fade-right'}" style="left:${l.toFixed(2)}%;width:${w.toFixed(2)}%" title="${esc(r.key)} — ${esc(r.summary)}&#10;${esc(tip)}"></div>`;
+  }
+  return `<span class="gantt-nodates">No dates yet</span>`;
+}
+
+// Owner-only local declutter/edit controls (see FUNCTIONAL_RULES.md "Planning Light"): hide/
+// unhide, rename (unidirectional — overwrites only the report's own display, never writes back to
+// Jira), and reassigning a node under a manually-created aggregate group. Plain POST forms, same
+// pattern as every other mutation in this app — no client-side fetch/AJAX. Changes land in
+// planning_overrides/planning_groups immediately but only show up in THIS report once it's
+// regenerated (frozen-snapshot rule, same as everything else here) — hence the note in the section
+// header rather than an inline live-preview.
+function planningManageControls(r, project, yearWeek, groupOptions) {
+  const redirect = `<input type="hidden" name="redirect" value="${esc(yearWeek)}">`;
+  const keyField = `<input type="hidden" name="jira_key" value="${esc(r.key)}">`;
+  const renameForm = `<form method="POST" action="/projects/${esc(project.slug)}/planning/rename" class="pl-inline-form">${redirect}${keyField}
+    <input type="text" name="summary_override" class="pl-rename-input" value="${esc(r.summary)}" onchange="this.form.submit()">
+  </form>`;
+  const hideForm = `<form method="POST" action="/projects/${esc(project.slug)}/planning/hide" class="pl-inline-form">${redirect}${keyField}
+    <input type="hidden" name="hidden" value="${r.hidden ? '0' : '1'}">
+    <button type="submit" class="pl-hide-btn" title="${r.hidden ? 'Unhide' : 'Hide'}">${r.hidden ? '↺' : '✕'}</button>
+  </form>`;
+  const groupForm = !r.isGroup ? `<form method="POST" action="/projects/${esc(project.slug)}/planning/group/assign" class="pl-inline-form">${redirect}${keyField}
+    <select name="group_id" onchange="this.form.submit()">
+      <option value="">— no group —</option>
+      ${groupOptions.map(g => `<option value="${g.id}" ${g.id === r.groupId ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}
+    </select>
+  </form>` : '';
+  return `<div class="pl-manage-controls">${renameForm}${hideForm}${groupForm}</div>`;
+}
+
+// Full Planning Light section (see FUNCTIONAL_RULES.md) — replaces the classic flat Gantt when a
+// project has an opted-in bigpicture_box_id. Rows/bars are plain server-rendered HTML (not built
+// from a JSON blob client-side like GANTT_JS) so the per-row hide/rename/group <form>s can sit
+// directly next to their row; only collapse/expand needs any client JS (PLANNING_COLLAPSE_JS).
+function renderPlanningSection({ project, yearWeek, isOwner, visiblePlanningRows, groupOptions, hasPartialDatesPlanning, planningMonths, planningQuarterLines, pctDate }) {
+  const manageCbId = 'pl-manage-cb';
+  if (!visiblePlanningRows.length) {
+    return `
+  <div class="matrix-section planning-section">
+    <div class="section-label"><span>Planning</span></div>
+    <div style="padding:14px 20px;font-size:13px;color:#636369">No items in the configured BigPicture scope.</div>
+  </div>`;
+  }
+  const monthsHtml = planningMonths.map(m => `<div class="gantt-mcell${m.q ? ' qs' : ''}">${m.q ? `<span class="gantt-mqtr">${esc(m.q)}</span>` : ''}<span class="gantt-mname">${esc(m.m)} ${esc(m.y)}</span></div>`).join('');
+  const qtrLinesHtml = planningQuarterLines.map(d => `<div class="gantt-vline qtr" style="left:${pctDate(d).toFixed(2)}%"></div>`).join('');
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayLineHtml = `<div class="gantt-vline vtoday" style="left:${pctDate(todayIso).toFixed(2)}%"><span class="gantt-vlabel" style="color:#ED733D">today</span></div>`;
+
+  const lrows = visiblePlanningRows.map(r => `
+    <div class="planning-lrow${r.hidden ? ' pl-hidden' : ''}" data-depth="${r.depth}">
+      ${r.hasChildren ? `<span class="pl-caret">▾</span>` : `<span class="pl-caret-spacer"></span>`}
+      <span class="pl-summary" style="padding-left:${r.depth * 16}px" title="${esc(r.summary)}">${esc(r.summary)}</span>
+      <span class="pl-status st ${r.status}">${PLANNING_STATUS_LABEL[r.status] || r.status}</span>
+      ${isOwner ? planningManageControls(r, project, yearWeek, groupOptions) : ''}
+    </div>`).join('');
+  const rrows = visiblePlanningRows.map(r => `
+    <div class="planning-row${r.hidden ? ' pl-hidden' : ''}">${planningBarHtml(r, pctDate)}</div>`).join('');
+
+  return `
+  <div class="matrix-section planning-section">
+    ${isOwner ? `<input type="checkbox" id="${manageCbId}" class="pl-manage-cb">` : ''}
+    <div class="section-label">
+      <span>Planning</span>
+      ${isOwner ? `<label class="pl-manage-toggle" for="${manageCbId}">Manage</label>` : ''}
+    </div>
+    ${isOwner ? `<div class="pl-manage-hint">Hide / rename / group changes apply on the next ↻ Refresh, not immediately.</div>
+    <form method="POST" action="/projects/${esc(project.slug)}/planning/group/create" class="pl-new-group-form">
+      <input type="hidden" name="redirect" value="${esc(yearWeek)}">
+      <input type="text" name="name" placeholder="New group name…" class="pl-rename-input">
+      <button type="submit" class="pl-hide-btn pl-new-group-btn">+ Group</button>
+    </form>` : ''}
+    <div class="gantt-mobile-note">📊 The planning timeline needs a wider screen — view this report on a desktop or tablet to see it.</div>
+    <div class="gantt-outer planning-outer">
+      <div class="gantt-lcol planning-lcol" id="planning-lcol">
+        <div class="gantt-lhdr planning-lhdr"><span class="pl-hdr-summary">Summary</span><span class="pl-hdr-status">Status</span></div>
+        ${lrows}
+      </div>
+      <div class="gantt-rcol">
+        <div class="gantt-months">${monthsHtml}</div>
+        <div class="gantt-body" id="planning-body">${qtrLinesHtml}${todayLineHtml}${rrows}</div>
+      </div>
+    </div>
+    <div class="gantt-legend">
+      <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#A6D64D"></div>Done</div>
+      <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#0050D5"></div>In Progress</div>
+      <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#ED733D"></div>Blocked</div>
+      <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#BEC0C6;border:1px dashed #C8CAD4"></div>To Start</div>
+      ${hasPartialDatesPlanning ? '<div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:linear-gradient(to right,transparent,#87878C)"></div>Only one date known (hover for detail)</div>' : ''}
+    </div>
+  </div>`;
+}
+
+// Collapse/expand only (see FUNCTIONAL_RULES.md "Planning Light") — deliberately not persisted
+// (resets on reload); the one thing that actually needs to survive a reload, hidden rows, is
+// already handled server-side via planning_overrides. Walks the left/right row lists in lockstep
+// by index (both rendered from the exact same visiblePlanningRows array, in the same order, so
+// their nth-child positions always line up) and hides every row deeper than the clicked one, up to
+// the next row at the same depth or shallower.
+function PLANNING_COLLAPSE_JS() {
+  return `
+(function(){
+  var lrows=document.querySelectorAll('#planning-lcol .planning-lrow');
+  var rrows=document.querySelectorAll('#planning-body .planning-row');
+  document.querySelectorAll('.pl-caret').forEach(function(caret){
+    caret.addEventListener('click',function(){
+      var row=caret.closest('.planning-lrow');
+      var idx=Array.prototype.indexOf.call(lrows,row);
+      var depth=parseInt(row.getAttribute('data-depth'),10);
+      var collapsed=caret.classList.toggle('pl-collapsed');
+      caret.textContent=collapsed?'▸':'▾';
+      var i=idx+1;
+      while(i<lrows.length){
+        var d=parseInt(lrows[i].getAttribute('data-depth'),10);
+        if(d<=depth)break;
+        lrows[i].style.display=collapsed?'none':'';
+        if(rrows[i])rrows[i].style.display=collapsed?'none':'';
+        i++;
+      }
+    });
+  });
+})();`;
 }
 
 function GANTT_JS(epics) {
@@ -612,6 +792,45 @@ const CSS = `
   .gantt-mobile-note{display:none}
   .gantt-leg-item{display:flex;align-items:center;gap:5px;font-size:13.5px;color:var(--tx2)}
   .gantt-leg-swatch{width:14px;height:10px;border-radius:1px;flex-shrink:0}
+  /* Planning Light (see FUNCTIONAL_RULES.md) — reuses .gantt-outer/.gantt-rcol/.gantt-months/
+     .gantt-body/.gantt-bar/.gantt-vline/.gantt-legend as-is; only the left label column becomes a
+     wider 2-sub-column (Summary, Status) tree instead of the classic single team/key/name row. */
+  .planning-lcol{width:340px}
+  .planning-lhdr{display:flex;align-items:center;padding:0 12px;gap:8px}
+  .pl-hdr-summary{flex:1;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tx3)}
+  .pl-hdr-status{width:84px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tx3)}
+  .planning-lrow{height:24px;display:flex;align-items:center;padding:0 12px 0 8px;border-bottom:1px solid var(--bd2);gap:4px;overflow:visible}
+  .planning-lrow:last-child{border-bottom:none}
+  .planning-lrow.pl-hidden{display:none;opacity:.5;background:repeating-linear-gradient(45deg,transparent,transparent 6px,var(--bd2) 6px,var(--bd2) 7px)}
+  .pl-manage-cb:checked~.planning-outer .planning-lrow.pl-hidden,
+  .pl-manage-cb:checked~.planning-outer .planning-row.pl-hidden{display:flex}
+  .pl-caret{width:14px;flex-shrink:0;cursor:pointer;font-size:10px;color:var(--tx3);text-align:center;user-select:none}
+  .pl-caret-spacer{width:14px;flex-shrink:0}
+  .pl-summary{flex:1;min-width:0;font-size:13.5px;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pl-status{width:84px;flex-shrink:0;font-size:12px}
+  .pl-manage-controls{display:none;align-items:center;gap:4px;flex-shrink:0}
+  .pl-manage-cb:checked~.planning-outer .pl-manage-controls{display:flex}
+  .pl-manage-cb:checked~.planning-outer .pl-summary,.pl-manage-cb:checked~.planning-outer .pl-status{display:none}
+  /* Not display:none — some browsers stop a <label for> from toggling a display:none checkbox at
+     all, which would silently break the whole Manage toggle. Visually hidden but still in the
+     interaction/accessibility tree. */
+  .pl-manage-cb{position:absolute;opacity:0;width:1px;height:1px;overflow:hidden}
+  .pl-inline-form{display:inline-flex;margin:0}
+  .pl-rename-input{width:120px;font-size:12px;padding:2px 4px;border:1px solid var(--bd);border-radius:2px;color:var(--tx)}
+  .pl-hide-btn{border:1px solid var(--bd);background:var(--sur);border-radius:2px;width:20px;height:20px;font-size:11px;color:var(--tx2);cursor:pointer;line-height:1}
+  .pl-hide-btn:hover{background:var(--gnd);color:var(--blk-c)}
+  .pl-manage-controls select{font-size:11px;max-width:90px;border:1px solid var(--bd);border-radius:2px;color:var(--tx2)}
+  .pl-manage-toggle{font-size:12px;font-weight:600;color:var(--cobalt);text-transform:none;letter-spacing:0;cursor:pointer;padding:3px 8px;border:1px solid var(--cobalt);border-radius:2px}
+  .pl-manage-cb:checked~.section-label .pl-manage-toggle{background:var(--cobalt);color:#fff}
+  .pl-manage-hint{display:none;font-size:12px;color:var(--tx3);padding:6px 20px;border-bottom:1px solid var(--bd2);font-style:italic}
+  .pl-manage-cb:checked~.pl-manage-hint{display:block}
+  .pl-new-group-form{display:none;align-items:center;gap:6px;padding:8px 20px;border-bottom:1px solid var(--bd2)}
+  .pl-manage-cb:checked~.pl-new-group-form{display:flex}
+  .pl-new-group-btn{width:auto;padding:2px 10px}
+  .planning-row{height:24px;border-bottom:1px solid var(--bd2);position:relative;overflow:visible}
+  .planning-row:nth-child(odd){background:var(--gnd)}
+  .planning-row:last-child{border-bottom:none}
+  .planning-row.pl-hidden{display:none}
   .doc-footer{background:var(--mb);color:rgba(255,255,255,.4);text-align:center;padding:18px 32px;font-size:13.5px;letter-spacing:.04em}
   @media(max-width:700px){
     .identity-grid{grid-template-columns:1fr 1fr}

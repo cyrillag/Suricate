@@ -138,6 +138,34 @@ async function getPortfolioEpics(token, rootEpic) {
   }));
 }
 
+// Planning Light (see FUNCTIONAL_RULES.md) — runs a Jira-authored JQL string (a BigPicture box's
+// own narrowingQuery, already configured by the PM inside BigPicture) rather than this file's own
+// portfolioChildrenOf walk, unioning in a set of individually-pinned keys (BigPicture's
+// manuallyAddedTasks) the same way extra_epics used to (the retired feature this replaces).
+// customfield_16100 (portfolio parent, JQL shorthand cf[16100] — same field getChildEpics already
+// walks) is fetched too, for the hierarchy/date-rollup pass against the scoped set.
+async function searchByJql(token, jqlClauses, extraKeys = []) {
+  if (!jqlClauses.length && !extraKeys.length) return [];
+  const EPIC_FIELDS = 'summary,status,assignee,reporter,customfield_10110,customfield_10111,customfield_16100,issuetype';
+  const parts = jqlClauses.map(q => `(${q})`);
+  if (extraKeys.length) parts.push(`issuekey in (${extraKeys.join(',')})`);
+  let jql = `(${parts.join(' OR ')}) and status not in (Cancelled, Canceled)`;
+  const data = await api(token, '/search', { jql, fields: EPIC_FIELDS, maxResults: 500 });
+  return data.issues.map(i => ({
+    key:       i.key,
+    summary:   i.fields.summary,
+    team:      extractTeam(i.key),
+    status:    i.fields.status?.name || 'To Do',
+    assignee:  i.fields.assignee?.displayName || null,
+    reporter:  i.fields.reporter?.displayName || null,
+    // Server sometimes returns this as a plain key string, sometimes as an object with a `.key` —
+    // observed inconsistently across custom field configs; normalize both.
+    parentKey: (i.fields.customfield_16100 && i.fields.customfield_16100.key) || i.fields.customfield_16100 || null,
+    start:     i.fields.customfield_10110 || null,
+    end:       i.fields.customfield_10111 || null
+  }));
+}
+
 async function getRootEpicMeta(token, epicKey) {
   const data = await api(token, `/issue/${epicKey}`, { fields: 'summary,customfield_10110,customfield_10111,status' });
   return {
@@ -180,4 +208,4 @@ async function getEpicsByKeys(token, keys) {
   return results;
 }
 
-module.exports = { getMe, findUserByEmail, getChildEpics, getPortfolioEpics, getEpicsByKeys, getRootEpicMeta, mapStatus, BASE };
+module.exports = { getMe, findUserByEmail, getChildEpics, getPortfolioEpics, getEpicsByKeys, searchByJql, getRootEpicMeta, mapStatus, BASE };

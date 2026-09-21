@@ -177,6 +177,88 @@ GA. Project Identity can show one end date per phase a project actually has.
   fields wouldn't actually solve the problem that got the old mechanism retired (see above), since
   the underlying Jira hierarchy still doesn't separate the phases either way.
 
+## Planning Light (BigPicture-scoped planning)
+
+A project can opt in (`projects.bigpicture_box_id`, Edit page — a separate field from
+`jira_root_epic`, since a BigPicture box ID isn't always shaped like a Jira key) to a hierarchical,
+2-column (Summary, Status) planning view that **replaces** the classic flat Planning/Gantt section
+entirely for that project — never shown alongside it. A project with no box ID configured is
+completely unaffected: same flat epic-list Gantt as before, same `jira.getPortfolioEpics` code
+path (`refreshFullEpicTree`).
+
+- **Scope comes from BigPicture, not a second, divergent source of truth.** The whole point of this
+  feature is that a PM has already configured which Jira sources populate their BigPicture "box" —
+  Planning Light reads that configuration (`bigpicture.js`'s `getScopeDefinition`, the box's
+  `narrowingQuery` JQL plus any individually pinned `manuallyAddedTasks`) and runs it through this
+  app's own plain Jira search (`jira.js`'s `searchByJql`), rather than re-deriving scope from a
+  fixed root epic the way the classic Gantt does. This is also what replaced the retired
+  `extra_epics` manual-pin field (see "Milestones" above's Planning/Gantt section) — the problem
+  `extra_epics` was a workaround for (an epic belonging outside the root epic's own hierarchy) is
+  what BigPicture's own scope config already solves properly.
+- **BigPicture's REST API uses a different base path and a different auth scheme from the rest of
+  this app's Jira calls** — `Authorization: APIToken <token>` (env `BIGPICTURE_API_TOKEN`), not the
+  `Bearer ${JIRA_TOKEN}` used everywhere else — hence its own module (`bigpicture.js`), same
+  reasoning as `confluence.js` being separate from `jira.js` despite both being Atlassian-adjacent.
+  Self-hosted installs before ~8.32 use a different URL path
+  (`/rest/softwareplant-bigpicture/1.0` vs `/rest/bigpicture/1.0`) — `bpFetch` tries the new one
+  first and falls back to the old one on a 404, since neither this app nor whoever configures a
+  project's box ID necessarily knows which version the instance is on.
+- **Hierarchy is derived the same way the classic tree-walk already does it** (each issue's own
+  portfolio-parent field, `cf[16100]`/`customfield_16100`) — not from any BigPicture box-to-box
+  endpoint. BigPicture's own dedicated "list tasks in a box" endpoint only returns bare IDs and is
+  Cloud-only (confirmed unavailable for this on-premise instance) — reusing the existing Jira
+  hierarchy mechanism against the BigPicture-scoped issue set was the only viable path, and it also
+  means Planning Light didn't need to learn BigPicture's own internal task model at all.
+- **A parent's Start/End dates are never read from Jira — they're always computed as the MIN start
+  / MAX end of their children**, recursively, bottom-up (`buildPlanningTree`'s `rollup`). This
+  applies to both a real Jira parent epic and a synthetic aggregate group (see below) — a group has
+  no dates of its own by definition, only ever rolled-up ones. A leaf epic keeps its own real Jira
+  dates.
+- **Local overrides — hide, rename, group — are Suricate-only and unidirectional; nothing here is
+  ever written back to Jira.** (Bi-directional Start/End date sync back to Jira, the other stated
+  requirement, is an explicit, deliberately separate later phase — new risk profile, writing to
+  shared Jira data other tools also rely on, not bundled into this read-only-from-Jira phase.)
+  Stored in `planning_overrides`/`planning_groups`, keyed by `jira_key` (or a synthetic
+  `GROUP:<id>` key for a manually-created aggregate group) — **never wiped by a Refresh**, unlike
+  `epics_cache`, which is exactly what makes these overrides survive a re-sync.
+  - **Hide only removes that one row, not its subtree.** A hidden wrapper epic's children still
+    render (at their existing indent) — hiding is for decluttering a noisy intermediate node for
+    communication purposes, not for pruning a whole branch of real work out of the report. A
+    non-owner viewer never receives a hidden row in the HTML at all; the owner does (dimmed,
+    struck-through), only actually visible in the section's "Manage" mode, so a hidden item can
+    still be found again to unhide it — otherwise hiding would be a one-way trip.
+  - **Rename overwrites the display summary only** — unidirectional, exactly like the section says;
+    it never touches the Jira issue's own summary field.
+  - **A manual group assignment overrides a node's natural Jira parent, it doesn't add to it** — a
+    node reassigned to a group renders under that group instead of wherever `cf[16100]` would have
+    put it, the same "replaces, not supplements" pattern the Milestones fields use for Target ETA.
+  - Changes to any of these take effect the next time the report is regenerated (↻ Refresh) — same
+    frozen-snapshot rule as everything else in this app (`reports.planning_snapshot_json`, frozen
+    at generation time exactly like `epics_snapshot_json`). The report page's Manage-mode UI says so
+    directly rather than faking a live preview that the underlying data model doesn't support.
+- **The whole resolved tree (scope + hierarchy + rollup dates + overrides + groups already applied)
+  is frozen per report row** (`reports.planning_snapshot_json`), same reasoning as every other
+  snapshot column here — a past week's report must not change because a PM hides/renames/regroups
+  something afterward. `null` for a project that hasn't opted in, or for a legacy row predating this
+  column — the renderer falls back to the classic flat Gantt only when `planningTree` itself is
+  `null`; an opted-in project whose BigPicture box resolves to zero items still gets the Planning
+  Light section (with a "No items in the configured scope" message), never a silent fallback to the
+  old view, since falling back there would mask a real misconfiguration.
+- **Same fiscal-quarter timeline axis as the classic Gantt, reusing the exact same
+  `buildGanttMonths`/6-month-back floor** — no separate quarter logic for this section. Unlike the
+  classic Gantt, the timeline bars here are rendered server-side as plain HTML (not built from a
+  JSON blob by client-side JS) so each row's hide/rename/group `<form>` can sit directly next to its
+  own bar row without a separate hydration step; only collapse/expand needs any client JS.
+- **Collapse/expand is client-side only and deliberately not persisted** — it resets on reload. The
+  one thing about a row's visibility that actually needs to survive a reload (whether it's hidden
+  from the report at all) is already handled server-side via `planning_overrides.hidden`; collapse
+  state is just a reading convenience for the person currently looking at the page.
+- The Manage-mode toggle and all owner-only controls are pure CSS (a hidden checkbox + a
+  `:checked ~` sibling selector), not JavaScript — consistent with the rest of this app's very light
+  client-side footprint. The checkbox is visually hidden via absolute-positioning/opacity, not
+  `display:none`, since a `<label for>` cannot reliably toggle a `display:none` checkbox in every
+  browser.
+
 ## Report export
 
 - **PDF export (re-added) renders the exact live report page server-side, never a separate
