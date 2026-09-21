@@ -275,7 +275,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
     </div>
   </div>
 
-  ${planningTree !== null ? renderPlanningSection({ project, yearWeek, isOwner, visiblePlanningRows, groupOptions, hasPartialDatesPlanning, planningMonths, planningQuarterLines, pctDate }) : (ganttEpics.length ? `
+  ${planningTree !== null ? renderPlanningSection({ project, yearWeek, isOwner, isCurrentWeek, visiblePlanningRows, groupOptions, hasPartialDatesPlanning, planningMonths, planningQuarterLines, pctDate }) : (ganttEpics.length ? `
   <div class="matrix-section">
     <div class="section-label">Planning — team epics</div>
     <div class="gantt-mobile-note">📊 The planning timeline needs a wider screen — view this report on a desktop or tablet to see it.</div>
@@ -447,7 +447,7 @@ function planningManageControls(r, project, yearWeek, groupOptions) {
 // project has an opted-in bigpicture_box_id. Rows/bars are plain server-rendered HTML (not built
 // from a JSON blob client-side like GANTT_JS) so the per-row hide/rename/group <form>s can sit
 // directly next to their row; only collapse/expand needs any client JS (PLANNING_COLLAPSE_JS).
-function renderPlanningSection({ project, yearWeek, isOwner, visiblePlanningRows, groupOptions, hasPartialDatesPlanning, planningMonths, planningQuarterLines, pctDate }) {
+function renderPlanningSection({ project, yearWeek, isOwner, isCurrentWeek, visiblePlanningRows, groupOptions, hasPartialDatesPlanning, planningMonths, planningQuarterLines, pctDate }) {
   const manageCbId = 'pl-manage-cb';
   if (!visiblePlanningRows.length) {
     return `
@@ -478,7 +478,9 @@ function renderPlanningSection({ project, yearWeek, isOwner, visiblePlanningRows
       <span>Planning</span>
       ${isOwner ? `<label class="pl-manage-toggle" for="${manageCbId}">Manage</label>` : ''}
     </div>
-    ${isOwner ? `<div class="pl-manage-hint">Hide / rename / group changes apply on the next ↻ Refresh, not immediately.</div>
+    ${isOwner ? `<div class="pl-manage-hint">${isCurrentWeek
+      ? 'Hide / rename / group changes apply immediately on this current-week report.'
+      : 'This is a past, locked report — hide / rename / group changes are saved but only apply once the project’s current week is generated.'}</div>
     <form method="POST" action="/projects/${esc(project.slug)}/planning/group/create" class="pl-new-group-form">
       <input type="hidden" name="redirect" value="${esc(yearWeek)}">
       <input type="text" name="name" placeholder="New group name…" class="pl-rename-input">

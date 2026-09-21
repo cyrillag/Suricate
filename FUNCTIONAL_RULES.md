@@ -261,10 +261,15 @@ path (`refreshFullEpicTree`).
   - **A manual group assignment overrides a node's natural Jira parent, it doesn't add to it** — a
     node reassigned to a group renders under that group instead of wherever `cf[16100]` would have
     put it, the same "replaces, not supplements" pattern the Milestones fields use for Target ETA.
-  - Changes to any of these take effect the next time the report is regenerated (↻ Refresh) — same
-    frozen-snapshot rule as everything else in this app (`reports.planning_snapshot_json`, frozen
-    at generation time exactly like `epics_snapshot_json`). The report page's Manage-mode UI says so
-    directly rather than faking a live preview that the underlying data model doesn't support.
+  - **The planning routes (`/planning/hide`, `/rename`, `/group/create`, `/group/assign`)
+    auto-regenerate the report when the page being edited is the project's current week** —
+    otherwise saving an override behind a frozen snapshot the viewer is still looking at reads as
+    "nothing happened" (this shipped once: a group got created successfully but never appeared,
+    since only its page's own ↻ Refresh button would have picked it up). A past, already-locked
+    week is left untouched (it can never be regenerated, per the existing past-week-locked rule) —
+    the override is still saved and will apply whenever that project's *current* week is next
+    generated, and the Manage-mode UI says so explicitly for a past week, while a current-week edit
+    is presented as taking effect immediately (since it now does).
 - **The whole resolved tree (scope + hierarchy + rollup dates + overrides + groups already applied)
   is frozen per report row** (`reports.planning_snapshot_json`), same reasoning as every other
   snapshot column here — a past week's report must not change because a PM hides/renames/regroups

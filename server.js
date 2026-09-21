@@ -776,15 +776,27 @@ app.post('/projects/:slug/reports/:yearweek(\\d{4}-W\\d{2})/delete', requireAuth
 
 // ── PLANNING LIGHT — owner-local declutter/edit ────────────────────
 // Hide/rename/group are Suricate-local only (see FUNCTIONAL_RULES.md "Planning Light") — never
-// written back to Jira (that's the deferred Phase 2). Each route redirects back to whichever
-// report the form was submitted from; a change only actually appears there once that report is
-// next regenerated (frozen-snapshot rule, same as everywhere else in this app) — the report page's
-// Manage-mode hint says so, rather than faking a live preview here.
+// written back to Jira (that's the deferred Phase 2).
 function planningRedirect(proj, redirect) {
   return /^\d{4}-W\d{2}$/.test(redirect || '') ? `/projects/${proj.slug}/${redirect}` : `/projects/${proj.slug}`;
 }
 
-app.post('/projects/:slug/planning/hide', requireAuth, (req, res) => {
+// A planning override otherwise only takes effect on the report's next full ↻ Refresh
+// (frozen-snapshot rule, same as everywhere else) — which read as "nothing happened" the first
+// time this shipped (a group got created but never showed up, since the page the form redirected
+// back to was still the old frozen snapshot). Regenerating here closes that gap for the one case
+// where it's cheap and expected to feel instant: editing the *current* week, right after the edit
+// that was just made. A past week stays untouched — it's locked/frozen forever regardless
+// (`isPastWeek`'s existing rule), so there's nothing to regenerate there; the override itself is
+// still saved either way and will apply whenever that project's current week is next generated.
+async function regenerateIfCurrentWeek(proj, redirect) {
+  if (redirect !== currentWeekStr()) return;
+  const [yr, wn] = redirect.split('-W');
+  try { await generateReportRow(proj, parseInt(yr, 10), parseInt(wn, 10)); }
+  catch (err) { console.warn(`Could not regenerate report after a Planning Light edit: ${err.message}`); }
+}
+
+app.post('/projects/:slug/planning/hide', requireAuth, async (req, res) => {
   const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
   if (!proj) return res.status(404).send('Project not found.');
   const { jira_key, hidden, redirect } = req.body;
@@ -793,10 +805,11 @@ app.post('/projects/:slug/planning/hide', requireAuth, (req, res) => {
       ON CONFLICT(project_id, jira_key) DO UPDATE SET hidden=excluded.hidden, updated_at=unixepoch()`)
       .run(proj.id, jira_key, hidden ? 1 : 0);
   }
+  await regenerateIfCurrentWeek(proj, redirect);
   res.redirect(planningRedirect(proj, redirect));
 });
 
-app.post('/projects/:slug/planning/rename', requireAuth, (req, res) => {
+app.post('/projects/:slug/planning/rename', requireAuth, async (req, res) => {
   const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
   if (!proj) return res.status(404).send('Project not found.');
   const { jira_key, summary_override, redirect } = req.body;
@@ -806,20 +819,22 @@ app.post('/projects/:slug/planning/rename', requireAuth, (req, res) => {
       ON CONFLICT(project_id, jira_key) DO UPDATE SET summary_override=excluded.summary_override, updated_at=unixepoch()`)
       .run(proj.id, jira_key, override);
   }
+  await regenerateIfCurrentWeek(proj, redirect);
   res.redirect(planningRedirect(proj, redirect));
 });
 
-app.post('/projects/:slug/planning/group/create', requireAuth, (req, res) => {
+app.post('/projects/:slug/planning/group/create', requireAuth, async (req, res) => {
   const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
   if (!proj) return res.status(404).send('Project not found.');
   const { name, redirect } = req.body;
   if (name?.trim()) {
     db.prepare('INSERT INTO planning_groups(project_id, name) VALUES(?,?)').run(proj.id, name.trim());
   }
+  await regenerateIfCurrentWeek(proj, redirect);
   res.redirect(planningRedirect(proj, redirect));
 });
 
-app.post('/projects/:slug/planning/group/assign', requireAuth, (req, res) => {
+app.post('/projects/:slug/planning/group/assign', requireAuth, async (req, res) => {
   const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
   if (!proj) return res.status(404).send('Project not found.');
   const { jira_key, group_id, redirect } = req.body;
@@ -835,6 +850,7 @@ app.post('/projects/:slug/planning/group/assign', requireAuth, (req, res) => {
         .run(proj.id, jira_key, gid);
     }
   }
+  await regenerateIfCurrentWeek(proj, redirect);
   res.redirect(planningRedirect(proj, redirect));
 });
 
