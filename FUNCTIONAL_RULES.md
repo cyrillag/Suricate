@@ -194,17 +194,24 @@ path (`refreshFullEpicTree`).
   retired `extra_epics` manual-pin field (see "Milestones" above's Planning/Gantt section) — the
   problem `extra_epics` was a workaround for (an epic belonging outside the root epic's own
   hierarchy) is what BigPicture's own scope config already solves properly.
-  - **A box's scope is usually expressed via `scopeDefinitionElements` (a saved Jira filter,
-    project, or Agile board picked in BigPicture's own UI), not via free JQL.** `narrowingQuery` is
-    a separate, optional raw-JQL override some PMs add on top of that, most often left blank —
-    verified empirically against a real box (`HYBR-95`): `narrowingQuery` was `""`, and its actual
-    ~250-issue scope came entirely from one `JIRA_FILTER` element. Each element type maps to its
-    own JQL clause (`JIRA_FILTER` → `filter = <id>`, `JIRA_PROJECT` → `project = <id>`,
-    `JIRA_AGILE_BOARD` → `board = <id>`, the last one unverified end-to-end against a real
-    board-scoped box). The scope-definition endpoint's actual payload also sits under an
-    undocumented `cargo` wrapper (`{currentVersion, latestVersion, cargo: {...}}`), not the response
-    root — the first implementation missed this and every box appeared to have zero scope until it
-    was caught.
+  - **A non-empty `narrowingQuery` (a raw JQL string) IS the box's actual configured scope, full
+    stop — when present, it's used on its own, never OR'd together with `scopeDefinitionElements`.**
+    Verified against two real boxes, which disagreed enough to matter: `HYBR-95` had
+    `narrowingQuery: ""` and its whole ~250-issue scope came from one `JIRA_FILTER` element instead
+    (so that's the fallback when there's no `narrowingQuery`) — but `HYBR-89` had both a real,
+    specific `narrowingQuery` (itself a `portfolioChildrenOf` walk) **and** nine
+    `scopeDefinitionElements` naming entire connected Jira projects (IPAM, NCC, MANAGER, CLDAPI,
+    LVL2...). Those elements are the projects the box is *allowed to pull from*, not literal
+    scope-additive elements — OR'ing their raw `project = <id>` clauses in on top of the
+    `narrowingQuery` would have pulled every issue in every one of those projects (thousands) instead
+    of the ~500-issue portfolio the `narrowingQuery` alone correctly resolves to (confirmed by
+    running both against Jira directly before shipping this). Each `scopeDefinitionElements` type
+    maps to its own JQL clause when it IS used (`JIRA_FILTER` → `filter = <id>`, `JIRA_PROJECT` →
+    `project = <id>`, `JIRA_AGILE_BOARD` → `board = <id>`, the last one unverified end-to-end
+    against a real board-scoped box). The scope-definition endpoint's actual payload also sits under
+    an undocumented `cargo` wrapper (`{currentVersion, latestVersion, cargo: {...}}`), not the
+    response root — the first implementation missed this and every box appeared to have zero scope
+    until it was caught.
   - **A box's scope is not epic-only.** On that same real box, 246 issues were in scope but only 31
     were Epics — the rest (mostly Task/Bug) report into their parent Epic via the classic "Epic
     Link" field (`customfield_10000`), not the portfolio-parent field Epic-and-above levels use
@@ -217,18 +224,28 @@ path (`refreshFullEpicTree`).
   (`/rest/softwareplant-bigpicture/1.0` vs `/rest/bigpicture/1.0`) — `bpFetch` tries the new one
   first and falls back to the old one on a 404, since neither this app nor whoever configures a
   project's box ID necessarily knows which version the instance is on.
-- **Hierarchy is derived from Jira's own parent fields, not from any BigPicture box-to-box
+- **Hierarchy is derived from Jira's own parent fields/links, not from any BigPicture box-to-box
   endpoint.** BigPicture's own dedicated "list tasks in a box" endpoint only returns bare IDs and is
   Cloud-only (confirmed unavailable for this on-premise instance) — reusing Jira's own hierarchy
-  fields against the BigPicture-scoped issue set was the only viable path, and it also means
-  Planning Light didn't need to learn BigPicture's own internal task model at all. **Two different
-  fields are checked, since which one is populated depends on the issue's own level**: the
-  portfolio-parent field (`cf[16100]`/`customfield_16100` — the field the classic tree-walk already
-  uses) for Epic-and-above levels, and the classic "Epic Link" field (`customfield_10000`) for
-  Task/Bug/Story-level issues pointing at their parent Epic. On the real box tested, only 37 of 246
-  issues had `customfield_16100` set at all — the other 209 all used `customfield_10000` instead.
-  `jira.js`'s `searchByJql` fetches both and merges them into one `parentKey` per issue, since in
-  practice an issue only ever has one of the two populated.
+  mechanisms against the BigPicture-scoped issue set was the only viable path, and it also means
+  Planning Light didn't need to learn BigPicture's own internal task model at all. **Three different
+  mechanisms are checked, in priority order, since which one is populated depends on the issue's own
+  level and on how a given PM built their hierarchy**:
+  1. the portfolio-parent field (`cf[16100]`/`customfield_16100` — the field the classic tree-walk
+     already uses) for Epic-and-above levels;
+  2. the classic "Epic Link" field (`customfield_10000`) for Task/Bug/Story-level issues pointing at
+     their parent Epic — on one real box, only 37 of 246 issues had `customfield_16100` set at all,
+     the other 209 all used `customfield_10000` instead;
+  3. a plain Jira issue link of type **"Parent-Child"** (`issuelinks`, checked on its *inward* side
+     only — "is child of" — never the outward "is parent of" side, which would read backwards) —
+     seen on a real box built with custom "Epic LPM"/"Phase"/"Deliverable" issue types for a
+     multi-level Planning Light test, where the top level was wired via this link type instead of
+     either custom field, with lower levels (Phase/Deliverable) using `cf[16100]` like normal. All
+     three land in a single `parentKey` per issue (`jira.js`'s `searchByJql`) so the hierarchy/rollup
+     pass (`buildPlanningTree`) doesn't need to know which one applies for a given issue — in
+     practice an issue only ever has one of the three actually populated. Because the priority order
+     is fixed, a PM who wires the *same* relationship two different ways (redundantly) always gets a
+     consistent result rather than one that depends on fetch order.
 - **Granular work items (Task/Bug/Story/Sub-task/Improvement) still count toward their parent
   Epic's rolled-up dates, but never get their own row.** A box's configured scope commonly includes
   hundreds of these (see above) — rendering every one of them would be the exact opposite of

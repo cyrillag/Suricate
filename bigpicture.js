@@ -37,36 +37,46 @@ async function bpFetch(token, path) {
 }
 
 // The box's own configured scope — what a PM sees under Box Configuration > Tasks > Scope
-// definition in BigPicture itself. Verified empirically against a real box (HYBR-95): the actual
-// payload is wrapped in a currentVersion/latestVersion/cargo envelope (undocumented anywhere
-// obvious) — the scope data itself is at `cargo`, not the response root. And a box's scope is
-// usually expressed via one or more `scopeDefinitionElements` (a saved Jira filter, project, or
-// Agile board picked in BigPicture's own UI) rather than as free JQL — `narrowingQuery` is a
-// separate, optional raw-JQL override on top, most often left blank (HYBR-95 itself has
-// narrowingQuery:"" with its real ~260-issue scope coming entirely from one JIRA_FILTER element).
+// definition in BigPicture itself. Verified empirically against two real boxes: the actual payload
+// is wrapped in a currentVersion/latestVersion/cargo envelope (undocumented anywhere obvious) — the
+// scope data itself is at `cargo`, not the response root.
 async function getScopeDefinition(token, boxId) {
   const data = await bpFetch(token, `/public/ppm/box/area/task/scope/def/own/${boxId}`);
   const cargo = data.cargo || data;
   const platforms = cargo.extPlatformScopeDefinitions || [];
   const queries = [];
   const manualKeys = [];
-  // A box can have more than one scope-definition entry (rare, e.g. mixed sources), and each entry
-  // can itself have several elements — every clause gets OR'd together (via jira.js's searchByJql)
-  // rather than picking just the first, so nothing configured in BigPicture silently drops out.
+  // A box can have more than one scope-definition entry (rare, e.g. mixed sources) — every clause
+  // gets OR'd together (via jira.js's searchByJql) rather than picking just the first, so nothing
+  // configured in BigPicture silently drops out.
   platforms.forEach(p => {
-    (p.scopeDefinitionElements || []).forEach(el => {
-      // isAvailable/isAccessible false means the referenced filter/project/board no longer exists
-      // or the service account can't see it — skip rather than send Jira a JQL clause referencing
-      // something it will just reject.
-      if (el.isAvailable === false || el.isAccessible === false) return;
-      if (el.type === 'JIRA_FILTER') queries.push(`filter = ${el.value}`);
-      else if (el.type === 'JIRA_PROJECT') queries.push(`project = ${el.value}`);
-      // Unverified against a real board-scoped box — Jira Software's JQL registers `board =` when
-      // the Agile plugin is present, which it is here, but this specific clause hasn't been tested
-      // end-to-end the way JIRA_FILTER has.
-      else if (el.type === 'JIRA_AGILE_BOARD') queries.push(`board = ${el.value}`);
-    });
-    if (p.narrowingQuery) queries.push(p.narrowingQuery);
+    // A non-empty narrowingQuery is the PM's actual configured scope for this entry, full stop —
+    // verified against two real boxes. HYBR-95 had narrowingQuery:"" and its whole ~250-issue scope
+    // came from a single scopeDefinitionElements entry (a saved filter) instead — so that's the
+    // fallback when there's no narrowingQuery. HYBR-89 had BOTH a real narrowingQuery AND nine
+    // scopeDefinitionElements entries naming entire connected Jira projects (IPAM, NCC, MANAGER,
+    // CLDAPI, LVL2...) — those are the projects the box is *allowed to pull from*, not literal
+    // scope-additive elements; OR'ing their raw `project = <id>` clauses in on top of the
+    // narrowingQuery would have pulled in every issue in every one of those projects instead of the
+    // ~500-issue portfolio the narrowingQuery alone correctly resolves to (confirmed by running
+    // both against Jira directly). So: narrowingQuery wins outright when present; only fall back to
+    // scopeDefinitionElements when it's blank.
+    if (p.narrowingQuery && p.narrowingQuery.trim()) {
+      queries.push(p.narrowingQuery);
+    } else {
+      (p.scopeDefinitionElements || []).forEach(el => {
+        // isAvailable/isAccessible false means the referenced filter/project/board no longer
+        // exists or the service account can't see it — skip rather than send Jira a JQL clause
+        // referencing something it will just reject.
+        if (el.isAvailable === false || el.isAccessible === false) return;
+        if (el.type === 'JIRA_FILTER') queries.push(`filter = ${el.value}`);
+        else if (el.type === 'JIRA_PROJECT') queries.push(`project = ${el.value}`);
+        // Unverified against a real board-scoped box — Jira Software's JQL registers `board =`
+        // when the Agile plugin is present, which it is here, but this specific clause hasn't
+        // been tested end-to-end the way JIRA_FILTER has.
+        else if (el.type === 'JIRA_AGILE_BOARD') queries.push(`board = ${el.value}`);
+      });
+    }
     (p.manuallyAddedTasks || []).forEach(t => {
       const k = t.key || t.externalId;
       if (k) manualKeys.push(k);

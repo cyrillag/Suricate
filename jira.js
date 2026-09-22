@@ -147,31 +147,41 @@ async function getPortfolioEpics(token, rootEpic) {
 // Link" field (customfield_10000), not customfield_16100 (portfolio parent, JQL shorthand
 // cf[16100] — the field Epic-and-above levels use, and the same one getChildEpics already walks).
 // Only 37/246 issues on that real box had customfield_16100 set at all; the other 209 all had
-// customfield_10000 instead. Both are fetched and merged into a single parentKey per issue so the
-// hierarchy/rollup pass (server.js's buildPlanningTree) doesn't need to know which field applies —
-// an issue only ever has one of the two populated in practice.
+// customfield_10000 instead. A third real box (custom "Epic LPM"/"Phase"/"Deliverable" issue types,
+// hand-built for a multi-level Planning Light test) additionally used a plain Jira issue-link type
+// named "Parent-Child" for its top level, instead of either custom field — so that's checked too,
+// as a last-resort fallback. All three are merged into a single parentKey per issue so the
+// hierarchy/rollup pass (server.js's buildPlanningTree) doesn't need to know which mechanism
+// applies — an issue only ever has one of the three populated in practice.
 async function searchByJql(token, jqlClauses, extraKeys = []) {
   if (!jqlClauses.length && !extraKeys.length) return [];
-  const EPIC_FIELDS = 'summary,status,assignee,reporter,customfield_10110,customfield_10111,customfield_16100,customfield_10000,issuetype';
+  const EPIC_FIELDS = 'summary,status,assignee,reporter,customfield_10110,customfield_10111,customfield_16100,customfield_10000,issuelinks,issuetype';
   const parts = jqlClauses.map(q => `(${q})`);
   if (extraKeys.length) parts.push(`issuekey in (${extraKeys.join(',')})`);
   let jql = `(${parts.join(' OR ')}) and status not in (Cancelled, Canceled)`;
   const data = await api(token, '/search', { jql, fields: EPIC_FIELDS, maxResults: 500 });
-  return data.issues.map(i => ({
-    key:       i.key,
-    summary:   i.fields.summary,
-    team:      extractTeam(i.key),
-    type:      i.fields.issuetype?.name || null,
-    status:    i.fields.status?.name || 'To Do',
-    assignee:  i.fields.assignee?.displayName || null,
-    reporter:  i.fields.reporter?.displayName || null,
-    // Server sometimes returns customfield_16100 as a plain key string, sometimes as an object
-    // with a `.key` — observed inconsistently across custom field configs; normalize both.
-    // customfield_10000 (Epic Link) is always a plain key string.
-    parentKey: (i.fields.customfield_16100 && i.fields.customfield_16100.key) || i.fields.customfield_16100 || i.fields.customfield_10000 || null,
-    start:     i.fields.customfield_10110 || null,
-    end:       i.fields.customfield_10111 || null
-  }));
+  return data.issues.map(i => {
+    // A "Parent-Child" link only counts when it's the INWARD side (this issue "is child of" the
+    // linked one) — the OUTWARD side ("is parent of") means the linked issue is this one's CHILD,
+    // not its parent, and must never be read backwards into a parentKey.
+    const parentLink = (i.fields.issuelinks || []).find(l => l.type?.name === 'Parent-Child' && l.inwardIssue);
+    return {
+      key:       i.key,
+      summary:   i.fields.summary,
+      team:      extractTeam(i.key),
+      type:      i.fields.issuetype?.name || null,
+      status:    i.fields.status?.name || 'To Do',
+      assignee:  i.fields.assignee?.displayName || null,
+      reporter:  i.fields.reporter?.displayName || null,
+      // Server sometimes returns customfield_16100 as a plain key string, sometimes as an object
+      // with a `.key` — observed inconsistently across custom field configs; normalize both.
+      // customfield_10000 (Epic Link) is always a plain key string.
+      parentKey: (i.fields.customfield_16100 && i.fields.customfield_16100.key) || i.fields.customfield_16100
+        || i.fields.customfield_10000 || (parentLink && parentLink.inwardIssue.key) || null,
+      start:     i.fields.customfield_10110 || null,
+      end:       i.fields.customfield_10111 || null
+    };
+  });
 }
 
 async function getRootEpicMeta(token, epicKey) {
