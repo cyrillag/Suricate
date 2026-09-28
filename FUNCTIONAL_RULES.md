@@ -251,14 +251,18 @@ path (`refreshFullEpicTree`).
   ways always gets a consistent result rather than one that depends on fetch order. The scope search
   is paginated — a box can exceed one 500-issue page (BGP's is about that size), and a silently
   truncated page would drop arbitrary nodes.
-- **When the tree contains Phase or Deliverable issues, only those two levels get a row** (plus
-  synthetic groups). The Epic LPM root above them, and the New Features/delivery-team Epics/Tasks
-  below them, are still fetched and still feed the rollup — a Deliverable's dates and status are
-  those of the work underneath it, a Phase's those of its Deliverables — they just aren't drawn.
-  Indentation counts displayed ancestors only (Phase at depth 0, Deliverable at depth 1, whatever
-  the raw Jira depth), and a Deliverable gets no collapse caret since nothing renders under it. A
-  box with no Phase/Deliverable issue anywhere keeps the Epic-level rule below, so existing
-  Epic-based boxes (HYBR-95) are unaffected.
+- **On a Phase/Deliverable-structured box, only those two levels get a row** (plus synthetic
+  groups). A box counts as structured when at least one **Phase is linked ("is child of") directly
+  under the project's root epic** (`jira_root_epic`) — not merely when a Phase/Deliverable issue
+  appears somewhere in scope: Encryption at Rest's box (HYBR-95) carries one stray Deliverable in an
+  otherwise Epic-based tree, and a presence check (shipped briefly on preview) collapsed its ~35
+  rows down to 2. The flag is computed in `buildPlanningTree` and frozen on every node of the
+  snapshot (`structured`), so a past week keeps rendering the way it was generated. The Epic LPM
+  root above, and the New Features/delivery-team Epics/Tasks below, are still fetched and still
+  feed the rollup — they just aren't drawn. Indentation counts displayed ancestors only (Phase at
+  depth 0, Deliverable at depth 1, whatever the raw Jira depth), and a Deliverable gets no collapse
+  caret since nothing renders under it. Any other box keeps the Epic-level rule below, and none of
+  the Phase/Deliverable date/status rules further down apply to it either.
 - **Granular work items (Task/Bug/Story/Sub-task/Improvement) still count toward their parent
   Epic's rolled-up dates, but never get their own row.** A box's configured scope commonly includes
   hundreds of these (see above) — rendering every one of them would be the exact opposite of

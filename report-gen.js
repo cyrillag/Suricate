@@ -385,14 +385,12 @@ const GRANULAR_TYPES = new Set(['Task', 'Sub-task', 'Subtask', 'Bug', 'Story', '
 // A box built on the "Epic LPM > Phase > Deliverable > New Feature > Epic" structure (BGP Service)
 // is reported at the Phase/Deliverable levels only — everything above (the Epic LPM root) and below
 // (New Feature, delivery-team Epics, their Tasks) is still fetched and still feeds the rollup dates
-// and statuses, it just never gets a row. Only kicks in when the tree actually contains one of these
-// types, so a box with a plain Epic-based hierarchy (HYBR-95) keeps the GRANULAR_TYPES rule above.
+// and statuses, it just never gets a row. Only on a tree buildPlanningTree (server.js) flagged as
+// structured (a Phase linked directly under the root epic) — a box with a plain Epic-based
+// hierarchy (HYBR-95, even with a stray Deliverable in it) keeps the GRANULAR_TYPES rule above.
 const REPORTED_LEVEL_TYPES = new Set(['Phase', 'Deliverable']);
-function treeHasType(tree, types) {
-  return tree.some(n => types.has(n.type) || treeHasType(n.children, types));
-}
 function flattenPlanningTree(tree) {
-  const levelsOnly = treeHasType(tree, REPORTED_LEVEL_TYPES);
+  const levelsOnly = tree.some(n => n.structured);
   const isRow = node => node.key.startsWith('GROUP:')
     || (levelsOnly ? REPORTED_LEVEL_TYPES.has(node.type) : !GRANULAR_TYPES.has(node.type));
   const out = [];

@@ -216,11 +216,11 @@ async function refreshFullEpicTree(projectId, rootEpic) {
 // configuration, not a raw Jira portfolio walk. Fetches the box's narrowingQuery/manuallyAddedTasks
 // (bigpicture.js), runs that JQL through the plain Jira search API (jira.js's searchByJql), caches
 // the result into epics_cache like every other epic-fetching path here, then builds the tree.
-async function resolvePlanningTree(projectId, boxId) {
+async function resolvePlanningTree(projectId, boxId, rootEpic) {
   const { queries, manualKeys } = await bigpicture.getScopeDefinition(BIGPICTURE_TOKEN, boxId);
   const epics = await jira.searchByJql(JIRA_TOKEN, queries, manualKeys);
   epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter, e.parentKey));
-  return buildPlanningTree(projectId, epics);
+  return buildPlanningTree(projectId, epics, rootEpic);
 }
 
 // Builds the hierarchy from a freshly-fetched BigPicture-scoped epic set — not re-read from
@@ -230,7 +230,7 @@ async function resolvePlanningTree(projectId, boxId) {
 // dates up from leaves to root (a parent's own dates are never used, only computed — see
 // FUNCTIONAL_RULES.md "level above inherits from below" — except on a Phase/Deliverable, whose own
 // Jira dates win when set).
-function buildPlanningTree(projectId, epics) {
+function buildPlanningTree(projectId, epics, rootEpic) {
   const overrides = db.prepare('SELECT * FROM planning_overrides WHERE project_id=?').all(projectId);
   const overrideByKey = new Map(overrides.map(o => [o.jira_key, o]));
   const groups = db.prepare('SELECT * FROM planning_groups WHERE project_id=? ORDER BY sort_order').all(projectId);
@@ -239,7 +239,10 @@ function buildPlanningTree(projectId, epics) {
   // an issue attached only through a leftover Parent Link/Epic Link isn't part of that structure and
   // must not skew a Phase's or Deliverable's rollup (verified on BGP: old NETDC epics still pointing
   // at the ALPHA phase via Parent Link pushed its end from Dec 2025 to Jul 2026). Links only, then.
-  const structured = epics.some(e => REPORTED_LEVEL_TYPES.has(e.type));
+  // Detected by a Phase linked directly under the project's root epic, not by the mere presence of
+  // a Phase/Deliverable issue — Encryption at Rest's box (HYBR-95) carries one stray Deliverable in
+  // an otherwise Epic-based tree, and a presence check collapsed its ~35 rows down to 2.
+  const structured = epics.some(e => e.type === 'Phase' && e.linkParentKey && e.linkParentKey === rootEpic);
 
   const byKey = new Map();
   epics.forEach(e => {
@@ -251,6 +254,9 @@ function buildPlanningTree(projectId, epics) {
       // A manual group assignment overrides the node's natural Jira parent — moving it under a
       // PM-defined aggregate instead of (not in addition to) where BigPicture's scope put it.
       parentKey: (ov && ov.group_id ? `GROUP:${ov.group_id}` : (structured ? e.linkParentKey : e.parentKey)) || null,
+      // Frozen with the snapshot, so flattenPlanningTree knows which row rule applies — a legacy
+      // snapshot without it keeps the Epic-level rule.
+      structured,
       children: []
     });
   });
@@ -280,10 +286,10 @@ function buildPlanningTree(projectId, epics) {
     // wins, each field independently, and only a missing one is computed from below. Their Jira
     // status, on the other hand, is a workflow placeholder ("Request" on every BGP one) — it's
     // always computed from below, like a group's.
-    const ownDates = REPORTED_LEVEL_TYPES.has(node.type);
-    node.start = (ownDates && node.start) || (starts.length ? starts.reduce((a, b) => a < b ? a : b) : null);
-    node.end   = (ownDates && node.end)   || (ends.length ? ends.reduce((a, b) => a > b ? a : b) : null);
-    if (node.status === null || REPORTED_LEVEL_TYPES.has(node.type)) {
+    const plannedLevel = node.structured && REPORTED_LEVEL_TYPES.has(node.type);
+    node.start = (plannedLevel && node.start) || (starts.length ? starts.reduce((a, b) => a < b ? a : b) : null);
+    node.end   = (plannedLevel && node.end)   || (ends.length ? ends.reduce((a, b) => a > b ? a : b) : null);
+    if (node.status === null || plannedLevel) {
       // Same worst-of precedence as every other status roll-up in this app (deliverable-level,
       // multi-epic workstreams): Done only if every child is, otherwise Blocked beats In Progress
       // beats To Start.
@@ -680,7 +686,7 @@ async function generateReportRow(proj, year, week) {
   // view) on any failure, so a BigPicture outage doesn't block report generation.
   let planningTree = null;
   if (proj.bigpicture_box_id && BIGPICTURE_TOKEN) {
-    try { planningTree = await resolvePlanningTree(proj.id, proj.bigpicture_box_id); }
+    try { planningTree = await resolvePlanningTree(proj.id, proj.bigpicture_box_id, proj.jira_root_epic); }
     catch (err) { console.warn(`Could not resolve Planning Light tree for box ${proj.bigpicture_box_id}: ${err.message}`); }
   }
 
