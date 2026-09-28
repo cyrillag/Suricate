@@ -274,6 +274,23 @@ path (`refreshFullEpicTree`).
   applies to both a real Jira parent epic and a synthetic aggregate group (see below) — a group has
   no dates of its own by definition, only ever rolled-up ones. A leaf epic keeps its own real Jira
   dates.
+  - **Exception: Phase and Deliverable issues keep their own Jira Start/End when set** — they're the
+    levels a PM plans on directly (BGP: Technical delivery set to 01/12/25 → 03/11/26 in Jira,
+    while its children only covered 02/03/26 → 15/09/26). Each field independently: a missing Start
+    or End is still computed from below. A Phase with no dates of its own therefore rolls up from its
+    Deliverables' *effective* dates (own-or-computed).
+  - **Their status, however, is always computed from below** (same worst-of rule as a group: Done
+    only if every child is, then Blocked > In Progress > To Start) — their Jira workflow status is a
+    placeholder ("Request" on every BGP Phase/Deliverable), which would otherwise show everything as
+    To Start. A Phase/Deliverable with no child in scope keeps its own mapped status.
+  - **On a Phase/Deliverable-structured box, the hierarchy follows "Parent-Child" links only** — the
+    `cf[16100]`/Epic Link fallbacks are ignored (`searchByJql`'s `linkParentKey`). Verified on BGP:
+    old NETDC epics still attached to the ALPHA phase via Parent Link only (no link) pushed its end
+    from Dec 2025 to Jul 2026. An issue in the box's scope but with no link parent simply becomes a
+    non-displayed root, contributing to nothing. Conversely, an issue linked into the tree but
+    outside the BigPicture box's scope is not fetched at all — the scope still comes from the box
+    (BGP: 7 link-only issues such as XDEP-202/203 aren't reached by a `portfolioChildrenOf` walk of
+    LVL2-3688); adding them is a box-configuration fix, not a Suricate one.
 - **Local overrides — hide, rename, group — are Suricate-only and unidirectional; nothing here is
   ever written back to Jira.** (Bi-directional Start/End date sync back to Jira, the other stated
   requirement, is an explicit, deliberately separate later phase — new risk profile, writing to

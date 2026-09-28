@@ -895,3 +895,4 @@ const CSS = `
 `;
 
 module.exports = generateReport;
+module.exports.REPORTED_LEVEL_TYPES = REPORTED_LEVEL_TYPES;

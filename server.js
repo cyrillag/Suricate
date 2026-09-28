@@ -7,6 +7,7 @@ const jira       = require('./jira');
 const bigpicture = require('./bigpicture');
 const confluence = require('./confluence');
 const genReport  = require('./report-gen');
+const { REPORTED_LEVEL_TYPES } = genReport;
 const qualityCheck = require('./quality-check');
 const { translate, pluralize } = require('./i18n');
 const { AppError } = require('./errors');
@@ -227,11 +228,18 @@ async function resolvePlanningTree(projectId, boxId) {
 // Sync Jira, seedWorkstreamsFromJiraTree, refreshFullEpicTree) that have nothing to do with this
 // project's Planning Light scope. Applies the PM's local hide/rename/group overrides, then rolls
 // dates up from leaves to root (a parent's own dates are never used, only computed — see
-// FUNCTIONAL_RULES.md "level above inherits from below").
+// FUNCTIONAL_RULES.md "level above inherits from below" — except on a Phase/Deliverable, whose own
+// Jira dates win when set).
 function buildPlanningTree(projectId, epics) {
   const overrides = db.prepare('SELECT * FROM planning_overrides WHERE project_id=?').all(projectId);
   const overrideByKey = new Map(overrides.map(o => [o.jira_key, o]));
   const groups = db.prepare('SELECT * FROM planning_groups WHERE project_id=? ORDER BY sort_order').all(projectId);
+
+  // A Phase/Deliverable-structured box (BGP Service) is built entirely from "Parent-Child" links —
+  // an issue attached only through a leftover Parent Link/Epic Link isn't part of that structure and
+  // must not skew a Phase's or Deliverable's rollup (verified on BGP: old NETDC epics still pointing
+  // at the ALPHA phase via Parent Link pushed its end from Dec 2025 to Jul 2026). Links only, then.
+  const structured = epics.some(e => REPORTED_LEVEL_TYPES.has(e.type));
 
   const byKey = new Map();
   epics.forEach(e => {
@@ -242,7 +250,7 @@ function buildPlanningTree(projectId, epics) {
       groupId: (ov && ov.group_id) || null,
       // A manual group assignment overrides the node's natural Jira parent — moving it under a
       // PM-defined aggregate instead of (not in addition to) where BigPicture's scope put it.
-      parentKey: (ov && ov.group_id ? `GROUP:${ov.group_id}` : e.parentKey) || null,
+      parentKey: (ov && ov.group_id ? `GROUP:${ov.group_id}` : (structured ? e.linkParentKey : e.parentKey)) || null,
       children: []
     });
   });
@@ -268,9 +276,14 @@ function buildPlanningTree(projectId, epics) {
     node.children.forEach(rollup);
     const starts = node.children.map(c => c.start).filter(Boolean);
     const ends   = node.children.map(c => c.end).filter(Boolean);
-    node.start = starts.length ? starts.reduce((a, b) => a < b ? a : b) : null;
-    node.end   = ends.length ? ends.reduce((a, b) => a > b ? a : b) : null;
-    if (node.status === null) {
+    // Phases/Deliverables are the levels a PM plans on directly in Jira: their own Start/End date
+    // wins, each field independently, and only a missing one is computed from below. Their Jira
+    // status, on the other hand, is a workflow placeholder ("Request" on every BGP one) — it's
+    // always computed from below, like a group's.
+    const ownDates = REPORTED_LEVEL_TYPES.has(node.type);
+    node.start = (ownDates && node.start) || (starts.length ? starts.reduce((a, b) => a < b ? a : b) : null);
+    node.end   = (ownDates && node.end)   || (ends.length ? ends.reduce((a, b) => a > b ? a : b) : null);
+    if (node.status === null || REPORTED_LEVEL_TYPES.has(node.type)) {
       // Same worst-of precedence as every other status roll-up in this app (deliverable-level,
       // multi-epic workstreams): Done only if every child is, otherwise Blocked beats In Progress
       // beats To Start.

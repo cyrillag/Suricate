@@ -192,6 +192,9 @@ async function searchByJql(token, jqlClauses, extraKeys = []) {
       parentKey: (parentLink && parentLink.inwardIssue.key)
         || (i.fields.customfield_16100 && i.fields.customfield_16100.key) || i.fields.customfield_16100
         || i.fields.customfield_10000 || null,
+      // The link alone, without the custom-field fallbacks — a Phase/Deliverable-structured box
+      // follows links only (see buildPlanningTree).
+      linkParentKey: (parentLink && parentLink.inwardIssue.key) || null,
       start:     i.fields.customfield_10110 || null,
       end:       i.fields.customfield_10111 || null
     };
