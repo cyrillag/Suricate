@@ -330,11 +330,21 @@ path (`refreshFullEpicTree`).
   `null`; an opted-in project whose BigPicture box resolves to zero items still gets the Planning
   Light section (with a "No items in the configured scope" message), never a silent fallback to the
   old view, since falling back there would mask a real misconfiguration.
-- **Same fiscal-quarter timeline axis as the classic Gantt, reusing the exact same
-  `buildGanttMonths`/6-month-back floor** — no separate quarter logic for this section. Unlike the
-  classic Gantt, the timeline bars here are rendered server-side as plain HTML (not built from a
-  JSON blob by client-side JS) so each row's hide/rename/group `<form>` can sit directly next to its
-  own bar row without a separate hydration step; only collapse/expand needs any client JS.
+- **Same fiscal-quarter month axis as the classic Gantt (`buildGanttMonths`), but its own window:
+  from 3 months before today (not the classic Gantt's 6) to the end of the month of the latest date
+  shown, at least 3 months ahead** — no fixed end date (the old hardcoded 30/11/2026 already clipped
+  HYBR-95 and HYBR-122). An item that ended before the window gets a "◂ Ended <date>" label instead
+  of a clamped sliver on the left edge. Unlike the classic Gantt, the timeline bars here are
+  rendered server-side as plain HTML (not built from a JSON blob by client-side JS) so each row's
+  hide/rename/group `<form>` can sit directly next to its own bar row without a separate hydration
+  step; only collapse/expand needs any client JS.
+- **Only the timeline scrolls horizontally; the Summary/Status column stays fixed.** Each month has
+  a fixed width (`PLANNING_MONTH_PX`), stretched to the full width when the plan is short. The PDF
+  export can't scroll, so its print CSS squeezes the whole timeline into the page width instead.
+- **Rows are sorted chronologically at every level** (siblings only — the hierarchy is kept), on
+  effective dates (own or rolled up): by start, or by end when there's no start, then by end;
+  undated items last. Jira's search order meant nothing here (BGP's GA phase appeared above
+  ALPHA/BETA). Applies to every Planning Light box.
 - **Collapse/expand is client-side only and deliberately not persisted** — it resets on reload. The
   one thing about a row's visibility that actually needs to survive a reload (whether it's hidden
   from the report at all) is already handled server-side via `planning_overrides.hidden`; collapse

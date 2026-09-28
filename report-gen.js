@@ -104,17 +104,25 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
 
   // Planning Light (see FUNCTIONAL_RULES.md) — when the project is opted in (planningTree isn't
   // null), it REPLACES the flat ganttEpics section above rather than sitting alongside it. Same
-  // fixed 6-month-back/fiscal-quarter timeline axis as the classic Gantt, computed server-side
-  // here (not client-side like GANTT_JS below) so the hide/rename/group forms can be rendered as
-  // plain HTML in lockstep with the bars, with no client JS needed beyond collapse/expand.
-  const planningTstart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - 6, 1));
-  const planningTend = new Date('2026-11-30');
+  // fiscal-quarter month axis as the classic Gantt, computed server-side here (not client-side like
+  // GANTT_JS below) so the hide/rename/group forms can be rendered as plain HTML in lockstep with
+  // the bars, with no client JS needed beyond collapse/expand. The axis starts 3 months before
+  // today (not the classic Gantt's 6) and runs to the end of the month of the latest date shown —
+  // at least 3 months ahead — instead of a fixed end: the timeline scrolls horizontally on its own
+  // (see renderPlanningSection), so a long plan no longer has to be clipped or squeezed to fit.
+  const planningRows = planningTree ? flattenPlanningTree(planningTree) : null;
+  const nowUtc = new Date();
+  const planningTstart = new Date(Date.UTC(nowUtc.getUTCFullYear(), nowUtc.getUTCMonth() - 3, 1));
+  const latestPlanningDate = (planningRows || []).flatMap(r => [r.start, r.end]).filter(Boolean)
+    .reduce((a, b) => a > b ? a : b, new Date(Date.UTC(nowUtc.getUTCFullYear(), nowUtc.getUTCMonth() + 3, 1)).toISOString().slice(0, 10));
+  // Exclusive end: the 1st of the month after the latest date, so that whole last month is drawn.
+  const planningTend = new Date(Date.UTC(Number(latestPlanningDate.slice(0, 4)), Number(latestPlanningDate.slice(5, 7)), 1));
   const pctDate = d => {
     if (!d) return null;
     const p = (new Date(d) - planningTstart) / (planningTend - planningTstart) * 100;
     return Math.max(0, Math.min(100, p));
   };
-  const planningRows = planningTree ? flattenPlanningTree(planningTree) : null;
+  const planningTstartIso = planningTstart.toISOString().slice(0, 10);
   // Hiding a node only removes that one row — its children still render (at their existing
   // indent), so hiding a noisy wrapper epic doesn't also erase the informative sub-epics under it
   // (see FUNCTIONAL_RULES.md). Owners keep hidden rows in the DOM (dimmed, only visible in Manage
@@ -123,7 +131,8 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
   const visiblePlanningRows = planningRows ? (isOwner ? planningRows : planningRows.filter(r => !r.hidden)) : null;
   const groupOptions = planningRows ? planningRows.filter(r => r.isGroup).map(r => ({ id: Number(r.key.slice(6)), name: r.summary })) : [];
   const hasPartialDatesPlanning = visiblePlanningRows ? visiblePlanningRows.some(r => (r.start && !r.end) || (!r.start && r.end)) : false;
-  const { months: planningMonths, quarterLines: planningQuarterLines } = planningTree ? buildGanttMonths(planningTstart, planningTend) : { months: [], quarterLines: [] };
+  // buildGanttMonths' end is inclusive — pass the last day of the last month, not the exclusive end.
+  const { months: planningMonths, quarterLines: planningQuarterLines } = planningTree ? buildGanttMonths(planningTstart, new Date(planningTend - 86400000)) : { months: [], quarterLines: [] };
 
   // Donut data
   const donutJSON = JSON.stringify([
@@ -275,7 +284,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
     </div>
   </div>
 
-  ${planningTree !== null ? renderPlanningSection({ project, yearWeek, isOwner, isCurrentWeek, visiblePlanningRows, groupOptions, hasPartialDatesPlanning, planningMonths, planningQuarterLines, pctDate }) : (ganttEpics.length ? `
+  ${planningTree !== null ? renderPlanningSection({ project, yearWeek, isOwner, isCurrentWeek, visiblePlanningRows, groupOptions, hasPartialDatesPlanning, planningMonths, planningQuarterLines, pctDate, planningTstartIso }) : (ganttEpics.length ? `
   <div class="matrix-section">
     <div class="section-label">Planning — team epics</div>
     <div class="gantt-mobile-note">📊 The planning timeline needs a wider screen — view this report on a desktop or tablet to see it.</div>
@@ -420,7 +429,11 @@ const PLANNING_STATUS_LABEL = { done: 'Done', prog: 'In Progress', blk: 'Blocked
 // Same full/fade-left/fade-right/no-date bar logic as GANTT_JS's client-side version, just
 // rendered server-side here (see planningTstart/pctDate at the call site) so it can sit in
 // lockstep with the plain-HTML hide/rename/group forms below without needing a JSON hydration step.
-function planningBarHtml(r, pctDate) {
+function planningBarHtml(r, pctDate, tstartIso) {
+  // Entirely before the 3-month window: clamping would leave a meaningless sliver on the left edge.
+  if (r.end && r.end < tstartIso) {
+    return `<span class="gantt-nodates" title="${esc(r.key)} — ${esc(r.summary)}&#10;${esc(r.start || '?')} → ${esc(r.end)}">◂ Ended ${esc(r.end)}</span>`;
+  }
   if (r.start && r.end) {
     const l = pctDate(r.start), w = Math.max(0.5, pctDate(r.end) - l);
     return `<div class="gantt-bar ${r.status}" style="left:${l.toFixed(2)}%;width:${w.toFixed(2)}%" title="${esc(r.key)} — ${esc(r.summary)}&#10;${r.start} → ${r.end}"></div>`;
@@ -466,7 +479,11 @@ function planningManageControls(r, project, yearWeek, groupOptions) {
 // project has an opted-in bigpicture_box_id. Rows/bars are plain server-rendered HTML (not built
 // from a JSON blob client-side like GANTT_JS) so the per-row hide/rename/group <form>s can sit
 // directly next to their row; only collapse/expand needs any client JS (PLANNING_COLLAPSE_JS).
-function renderPlanningSection({ project, yearWeek, isOwner, isCurrentWeek, visiblePlanningRows, groupOptions, hasPartialDatesPlanning, planningMonths, planningQuarterLines, pctDate }) {
+// Fixed width per month: the Summary/Status column stays put while only the timeline scrolls
+// horizontally (.planning-rscroll) once the months no longer fit — min-width:100% still stretches a
+// short plan to the full available width.
+const PLANNING_MONTH_PX = 110;
+function renderPlanningSection({ project, yearWeek, isOwner, isCurrentWeek, visiblePlanningRows, groupOptions, hasPartialDatesPlanning, planningMonths, planningQuarterLines, pctDate, planningTstartIso }) {
   const manageCbId = 'pl-manage-cb';
   if (!visiblePlanningRows.length) {
     return `
@@ -488,7 +505,7 @@ function renderPlanningSection({ project, yearWeek, isOwner, isCurrentWeek, visi
       ${isOwner ? planningManageControls(r, project, yearWeek, groupOptions) : ''}
     </div>`).join('');
   const rrows = visiblePlanningRows.map(r => `
-    <div class="planning-row${r.hidden ? ' pl-hidden' : ''}">${planningBarHtml(r, pctDate)}</div>`).join('');
+    <div class="planning-row${r.hidden ? ' pl-hidden' : ''}">${planningBarHtml(r, pctDate, planningTstartIso)}</div>`).join('');
 
   return `
   <div class="matrix-section planning-section">
@@ -511,9 +528,11 @@ function renderPlanningSection({ project, yearWeek, isOwner, isCurrentWeek, visi
         <div class="gantt-lhdr planning-lhdr"><span class="pl-hdr-summary">Summary</span><span class="pl-hdr-status">Status</span></div>
         ${lrows}
       </div>
-      <div class="gantt-rcol">
-        <div class="gantt-months">${monthsHtml}</div>
-        <div class="gantt-body" id="planning-body">${qtrLinesHtml}${todayLineHtml}${rrows}</div>
+      <div class="planning-rscroll">
+        <div class="gantt-rcol" style="width:${planningMonths.length * PLANNING_MONTH_PX}px">
+          <div class="gantt-months">${monthsHtml}</div>
+          <div class="gantt-body" id="planning-body">${qtrLinesHtml}${todayLineHtml}${rrows}</div>
+        </div>
       </div>
     </div>
     <div class="gantt-legend">
@@ -830,6 +849,10 @@ const CSS = `
      .gantt-body/.gantt-bar/.gantt-vline/.gantt-legend as-is; only the left label column becomes a
      wider 2-sub-column (Summary, Status) tree instead of the classic single team/key/name row. */
   .planning-lcol{width:340px}
+  /* Only the timeline scrolls; the label column is outside the scroller, so it stays fixed. */
+  .planning-outer{overflow-x:visible}
+  .planning-rscroll{flex:1;min-width:0;overflow-x:auto}
+  .planning-rscroll .gantt-rcol{min-width:100%}
   .planning-lhdr{display:flex;align-items:center;padding:0 12px;gap:8px}
   .pl-hdr-summary{flex:1;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tx3)}
   .pl-hdr-status{width:84px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tx3)}
@@ -885,6 +908,8 @@ const CSS = `
      arrows are hidden here, not the whole .week-nav — .ref-week (the "W35 · 2026" label) is the
      one piece of that widget that's informational rather than an action, and must stay. */
   @media print{.week-arrow,.nav-user,a[href$="/pdf"],a[href$="/edit"],form[action$="/reports/generate"],.confluence-link-wrap{display:none!important}}
+  /* A PDF can't scroll: squeeze the whole Planning Light timeline into the page width instead. */
+  @media print{.planning-rscroll{overflow:visible}.planning-rscroll .gantt-rcol{width:auto!important;min-width:0}}
   /* Deliberately subtle — a secondary way to reach more detail, not a primary action next to
      Refresh/Export PDF. Underline-on-hover only, inherits the muted .page-sub text color rather
      than getting its own accent treatment. */
