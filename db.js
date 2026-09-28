@@ -66,6 +66,8 @@ db.exec(`
     UNIQUE(project_id, jira_key)
   );
 
+  -- Retired with the Planning Light "Manage" mode (see FUNCTIONAL_RULES.md): planning_groups and
+  -- planning_overrides are no longer read or written, only kept so existing rows aren't dropped.
   -- Planning Light (see FUNCTIONAL_RULES.md). A PM-defined aggregate group (e.g. "NCC + ECPROJ +
   -- MANAGER together") — a synthetic parent node. Its own dates are never stored: they roll up
   -- from its members the same way any real Jira parent's do (see resolvePlanningTree), so there's

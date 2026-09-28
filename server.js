@@ -220,21 +220,16 @@ async function resolvePlanningTree(projectId, boxId, rootEpic) {
   const { queries, manualKeys } = await bigpicture.getScopeDefinition(BIGPICTURE_TOKEN, boxId);
   const epics = await jira.searchByJql(JIRA_TOKEN, queries, manualKeys);
   epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter, e.parentKey));
-  return buildPlanningTree(projectId, epics, rootEpic);
+  return buildPlanningTree(epics, rootEpic);
 }
 
 // Builds the hierarchy from a freshly-fetched BigPicture-scoped epic set — not re-read from
 // epics_cache, which can carry rows from other sync paths sharing that same table (Confluence
 // Sync Jira, seedWorkstreamsFromJiraTree, refreshFullEpicTree) that have nothing to do with this
-// project's Planning Light scope. Applies the PM's local hide/rename/group overrides, then rolls
-// dates up from leaves to root (a parent's own dates are never used, only computed — see
+// project's Planning Light scope. Rolls dates up from leaves to root (a parent's own dates are never used, only computed — see
 // FUNCTIONAL_RULES.md "level above inherits from below" — except on a Phase/Deliverable, whose own
 // Jira dates win when set).
-function buildPlanningTree(projectId, epics, rootEpic) {
-  const overrides = db.prepare('SELECT * FROM planning_overrides WHERE project_id=?').all(projectId);
-  const overrideByKey = new Map(overrides.map(o => [o.jira_key, o]));
-  const groups = db.prepare('SELECT * FROM planning_groups WHERE project_id=? ORDER BY sort_order').all(projectId);
-
+function buildPlanningTree(epics, rootEpic) {
   // A Phase/Deliverable-structured box (BGP Service) is built entirely from "Parent-Child" links —
   // an issue attached only through a leftover Parent Link/Epic Link isn't part of that structure and
   // must not skew a Phase's or Deliverable's rollup (verified on BGP: old NETDC epics still pointing
@@ -246,26 +241,14 @@ function buildPlanningTree(projectId, epics, rootEpic) {
 
   const byKey = new Map();
   epics.forEach(e => {
-    const ov = overrideByKey.get(e.key);
     byKey.set(e.key, {
-      key: e.key, summary: (ov && ov.summary_override) || e.summary, status: jira.mapStatus(e.status),
-      type: e.type, start: e.start, end: e.end, hidden: !!(ov && ov.hidden),
-      groupId: (ov && ov.group_id) || null,
-      // A manual group assignment overrides the node's natural Jira parent — moving it under a
-      // PM-defined aggregate instead of (not in addition to) where BigPicture's scope put it.
-      parentKey: (ov && ov.group_id ? `GROUP:${ov.group_id}` : (structured ? e.linkParentKey : e.parentKey)) || null,
+      key: e.key, summary: e.summary, status: jira.mapStatus(e.status),
+      type: e.type, start: e.start, end: e.end,
+      parentKey: (structured ? e.linkParentKey : e.parentKey) || null,
       // Frozen with the snapshot, so flattenPlanningTree knows which row rule applies — a legacy
       // snapshot without it keeps the Epic-level rule.
       structured,
       children: []
-    });
-  });
-  // A group is a synthetic node — no Jira data of its own, so no status/dates until rollup below.
-  groups.forEach(g => {
-    const ov = overrideByKey.get(`GROUP:${g.id}`);
-    byKey.set(`GROUP:${g.id}`, {
-      key: `GROUP:${g.id}`, summary: (ov && ov.summary_override) || g.name, status: null,
-      start: null, end: null, hidden: !!(ov && ov.hidden), parentKey: null, children: []
     });
   });
 
@@ -275,8 +258,7 @@ function buildPlanningTree(projectId, epics, rootEpic) {
     else roots.push(node);
   });
 
-  // Post-order: a hidden node still counts toward its parent's rollup (hiding is a display choice
-  // for the report, not a claim that the work doesn't exist) — only the renderer skips drawing it.
+  // Post-order: children first, so a parent always rolls up from already-rolled-up children.
   function rollup(node) {
     if (!node.children.length) return node;
     node.children.forEach(rollup);
@@ -285,11 +267,11 @@ function buildPlanningTree(projectId, epics, rootEpic) {
     // Phases/Deliverables are the levels a PM plans on directly in Jira: their own Start/End date
     // wins, each field independently, and only a missing one is computed from below. Their Jira
     // status, on the other hand, is a workflow placeholder ("Request" on every BGP one) — it's
-    // always computed from below, like a group's.
+    // always computed from below.
     const plannedLevel = node.structured && REPORTED_LEVEL_TYPES.has(node.type);
     node.start = (plannedLevel && node.start) || (starts.length ? starts.reduce((a, b) => a < b ? a : b) : null);
     node.end   = (plannedLevel && node.end)   || (ends.length ? ends.reduce((a, b) => a > b ? a : b) : null);
-    if (node.status === null || plannedLevel) {
+    if (plannedLevel) {
       // Same worst-of precedence as every other status roll-up in this app (deliverable-level,
       // multi-epic workstreams): Done only if every child is, otherwise Blocked beats In Progress
       // beats To Start.
@@ -799,86 +781,6 @@ app.post('/projects/:slug/reports/:yearweek(\\d{4}-W\\d{2})/delete', requireAuth
   const [yr, wn] = req.params.yearweek.split('-W');
   db.prepare('DELETE FROM reports WHERE project_id=? AND year=? AND week=?').run(proj.id, parseInt(yr), parseInt(wn));
   res.redirect(`/projects/${proj.slug}`);
-});
-
-// ── PLANNING LIGHT — owner-local declutter/edit ────────────────────
-// Hide/rename/group are Suricate-local only (see FUNCTIONAL_RULES.md "Planning Light") — never
-// written back to Jira (that's the deferred Phase 2).
-function planningRedirect(proj, redirect) {
-  return /^\d{4}-W\d{2}$/.test(redirect || '') ? `/projects/${proj.slug}/${redirect}` : `/projects/${proj.slug}`;
-}
-
-// A planning override otherwise only takes effect on the report's next full ↻ Refresh
-// (frozen-snapshot rule, same as everywhere else) — which read as "nothing happened" the first
-// time this shipped (a group got created but never showed up, since the page the form redirected
-// back to was still the old frozen snapshot). Regenerating here closes that gap for the one case
-// where it's cheap and expected to feel instant: editing the *current* week, right after the edit
-// that was just made. A past week stays untouched — it's locked/frozen forever regardless
-// (`isPastWeek`'s existing rule), so there's nothing to regenerate there; the override itself is
-// still saved either way and will apply whenever that project's current week is next generated.
-async function regenerateIfCurrentWeek(proj, redirect) {
-  if (redirect !== currentWeekStr()) return;
-  const [yr, wn] = redirect.split('-W');
-  try { await generateReportRow(proj, parseInt(yr, 10), parseInt(wn, 10)); }
-  catch (err) { console.warn(`Could not regenerate report after a Planning Light edit: ${err.message}`); }
-}
-
-app.post('/projects/:slug/planning/hide', requireAuth, async (req, res) => {
-  const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
-  if (!proj) return res.status(404).send('Project not found.');
-  const { jira_key, hidden, redirect } = req.body;
-  if (jira_key) {
-    db.prepare(`INSERT INTO planning_overrides(project_id, jira_key, hidden) VALUES(?,?,?)
-      ON CONFLICT(project_id, jira_key) DO UPDATE SET hidden=excluded.hidden, updated_at=unixepoch()`)
-      .run(proj.id, jira_key, hidden ? 1 : 0);
-  }
-  await regenerateIfCurrentWeek(proj, redirect);
-  res.redirect(planningRedirect(proj, redirect));
-});
-
-app.post('/projects/:slug/planning/rename', requireAuth, async (req, res) => {
-  const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
-  if (!proj) return res.status(404).send('Project not found.');
-  const { jira_key, summary_override, redirect } = req.body;
-  if (jira_key) {
-    const override = (summary_override || '').trim() || null;
-    db.prepare(`INSERT INTO planning_overrides(project_id, jira_key, summary_override) VALUES(?,?,?)
-      ON CONFLICT(project_id, jira_key) DO UPDATE SET summary_override=excluded.summary_override, updated_at=unixepoch()`)
-      .run(proj.id, jira_key, override);
-  }
-  await regenerateIfCurrentWeek(proj, redirect);
-  res.redirect(planningRedirect(proj, redirect));
-});
-
-app.post('/projects/:slug/planning/group/create', requireAuth, async (req, res) => {
-  const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
-  if (!proj) return res.status(404).send('Project not found.');
-  const { name, redirect } = req.body;
-  if (name?.trim()) {
-    db.prepare('INSERT INTO planning_groups(project_id, name) VALUES(?,?)').run(proj.id, name.trim());
-  }
-  await regenerateIfCurrentWeek(proj, redirect);
-  res.redirect(planningRedirect(proj, redirect));
-});
-
-app.post('/projects/:slug/planning/group/assign', requireAuth, async (req, res) => {
-  const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
-  if (!proj) return res.status(404).send('Project not found.');
-  const { jira_key, group_id, redirect } = req.body;
-  if (jira_key) {
-    const gid = group_id ? parseInt(group_id, 10) : null;
-    // A group_id could otherwise come from another project's table row entirely — cheap to check
-    // given how rarely this route fires, and it stops one owner reparenting under a group that
-    // isn't theirs.
-    const validGroup = gid ? db.prepare('SELECT 1 FROM planning_groups WHERE id=? AND project_id=?').get(gid, proj.id) : true;
-    if (validGroup) {
-      db.prepare(`INSERT INTO planning_overrides(project_id, jira_key, group_id) VALUES(?,?,?)
-        ON CONFLICT(project_id, jira_key) DO UPDATE SET group_id=excluded.group_id, updated_at=unixepoch()`)
-        .run(proj.id, jira_key, gid);
-    }
-  }
-  await regenerateIfCurrentWeek(proj, redirect);
-  res.redirect(planningRedirect(proj, redirect));
 });
 
 // ── REPORT VIEW ───────────────────────────────────────────────────

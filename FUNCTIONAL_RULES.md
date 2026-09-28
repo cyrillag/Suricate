@@ -268,11 +268,8 @@ path (`refreshFullEpicTree`).
   hundreds of these (see above) — rendering every one of them would be the exact opposite of
   "light". `report-gen.js`'s `flattenPlanningTree` fetches and keeps them in the tree (so the
   rollup pass in `buildPlanningTree` still sees them) but skips emitting a row for any node whose
-  Jira issue type is in a fixed `GRANULAR_TYPES` set. This is a different mechanism from a PM's
-  manual hide/unhide override — it's always-on and type-based, not stored in
-  `planning_overrides`, so a granular-type item is never individually addressable in Manage mode;
-  only Epic-and-above levels and synthetic groups are (only Phases/Deliverables and groups, on a
-  Phase/Deliverable-structured box — see above).
+  Jira issue type is in a fixed `GRANULAR_TYPES` set (on a Phase/Deliverable-structured box, the
+  Phase/Deliverable rule above applies instead).
 - **A parent's Start/End dates are never read from Jira — they're always computed as the MIN start
   / MAX end of their children**, recursively, bottom-up (`buildPlanningTree`'s `rollup`). This
   applies to both a real Jira parent epic and a synthetic aggregate group (see below) — a group has
@@ -295,37 +292,18 @@ path (`refreshFullEpicTree`).
     outside the BigPicture box's scope is not fetched at all — the scope still comes from the box
     (BGP: 7 link-only issues such as XDEP-202/203 aren't reached by a `portfolioChildrenOf` walk of
     LVL2-3688); adding them is a box-configuration fix, not a Suricate one.
-- **Local overrides — hide, rename, group — are Suricate-only and unidirectional; nothing here is
-  ever written back to Jira.** (Bi-directional Start/End date sync back to Jira, the other stated
-  requirement, is an explicit, deliberately separate later phase — new risk profile, writing to
-  shared Jira data other tools also rely on, not bundled into this read-only-from-Jira phase.)
-  Stored in `planning_overrides`/`planning_groups`, keyed by `jira_key` (or a synthetic
-  `GROUP:<id>` key for a manually-created aggregate group) — **never wiped by a Refresh**, unlike
-  `epics_cache`, which is exactly what makes these overrides survive a re-sync.
-  - **Hide only removes that one row, not its subtree.** A hidden wrapper epic's children still
-    render (at their existing indent) — hiding is for decluttering a noisy intermediate node for
-    communication purposes, not for pruning a whole branch of real work out of the report. A
-    non-owner viewer never receives a hidden row in the HTML at all; the owner does (dimmed,
-    struck-through), only actually visible in the section's "Manage" mode, so a hidden item can
-    still be found again to unhide it — otherwise hiding would be a one-way trip.
-  - **Rename overwrites the display summary only** — unidirectional, exactly like the section says;
-    it never touches the Jira issue's own summary field.
-  - **A manual group assignment overrides a node's natural Jira parent, it doesn't add to it** — a
-    node reassigned to a group renders under that group instead of wherever `cf[16100]` would have
-    put it, the same "replaces, not supplements" pattern the Milestones fields use for Target ETA.
-  - **The planning routes (`/planning/hide`, `/rename`, `/group/create`, `/group/assign`)
-    auto-regenerate the report when the page being edited is the project's current week** —
-    otherwise saving an override behind a frozen snapshot the viewer is still looking at reads as
-    "nothing happened" (this shipped once: a group got created successfully but never appeared,
-    since only its page's own ↻ Refresh button would have picked it up). A past, already-locked
-    week is left untouched (it can never be regenerated, per the existing past-week-locked rule) —
-    the override is still saved and will apply whenever that project's *current* week is next
-    generated, and the Manage-mode UI says so explicitly for a past week, while a current-week edit
-    is presented as taking effect immediately (since it now does).
-- **The whole resolved tree (scope + hierarchy + rollup dates + overrides + groups already applied)
-  is frozen per report row** (`reports.planning_snapshot_json`), same reasoning as every other
-  snapshot column here — a past week's report must not change because a PM hides/renames/regroups
-  something afterward. `null` for a project that hasn't opted in, or for a legacy row predating this
+- **No local overrides (the "Manage" mode is retired).** Planning Light used to let the owner
+  hide, rename and group rows in Suricate itself (`planning_overrides`/`planning_groups`, four
+  `/planning/*` routes, a CSS-only Manage toggle). Removed at the PM's request once the Jira
+  structure itself (Phase > Deliverable via links) gave the report the right rows and labels: the
+  planning now shows exactly what Jira says, and fixing the plan means fixing Jira. Both tables are
+  kept in the schema with their existing rows, just no longer read or written. A report frozen
+  while the mode existed can still carry hidden rows (left out, as they were) or synthetic
+  `GROUP:<id>` nodes (still rendered) in its snapshot. Nothing was ever written back to Jira;
+  bi-directional Start/End date sync remains a separate, later topic.
+- **The whole resolved tree (scope + hierarchy + rollup dates) is frozen per report row**
+  (`reports.planning_snapshot_json`), same reasoning as every other snapshot column here — a past
+  week's report must not change because Jira changes afterward. `null` for a project that hasn't opted in, or for a legacy row predating this
   column — the renderer falls back to the classic flat Gantt only when `planningTree` itself is
   `null`; an opted-in project whose BigPicture box resolves to zero items still gets the Planning
   Light section (with a "No items in the configured scope" message), never a silent fallback to the
@@ -335,9 +313,8 @@ path (`refreshFullEpicTree`).
   shown, at least 3 months ahead** — no fixed end date (the old hardcoded 30/11/2026 already clipped
   HYBR-95 and HYBR-122). An item that ended before the window gets a "◂ Ended <date>" label instead
   of a clamped sliver on the left edge. Unlike the classic Gantt, the timeline bars here are
-  rendered server-side as plain HTML (not built from a JSON blob by client-side JS) so each row's
-  hide/rename/group `<form>` can sit directly next to its own bar row without a separate hydration
-  step; only collapse/expand needs any client JS.
+  rendered server-side as plain HTML (not built from a JSON blob by client-side JS); only
+  collapse/expand needs any client JS.
 - **Only the timeline scrolls horizontally; the Summary/Status column stays fixed.** Each month has
   a fixed width (`PLANNING_MONTH_PX`), stretched to the full width when the plan is short. The PDF
   export can't scroll, so its print CSS squeezes the whole timeline into the page width instead.
@@ -345,15 +322,8 @@ path (`refreshFullEpicTree`).
   effective dates (own or rolled up): by end date, or by start when there's no end, then by start;
   undated items last. Jira's search order meant nothing here (BGP's GA phase appeared above
   ALPHA/BETA). Applies to every Planning Light box.
-- **Collapse/expand is client-side only and deliberately not persisted** — it resets on reload. The
-  one thing about a row's visibility that actually needs to survive a reload (whether it's hidden
-  from the report at all) is already handled server-side via `planning_overrides.hidden`; collapse
-  state is just a reading convenience for the person currently looking at the page.
-- The Manage-mode toggle and all owner-only controls are pure CSS (a hidden checkbox + a
-  `:checked ~` sibling selector), not JavaScript — consistent with the rest of this app's very light
-  client-side footprint. The checkbox is visually hidden via absolute-positioning/opacity, not
-  `display:none`, since a `<label for>` cannot reliably toggle a `display:none` checkbox in every
-  browser.
+- **Collapse/expand is client-side only and deliberately not persisted** — it resets on reload;
+  it's just a reading convenience for the person currently looking at the page.
 
 ## Report export
 
