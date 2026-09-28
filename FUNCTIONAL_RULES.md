@@ -342,7 +342,7 @@ path (`refreshFullEpicTree`).
   a fixed width (`PLANNING_MONTH_PX`), stretched to the full width when the plan is short. The PDF
   export can't scroll, so its print CSS squeezes the whole timeline into the page width instead.
 - **Rows are sorted chronologically at every level** (siblings only — the hierarchy is kept), on
-  effective dates (own or rolled up): by start, or by end when there's no start, then by end;
+  effective dates (own or rolled up): by end date, or by start when there's no end, then by start;
   undated items last. Jira's search order meant nothing here (BGP's GA phase appeared above
   ALPHA/BETA). Applies to every Planning Light box.
 - **Collapse/expand is client-side only and deliberately not persisted** — it resets on reload. The

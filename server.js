@@ -302,11 +302,12 @@ function buildPlanningTree(projectId, epics, rootEpic) {
   }
   roots.forEach(rollup);
 
-  // Chronological order at every level, on the effective (own-or-rolled-up) dates: by start, or by
-  // end for an item with only an end date, then by end; undated items last. Jira's search order
-  // is meaningless here — BGP's GA phase came out above ALPHA/BETA even though it ends last.
-  const sortKey = n => n.start || n.end || '9999-12-31';
-  const byDate = (a, b) => sortKey(a).localeCompare(sortKey(b)) || (a.end || '9999-12-31').localeCompare(b.end || '9999-12-31');
+  // Chronological order at every level, on the effective (own-or-rolled-up) dates: by end date, or
+  // by start for an item with only a start date, then by start; undated items last. End rather
+  // than start, per the PM: what reads as "order" in a plan is when things finish. Jira's search
+  // order is meaningless here — BGP's GA phase came out above ALPHA/BETA even though it ends last.
+  const sortKey = n => n.end || n.start || '9999-12-31';
+  const byDate = (a, b) => sortKey(a).localeCompare(sortKey(b)) || (a.start || '9999-12-31').localeCompare(b.start || '9999-12-31');
   (function sortTree(nodes) { nodes.sort(byDate); nodes.forEach(n => sortTree(n.children)); })(roots);
   return roots;
 }
