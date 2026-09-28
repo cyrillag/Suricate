@@ -382,17 +382,38 @@ function buildGanttMonths(tstart, tend) {
 // so a granular-type row can never be "unhidden" via Manage mode; only Epic-and-above levels (plus
 // synthetic groups) are ever individually addressable there.
 const GRANULAR_TYPES = new Set(['Task', 'Sub-task', 'Subtask', 'Bug', 'Story', 'Improvement']);
-function flattenPlanningTree(tree, depth = 0, out = []) {
-  tree.forEach(node => {
-    if (!GRANULAR_TYPES.has(node.type)) {
-      out.push({
+// A box built on the "Epic LPM > Phase > Deliverable > New Feature > Epic" structure (BGP Service)
+// is reported at the Phase/Deliverable levels only — everything above (the Epic LPM root) and below
+// (New Feature, delivery-team Epics, their Tasks) is still fetched and still feeds the rollup dates
+// and statuses, it just never gets a row. Only kicks in when the tree actually contains one of these
+// types, so a box with a plain Epic-based hierarchy (HYBR-95) keeps the GRANULAR_TYPES rule above.
+const REPORTED_LEVEL_TYPES = new Set(['Phase', 'Deliverable']);
+function treeHasType(tree, types) {
+  return tree.some(n => types.has(n.type) || treeHasType(n.children, types));
+}
+function flattenPlanningTree(tree) {
+  const levelsOnly = treeHasType(tree, REPORTED_LEVEL_TYPES);
+  const isRow = node => node.key.startsWith('GROUP:')
+    || (levelsOnly ? REPORTED_LEVEL_TYPES.has(node.type) : !GRANULAR_TYPES.has(node.type));
+  const out = [];
+  // depth counts emitted ancestors only, not raw tree depth — a Phase under the skipped Epic LPM
+  // root still renders at depth 0, and a Deliverable under it at depth 1.
+  (function walk(nodes, depth) {
+    nodes.forEach(node => {
+      if (!isRow(node)) { walk(node.children, depth); return; }
+      const row = {
         key: node.key, summary: node.summary, status: node.status || 'ts',
-        start: node.start, end: node.end, depth, hasChildren: node.children.length > 0,
+        start: node.start, end: node.end, depth, hasChildren: false,
         isGroup: node.key.startsWith('GROUP:'), hidden: !!node.hidden, groupId: node.groupId || null
-      });
-    }
-    if (node.children.length) flattenPlanningTree(node.children, depth + 1, out);
-  });
+      };
+      out.push(row);
+      const before = out.length;
+      walk(node.children, depth + 1);
+      // Caret only when something actually renders underneath — a Deliverable whose children are
+      // all skipped New Features/Epics is a leaf as far as the report is concerned.
+      row.hasChildren = out.length > before;
+    });
+  })(tree, 0);
   return out;
 }
 

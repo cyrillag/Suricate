@@ -149,22 +149,35 @@ async function getPortfolioEpics(token, rootEpic) {
 // Only 37/246 issues on that real box had customfield_16100 set at all; the other 209 all had
 // customfield_10000 instead. A third real box (custom "Epic LPM"/"Phase"/"Deliverable" issue types,
 // hand-built for a multi-level Planning Light test) additionally used a plain Jira issue-link type
-// named "Parent-Child" for its top level, instead of either custom field — so that's checked too,
-// as a last-resort fallback. All three are merged into a single parentKey per issue so the
-// hierarchy/rollup pass (server.js's buildPlanningTree) doesn't need to know which mechanism
-// applies — an issue only ever has one of the three populated in practice.
+// named "Parent-Child" for its top level, instead of either custom field — so that's checked too.
+// All three are merged into a single parentKey per issue so the hierarchy/rollup pass (server.js's
+// buildPlanningTree) doesn't need to know which mechanism applies.
+// The "Parent-Child" link wins when present: BGP Service was restructured on purpose as
+// "Epic LPM > Phase > Deliverable > New Feature > Epic" entirely through these links, while many of
+// the same issues still carry a customfield_16100 from the older Advanced Roadmaps structure
+// (typically pointing a New Feature straight at the Epic LPM root) — letting that stale field win
+// would attach nodes to the wrong level and skew the Phase/Deliverable rollups.
 async function searchByJql(token, jqlClauses, extraKeys = []) {
   if (!jqlClauses.length && !extraKeys.length) return [];
   const EPIC_FIELDS = 'summary,status,assignee,reporter,customfield_10110,customfield_10111,customfield_16100,customfield_10000,issuelinks,issuetype';
   const parts = jqlClauses.map(q => `(${q})`);
   if (extraKeys.length) parts.push(`issuekey in (${extraKeys.join(',')})`);
   let jql = `(${parts.join(' OR ')}) and status not in (Cancelled, Canceled)`;
-  const data = await api(token, '/search', { jql, fields: EPIC_FIELDS, maxResults: 500 });
-  return data.issues.map(i => {
+  // Paginated — a box scope can exceed one page (BGP's is ~500 issues), and a silently truncated
+  // page would drop arbitrary nodes, possibly a whole Phase or Deliverable.
+  const issues = [];
+  for (let startAt = 0; ; ) {
+    const data = await api(token, '/search', { jql, fields: EPIC_FIELDS, maxResults: 500, startAt });
+    issues.push(...data.issues);
+    startAt += data.issues.length;
+    if (!data.issues.length || startAt >= data.total) break;
+  }
+  return issues.map(i => {
     // A "Parent-Child" link only counts when it's the INWARD side (this issue "is child of" the
     // linked one) — the OUTWARD side ("is parent of") means the linked issue is this one's CHILD,
     // not its parent, and must never be read backwards into a parentKey.
-    const parentLink = (i.fields.issuelinks || []).find(l => l.type?.name === 'Parent-Child' && l.inwardIssue);
+    const parentLink = (i.fields.issuelinks || []).find(l =>
+      (l.type?.name === 'Parent-Child' || l.type?.inward === 'is child of') && l.inwardIssue);
     return {
       key:       i.key,
       summary:   i.fields.summary,
@@ -176,8 +189,9 @@ async function searchByJql(token, jqlClauses, extraKeys = []) {
       // Server sometimes returns customfield_16100 as a plain key string, sometimes as an object
       // with a `.key` — observed inconsistently across custom field configs; normalize both.
       // customfield_10000 (Epic Link) is always a plain key string.
-      parentKey: (i.fields.customfield_16100 && i.fields.customfield_16100.key) || i.fields.customfield_16100
-        || i.fields.customfield_10000 || (parentLink && parentLink.inwardIssue.key) || null,
+      parentKey: (parentLink && parentLink.inwardIssue.key)
+        || (i.fields.customfield_16100 && i.fields.customfield_16100.key) || i.fields.customfield_16100
+        || i.fields.customfield_10000 || null,
       start:     i.fields.customfield_10110 || null,
       end:       i.fields.customfield_10111 || null
     };

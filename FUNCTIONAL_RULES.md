@@ -231,21 +231,34 @@ path (`refreshFullEpicTree`).
   Planning Light didn't need to learn BigPicture's own internal task model at all. **Three different
   mechanisms are checked, in priority order, since which one is populated depends on the issue's own
   level and on how a given PM built their hierarchy**:
-  1. the portfolio-parent field (`cf[16100]`/`customfield_16100` — the field the classic tree-walk
+  1. a plain Jira issue link of type **"Parent-Child"** (`issuelinks`, checked on its *inward* side
+     only — "is child of" — never the outward "is parent of" side, which would read backwards).
+     BGP Service was deliberately restructured as **Epic LPM > Phase > Deliverable > New Feature >
+     Epic (NCC, PSM, NSA…)** entirely through these links, so a link is the PM's explicit, current
+     statement of the hierarchy and wins over the custom fields below — many of the same issues
+     still carry a `cf[16100]` left over from the older Advanced Roadmaps structure (e.g. a New
+     Feature pointing straight at the Epic LPM root), which would attach them to the wrong level.
+     (It used to be the last-resort fallback, back when it only wired a box's top level.);
+  2. the portfolio-parent field (`cf[16100]`/`customfield_16100` — the field the classic tree-walk
      already uses) for Epic-and-above levels;
-  2. the classic "Epic Link" field (`customfield_10000`) for Task/Bug/Story-level issues pointing at
+  3. the classic "Epic Link" field (`customfield_10000`) for Task/Bug/Story-level issues pointing at
      their parent Epic — on one real box, only 37 of 246 issues had `customfield_16100` set at all,
-     the other 209 all used `customfield_10000` instead;
-  3. a plain Jira issue link of type **"Parent-Child"** (`issuelinks`, checked on its *inward* side
-     only — "is child of" — never the outward "is parent of" side, which would read backwards) —
-     seen on a real box built with custom "Epic LPM"/"Phase"/"Deliverable" issue types for a
-     multi-level Planning Light test, where the top level was wired via this link type instead of
-     either custom field, with lower levels (Phase/Deliverable) using `cf[16100]` like normal. All
-     three land in a single `parentKey` per issue (`jira.js`'s `searchByJql`) so the hierarchy/rollup
-     pass (`buildPlanningTree`) doesn't need to know which one applies for a given issue — in
-     practice an issue only ever has one of the three actually populated. Because the priority order
-     is fixed, a PM who wires the *same* relationship two different ways (redundantly) always gets a
-     consistent result rather than one that depends on fetch order.
+     the other 209 all used `customfield_10000` instead.
+
+  All three land in a single `parentKey` per issue (`jira.js`'s `searchByJql`) so the
+  hierarchy/rollup pass (`buildPlanningTree`) doesn't need to know which one applies for a given
+  issue. Because the priority order is fixed, a PM who wires the *same* relationship two different
+  ways always gets a consistent result rather than one that depends on fetch order. The scope search
+  is paginated — a box can exceed one 500-issue page (BGP's is about that size), and a silently
+  truncated page would drop arbitrary nodes.
+- **When the tree contains Phase or Deliverable issues, only those two levels get a row** (plus
+  synthetic groups). The Epic LPM root above them, and the New Features/delivery-team Epics/Tasks
+  below them, are still fetched and still feed the rollup — a Deliverable's dates and status are
+  those of the work underneath it, a Phase's those of its Deliverables — they just aren't drawn.
+  Indentation counts displayed ancestors only (Phase at depth 0, Deliverable at depth 1, whatever
+  the raw Jira depth), and a Deliverable gets no collapse caret since nothing renders under it. A
+  box with no Phase/Deliverable issue anywhere keeps the Epic-level rule below, so existing
+  Epic-based boxes (HYBR-95) are unaffected.
 - **Granular work items (Task/Bug/Story/Sub-task/Improvement) still count toward their parent
   Epic's rolled-up dates, but never get their own row.** A box's configured scope commonly includes
   hundreds of these (see above) — rendering every one of them would be the exact opposite of
@@ -254,7 +267,8 @@ path (`refreshFullEpicTree`).
   Jira issue type is in a fixed `GRANULAR_TYPES` set. This is a different mechanism from a PM's
   manual hide/unhide override — it's always-on and type-based, not stored in
   `planning_overrides`, so a granular-type item is never individually addressable in Manage mode;
-  only Epic-and-above levels and synthetic groups are.
+  only Epic-and-above levels and synthetic groups are (only Phases/Deliverables and groups, on a
+  Phase/Deliverable-structured box — see above).
 - **A parent's Start/End dates are never read from Jira — they're always computed as the MIN start
   / MAX end of their children**, recursively, bottom-up (`buildPlanningTree`'s `rollup`). This
   applies to both a real Jira parent epic and a synthetic aggregate group (see below) — a group has
