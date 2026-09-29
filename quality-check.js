@@ -24,7 +24,7 @@ function daysBetween(a, b) {
 // Reuses jira.mapStatus's own done/in-progress/blocked/to-start buckets (the same ones driving
 // the Deliverable matrix and health badge) rather than Jira's raw statusCategory — not cached in
 // epics_cache, and this app already has its own considered status vocabulary (see
-// FUNCTIONAL_RULES.md: paused → in-progress, on hold → blocked, etc.) that a generic
+// FUNCTIONAL_RULES.md: waiting/paused → paused, on hold → blocked, etc.) that a generic
 // new/indeterminate/done split would just re-derive worse.
 // A Cancelled/Rejected epic is no longer real work — every check below skips it exactly like an
 // already-Done one. mapStatus's own done/in-progress/blocked/to-start vocabulary (built for the

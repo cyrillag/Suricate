@@ -47,9 +47,22 @@ to be re-applied here by hand rather than resolved by merging code:
   ("done"/"ongoing"/"to do" observed in practice; "ongoing" maps to In Progress alongside the
   usual "progress"/"review"/"dev" synonyms). Never let the lozenge's colour parameter leak into
   the extracted text — it will silently break the exact-match status lookup.
-- **A paused Jira epic status maps to In Progress, not To Start.** `mapStatus` (jira.js) buckets
-  any status containing "pause" into `prog`. Work that has started and been paused is not the same
-  as work that hasn't started; the default fall-through bucket (`ts`) would misreport it.
+- **Paused is a status of its own (`paus`, "Paused")**: work that started, then stopped for lack of
+  input or because it was deprioritized — Jira's **"Waiting"** status. `mapStatus` (jira.js) maps
+  any status containing "wait" or "pause" to it (so a Confluence lozenge typed "paused" works too),
+  checked before the In Progress synonyms so "Waiting for review" isn't read as In Progress.
+  **Exception: "Waiting for release" / "Waiting for deploy" maps to In Progress** — the work is
+  done and only awaits going live, which isn't a pause (agreed with the PMs, 2026-09-30; it used to
+  fall through to To Start, which was wrong too). It used
+  to be folded into In Progress, which overstated activity; it isn't To Start either (it did start),
+  nor Blocked (deprioritizing is a choice, not a problem) — so **it doesn't flip the health badge to
+  At Risk**, only Blocked workstreams and HIGH risks do.
+  - **Roll-up (one shared rule, `status.js`'s `rollupStatus`, for workstreams, deliverables and
+    Planning Light parents alike):** Done only if every child is Done, otherwise Blocked > In
+    Progress > Paused > To Start. A deliverable with one paused and one active workstream is still
+    In Progress; one with a paused and a not-yet-started workstream is Paused.
+  - Shown as light blue (OVHcloud Light Blue `#4AB0F5`), striped with a Royal Blue edge on Gantt
+    bars — a variant of the In Progress blue — with `#1A6FB0` for the text label (5.3:1 on white).
 - **An "On Hold" Jira epic status maps to Blocked, not In Progress.** Unlike "Paused", "On Hold"
   reads as stalled/waiting-on-something rather than a work-in-progress pause, so `mapStatus` buckets
   any status containing "hold" into `blk` alongside "Blocked"/"Impediment".
@@ -586,7 +599,7 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   tools are allowed to diverge.)
 - **Missing-metadata checks (🟡) are skipped once an epic's `mapStatus` bucket is `done`** —
   closed work doesn't need its dates backfilled. This reuses `jira.mapStatus`'s own
-  done/in-progress/blocked/to-start buckets (the same ones driving the Deliverable matrix
+  done/in-progress/paused/blocked/to-start buckets (the same ones driving the Deliverable matrix
   and health badge) rather than Jira's raw status, so paused/on-hold epics keep this app's
   already-agreed semantics instead of a generically re-derived one.
 - **A Cancelled or Rejected epic is skipped from every check, not just the 🟡 ones** — same

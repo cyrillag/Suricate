@@ -1,4 +1,5 @@
 const { translate } = require('./i18n');
+const { STATUS_LABEL, rollupStatus } = require('./status');
 
 // A plain "⚙" (U+2699 GEAR) renders inconsistently across platforms/fonts — on some it reads as a
 // ship's helm/wheel rather than a settings cog. An inline SVG (stroke=currentColor, so it inherits
@@ -33,14 +34,8 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
     seen[ws.deliverable].push(ws);
   });
 
-  const statusLabel = { done: 'Done', prog: 'In Progress', blk: 'Blocked', ts: 'To Start' };
-  const delStatus = del => {
-    const rows = del.rows;
-    if (rows.every(r => r.status === 'done')) return 'done';
-    if (rows.some(r => r.status === 'blk'))  return 'blk';
-    if (rows.some(r => r.status === 'prog'))  return 'prog';
-    return 'ts';
-  };
+  const statusLabel = STATUS_LABEL;
+  const delStatus = del => rollupStatus(del.rows.map(r => r.status || 'ts'));
 
   const matrixRows = deliverables.map(del => {
     const ds = delStatus(del);
@@ -133,6 +128,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
   const donutJSON = JSON.stringify([
     { v: stats.done, c: '#A6D64D' },
     { v: stats.prog, c: '#0050D5' },
+    { v: stats.paus || 0, c: '#4AB0F5' },
     { v: stats.blk,  c: '#ED733D' },
     { v: stats.ts,   c: '#BEC0C6' }
   ]);
@@ -253,6 +249,7 @@ ${notice ? `
           <div class="chart-legend">
             <div class="leg-row"><div class="leg-strip done"></div><span class="leg-lbl">Done</span><span class="leg-n">${stats.done}</span><span class="leg-pct">${pct(stats.done, stats.total)}%</span></div>
             <div class="leg-row"><div class="leg-strip prog"></div><span class="leg-lbl">In Progress</span><span class="leg-n">${stats.prog}</span><span class="leg-pct">${pct(stats.prog, stats.total)}%</span></div>
+            <div class="leg-row"><div class="leg-strip paus"></div><span class="leg-lbl">Paused</span><span class="leg-n">${stats.paus || 0}</span><span class="leg-pct">${pct(stats.paus || 0, stats.total)}%</span></div>
             <div class="leg-row"><div class="leg-strip blk"></div><span class="leg-lbl">Blocked</span><span class="leg-n">${stats.blk}</span><span class="leg-pct">${pct(stats.blk, stats.total)}%</span></div>
             <div class="leg-row"><div class="leg-strip ts"></div><span class="leg-lbl">To Start</span><span class="leg-n">${stats.ts}</span><span class="leg-pct">${pct(stats.ts, stats.total)}%</span></div>
           </div>
@@ -295,6 +292,7 @@ ${notice ? `
     <div class="gantt-legend">
       <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#A6D64D"></div>Done</div>
       <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#0050D5"></div>In Progress</div>
+      <div class="gantt-leg-item"><div class="gantt-leg-swatch paus-swatch"></div>Paused</div>
       <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#ED733D"></div>Blocked</div>
       <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#BEC0C6;border:1px dashed #C8CAD4"></div>To Start</div>
       ${hasPartialDates ? '<div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:linear-gradient(to right,transparent,#87878C)"></div>Only one date known (hover for detail)</div>' : ''}
@@ -418,7 +416,7 @@ function flattenPlanningTree(tree) {
   return out;
 }
 
-const PLANNING_STATUS_LABEL = { done: 'Done', prog: 'In Progress', blk: 'Blocked', ts: 'To Start' };
+const PLANNING_STATUS_LABEL = STATUS_LABEL;
 
 // Same full/fade-left/fade-right/no-date bar logic as GANTT_JS's client-side version, just
 // rendered server-side here (see planningTstart/pctDate at the call site).
@@ -493,6 +491,7 @@ function renderPlanningSection({ visiblePlanningRows, hasPartialDatesPlanning, p
     <div class="gantt-legend">
       <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#A6D64D"></div>Done</div>
       <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#0050D5"></div>In Progress</div>
+      <div class="gantt-leg-item"><div class="gantt-leg-swatch paus-swatch"></div>Paused</div>
       <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#ED733D"></div>Blocked</div>
       <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#BEC0C6;border:1px dashed #C8CAD4"></div>To Start</div>
       ${hasPartialDatesPlanning ? '<div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:linear-gradient(to right,transparent,#87878C)"></div>Only one date known (hover for detail)</div>' : ''}
@@ -672,7 +671,7 @@ const CSS = `
   @font-face{font-family:'Source Sans Pro';font-weight:400;src:local('Source Sans Pro'),local('SourceSansPro-Regular'),local('Source Sans 3')}
   @font-face{font-family:'Source Sans Pro';font-weight:600;src:local('Source Sans Pro SemiBold'),local('SourceSansPro-SemiBold'),local('Source Sans 3 SemiBold')}
   @font-face{font-family:'Source Sans Pro';font-weight:700;src:local('Source Sans Pro Bold'),local('SourceSansPro-Bold'),local('Source Sans 3 Bold')}
-  :root{--mb:#000E9C;--db:#00185E;--cobalt:#0050D5;--royal:#147DE8;--sky:#73E3FF;--yellow:#FFD124;--dyellow:#FFBB22;--orange:#ED733D;--dorange:#D85639;--green:#A6D64D;--dgr:#636369;--mgr:#87878C;--sgr:#BEC0C6;--lgr:#E5E7ED;--done-c:#4A7C1C;--done-bg:#EEF7E0;--done-s:#A6D64D;--prog-c:#0050D5;--prog-bg:#E8EFFF;--prog-s:#0050D5;--blk-c:#D85639;--blk-bg:#FEF0EE;--blk-s:#ED733D;--ts-c:#636369;--ts-bg:#F2F3F7;--ts-s:#BEC0C6;--sur:#FFFFFF;--gnd:#F3F4FA;--bd:#C8CAD4;--bd2:#E5E7ED;--tx:#00185E;--tx2:#636369;--tx3:#87878C;--f:'Source Sans Pro','Segoe UI',Arial,sans-serif;--fm:'Courier New',Courier,monospace;--r:2px}
+  :root{--mb:#000E9C;--db:#00185E;--cobalt:#0050D5;--royal:#147DE8;--sky:#73E3FF;--yellow:#FFD124;--dyellow:#FFBB22;--orange:#ED733D;--dorange:#D85639;--green:#A6D64D;--dgr:#636369;--mgr:#87878C;--sgr:#BEC0C6;--lgr:#E5E7ED;--done-c:#4A7C1C;--done-bg:#EEF7E0;--done-s:#A6D64D;--prog-c:#0050D5;--prog-bg:#E8EFFF;--prog-s:#0050D5;--blk-c:#D85639;--blk-bg:#FEF0EE;--blk-s:#ED733D;--paus-c:#1A6FB0;--paus-bg:#E6F4FE;--paus-s:#4AB0F5;--ts-c:#636369;--ts-bg:#F2F3F7;--ts-s:#BEC0C6;--sur:#FFFFFF;--gnd:#F3F4FA;--bd:#C8CAD4;--bd2:#E5E7ED;--tx:#00185E;--tx2:#636369;--tx3:#87878C;--f:'Source Sans Pro','Segoe UI',Arial,sans-serif;--fm:'Courier New',Courier,monospace;--r:2px}
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--gnd);color:var(--tx);font-family:var(--f);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased}
   /* .week-nav/.week-arrow/.ref-week now live in app.css (shared with report-missing.ejs) — see
@@ -723,7 +722,7 @@ const CSS = `
   .chart-legend{display:flex;flex-direction:column;gap:9px;width:100%}
   .leg-row{display:flex;align-items:center;gap:6px}
   .leg-strip{width:4px;height:16px;border-radius:1px;flex-shrink:0}
-  .leg-strip.done{background:var(--done-s)}.leg-strip.prog{background:var(--prog-s)}.leg-strip.blk{background:var(--blk-s)}.leg-strip.ts{background:var(--ts-s)}
+  .leg-strip.paus{background:var(--paus-s)}.leg-strip.done{background:var(--done-s)}.leg-strip.prog{background:var(--prog-s)}.leg-strip.blk{background:var(--blk-s)}.leg-strip.ts{background:var(--ts-s)}
   .leg-lbl{font-size:15px;color:var(--tx2);flex:1;min-width:0}
   .leg-n{font-size:13px;font-weight:700;color:var(--tx);font-variant-numeric:tabular-nums;min-width:20px;text-align:right;flex-shrink:0}
   .leg-pct{font-size:12.5px;color:var(--tx3);min-width:30px;text-align:right;font-variant-numeric:tabular-nums;flex-shrink:0}
@@ -761,7 +760,7 @@ const CSS = `
   .ws-name{font-size:13px;color:var(--tx);line-height:1.3}
   .cell-n{display:flex;align-items:center}
   .st{font-size:13px;font-weight:700;letter-spacing:.02em;white-space:nowrap}
-  .st.done{color:var(--done-c)}.st.prog{color:var(--prog-c)}.st.blk{color:var(--blk-c)}.st.ts{color:var(--ts-c)}
+  .st.paus{color:var(--paus-c)}.st.done{color:var(--done-c)}.st.prog{color:var(--prog-c)}.st.blk{color:var(--blk-c)}.st.ts{color:var(--ts-c)}
   .jtag{font-family:var(--fm);font-size:13.5px;color:var(--cobalt);background:var(--prog-bg);padding:2px 6px;border-radius:2px;text-decoration:none;display:inline-block}
   .jtag:hover{text-decoration:underline}
   .gantt-outer{display:flex;overflow-x:auto}
@@ -784,6 +783,9 @@ const CSS = `
   .gantt-row:last-child{border-bottom:none}
   .gantt-bar{position:absolute;top:4px;height:16px;border-radius:2px;min-width:2px;cursor:default}
   .gantt-bar:hover{filter:brightness(1.15);z-index:4}
+  /* Paused: light blue, striped, with a darker edge — "started, then stopped" reads as a variant of
+     the blue In Progress bar, and the Royal Blue border keeps it at 4:1 against the white row. */
+  .gantt-bar.paus,.paus-swatch{background:repeating-linear-gradient(135deg,var(--paus-s) 0 4px,#A5D8FA 4px 8px);border:1px solid var(--royal)}
   .gantt-bar.done{background:var(--done-s)}.gantt-bar.prog{background:var(--cobalt)}.gantt-bar.ts{background:var(--sgr);border:1px dashed var(--bd)}.gantt-bar.blk{background:var(--blk-s)}
   .gantt-nodates{position:absolute;left:8px;top:0;bottom:0;display:flex;align-items:center;font-size:12px;font-style:italic;color:var(--tx3)}
   /* A bar built from only one known date (see the JS above) fades toward whichever side the
