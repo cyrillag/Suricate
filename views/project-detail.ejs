@@ -43,7 +43,9 @@
   <% if (syncWarning && syncWarning.length) { %>
   <div class="auth-error">
     <% syncWarning.forEach(w => { %>
-      <div>⚠ <%= t('detail.sync_failed', { source: w.source === 'jira' ? t('detail.source_jira') : t('detail.source_confluence'), message: w.message }).replace(/^⚠\s*/, '') %></div>
+      <%# Each message already says what to do (retry, fix the page, renew a token…) — no blanket
+          "retry by clicking Generate" suffix, which was wrong for most causes. %>
+      <div>⚠ <% if (['jira', 'confluence', 'bigpicture'].includes(w.source)) { %><strong><%= t('detail.source_' + w.source) %></strong> — <% } %><%= w.message %></div>
     <% }) %>
   </div>
   <% } %>

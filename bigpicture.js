@@ -1,5 +1,5 @@
 const fetch = require('node-fetch');
-const { AppError, httpErrorCode } = require('./errors');
+const { AppError, httpErrorCode, networkErrorCode } = require('./errors');
 
 // BigPicture (SoftwarePlant/Appfire's Jira program-planning plugin) exposes its own REST API on
 // the same Jira host, but under a different base path and a different auth scheme from the plain
@@ -13,7 +13,7 @@ const JIRA_BASE = 'https://jira.ovhcloud.tools';
 const BASE_NEW = `${JIRA_BASE}/rest/bigpicture/1.0`;
 const BASE_OLD = `${JIRA_BASE}/rest/softwareplant-bigpicture/1.0`;
 
-async function bpFetch(token, path) {
+async function bpFetch(token, path, context = {}) {
   const tryBase = async (base) => {
     let res;
     try {
@@ -22,7 +22,7 @@ async function bpFetch(token, path) {
         timeout: 15000
       });
     } catch (err) {
-      throw new AppError('bigpicture_unavailable', `BigPicture unreachable: ${err.message}`);
+      throw new AppError(networkErrorCode('bigpicture', err), `BigPicture unreachable: ${err.message}`, context);
     }
     return res;
   };
@@ -31,7 +31,10 @@ async function bpFetch(token, path) {
   if (res.status === 404) res = await tryBase(BASE_OLD);
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new AppError(httpErrorCode('bigpicture', res.status), `BigPicture ${res.status}: ${body.slice(0, 200)}`);
+    const log = `BigPicture ${res.status}: ${body.slice(0, 200)}`;
+    if (res.status === 401 || res.status === 403) throw new AppError('bigpicture_token_invalid', log, context);
+    if (res.status === 404) throw new AppError('bigpicture_box_not_found', log, context);
+    throw new AppError(httpErrorCode('bigpicture', res.status), log, context);
   }
   return res.json();
 }
@@ -41,7 +44,7 @@ async function bpFetch(token, path) {
 // is wrapped in a currentVersion/latestVersion/cargo envelope (undocumented anywhere obvious) — the
 // scope data itself is at `cargo`, not the response root.
 async function getScopeDefinition(token, boxId) {
-  const data = await bpFetch(token, `/public/ppm/box/area/task/scope/def/own/${boxId}`);
+  const data = await bpFetch(token, `/public/ppm/box/area/task/scope/def/own/${boxId}`, { box: boxId });
   const cargo = data.cargo || data;
   const platforms = cargo.extPlatformScopeDefinitions || [];
   const queries = [];

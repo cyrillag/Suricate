@@ -1,5 +1,5 @@
 const fetch = require('node-fetch');
-const { AppError, httpErrorCode } = require('./errors');
+const { AppError, httpErrorCode, networkErrorCode } = require('./errors');
 const BASE = 'https://jira.ovhcloud.tools';
 
 async function api(token, path, params = {}) {
@@ -12,13 +12,39 @@ async function api(token, path, params = {}) {
       timeout: 15000
     });
   } catch (err) {
-    throw new AppError('jira_unavailable', `Jira unreachable: ${err.message}`);
+    throw new AppError(networkErrorCode('jira', err), `Jira unreachable: ${err.message}`);
   }
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new AppError(httpErrorCode('jira', res.status), `Jira ${res.status}: ${body.slice(0, 200)}`);
+    throw jiraHttpError(res, body, path);
   }
   return res.json();
+}
+
+// Refines httpErrorCode with what Jira's own responses say. Two traps seen for real:
+// - an expired/revoked token isn't always a 401 — Jira silently treats the call as anonymous, and a
+//   JQL search then fails with a 400 "...cannot be viewed by anonymous users" (Sept 2026: the
+//   service token expired and every Planning Light refresh failed that way);
+// - after too many failed logins Jira answers 403 with an X-Authentication-Denied-Reason header
+//   (CAPTCHA) — the token may be fine, the account is locked until someone logs in via the web UI.
+function jiraHttpError(res, body, path) {
+  const log = `Jira ${res.status} on ${path}: ${body.slice(0, 200)}`;
+  if (res.status === 401 || (res.status === 400 && /anonymous users/i.test(body))) {
+    return new AppError('jira_token_invalid', log);
+  }
+  if (res.status === 403 && res.headers.get('x-authentication-denied-reason')) {
+    return new AppError('jira_captcha', log);
+  }
+  const issueKey = (path.match(/^\/issue\/([A-Z][A-Z0-9_]*-\d+)/) || [])[1];
+  if (res.status === 404 && issueKey) return new AppError('jira_issue_not_found', log, { key: issueKey });
+  if (res.status === 400) {
+    // Jira's own errorMessages are already human-readable ("The value 'X' does not exist for the
+    // field 'project'.") — passing them through tells the PM which part of their query is wrong.
+    let detail = '';
+    try { detail = (JSON.parse(body).errorMessages || []).join(' '); } catch (e) { /* not JSON */ }
+    return new AppError('jira_bad_query', log, { detail: detail || body.slice(0, 200) });
+  }
+  return new AppError(httpErrorCode('jira', res.status), log);
 }
 
 async function getMe(token) {

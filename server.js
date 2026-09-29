@@ -91,6 +91,12 @@ function friendlyError(t, err) {
   return translated === `detail.err_${code}` ? t('detail.err_generic') : translated;
 }
 
+// The warning banner's {source, message}: the source comes from the error's own code, so a Jira
+// or BigPicture failure is labelled as such (every banner used to say "Confluence sync failed").
+function errorWarning(t, err) {
+  return { source: err instanceof AppError ? err.source : 'app', message: friendlyError(t, err) };
+}
+
 function formatDate(iso) {
   return iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
 }
@@ -428,7 +434,12 @@ app.post('/login', async (req, res) => {
   if (!email || !email.includes('@')) return res.render('login', { error: res.locals.t('login.err_email_required'), returnTo });
   try {
     const me = await jira.findUserByEmail(JIRA_TOKEN, email);
-    if (!me) return res.render('login', { error: res.locals.t('login.err_not_found'), returnTo });
+    // An expired service token doesn't fail the user search, it just runs it as anonymous and
+    // finds nobody — check the token before telling someone their own email doesn't exist.
+    if (!me) {
+      await jira.getMe(JIRA_TOKEN);
+      return res.render('login', { error: res.locals.t('login.err_not_found'), returnTo });
+    }
     const accountId   = me.key || me.name;
     const displayName = me.displayName || me.name || email;
     const existing = db.prepare('SELECT id FROM users WHERE jira_account_id=?').get(accountId);
@@ -444,7 +455,10 @@ app.post('/login', async (req, res) => {
     req.session.userName = displayName;
     req.session.save(() => res.redirect(returnTo));
   } catch (err) {
-    res.render('login', { error: res.locals.t('login.err_generic') + friendlyError(res.locals.t, err), returnTo });
+    // A classified error is already a full sentence naming Jira; only an unclassified one needs
+    // the "Jira connection error:" lead-in.
+    const lead = err instanceof AppError ? '' : res.locals.t('login.err_generic');
+    res.render('login', { error: lead + friendlyError(res.locals.t, err), returnTo });
   }
 });
 
@@ -500,7 +514,7 @@ app.post('/projects', requireAuth, async (req, res) => {
   // buttons on the project page, so we redirect either way instead of losing the created project.
   let warning = null;
   try { await syncConfluenceProject(projId, confPage.space, confPage.page); }
-  catch (err) { warning = { source: 'confluence', message: friendlyError(res.locals.t, err) }; }
+  catch (err) { warning = errorWarning(res.locals.t, err); }
 
   // Best-effort: the Planning/Gantt section is independent of the Confluence matrix, so a
   // Jira hiccup here shouldn't block creation or override the (more actionable) Confluence
@@ -674,10 +688,21 @@ async function generateReportRow(proj, year, week) {
   // jira_root_epic walk — resolved and frozen here, same re-read-on-every-generate treatment as
   // the ETA/milestones above. Left null (rendering falls back to the existing flat epics_snapshot
   // view) on any failure, so a BigPicture outage doesn't block report generation.
+  // The fallback is still silent in the report itself, but no longer to the person refreshing it:
+  // the cause comes back in `warnings` and is shown as a banner on top of the freshly generated
+  // report (the classic Gantt quietly replacing Planning Light used to be the only symptom).
   let planningTree = null;
-  if (proj.bigpicture_box_id && BIGPICTURE_TOKEN) {
-    try { planningTree = await resolvePlanningTree(proj.id, proj.bigpicture_box_id, proj.jira_root_epic); }
-    catch (err) { console.warn(`Could not resolve Planning Light tree for box ${proj.bigpicture_box_id}: ${err.message}`); }
+  const warnings = [];
+  if (proj.bigpicture_box_id) {
+    if (!BIGPICTURE_TOKEN) {
+      warnings.push(new AppError('bigpicture_token_missing', 'BIGPICTURE_API_TOKEN is not set', { box: proj.bigpicture_box_id }));
+    } else {
+      try { planningTree = await resolvePlanningTree(proj.id, proj.bigpicture_box_id, proj.jira_root_epic); }
+      catch (err) {
+        console.warn(`Could not resolve Planning Light tree for box ${proj.bigpicture_box_id}: ${err.message}`);
+        warnings.push(err);
+      }
+    }
   }
 
   // Delayed = later than the most recent *existing* prior report's own frozen eta_snapshot —
@@ -715,6 +740,7 @@ async function generateReportRow(proj, year, week) {
       updated_at=unixepoch()`).run(proj.id, year, week, execSummary, JSON.stringify(highlights), JSON.stringify(risks), JSON.stringify(resolvedWs), JSON.stringify(epics), planningTree ? JSON.stringify(planningTree) : null, etaIso, etaDelayed ? 1 : 0,
       milestoneEnds.milestone_alpha, milestoneEnds.milestone_beta, milestoneEnds.milestone_ga,
       milestoneStatuses.milestone_alpha, milestoneStatuses.milestone_beta, milestoneStatuses.milestone_ga, backfilled);
+  return { warnings };
 }
 
 app.post('/projects/:slug/reports/generate', requireAuth, async (req, res) => {
@@ -724,10 +750,10 @@ app.post('/projects/:slug/reports/generate', requireAuth, async (req, res) => {
   const [yr, wn] = weekStr.split('-W');
   const year = parseInt(yr), week = parseInt(wn);
   if (!Number.isInteger(week) || week < 1 || week > 53 || !Number.isInteger(year)) {
-    return res.redirect(`/projects/${proj.slug}?${warningQuery({ source: 'confluence', message: res.locals.t('detail.err_invalid_week', { week: weekStr }) })}`);
+    return res.redirect(`/projects/${proj.slug}?${warningQuery({ source: 'app', message: res.locals.t('detail.err_invalid_week', { week: weekStr }) })}`);
   }
   if (isFutureWeek(year, week)) {
-    return res.redirect(`/projects/${proj.slug}?${warningQuery({ source: 'confluence', message: res.locals.t('detail.err_future_week') })}`);
+    return res.redirect(`/projects/${proj.slug}?${warningQuery({ source: 'app', message: res.locals.t('detail.err_future_week') })}`);
   }
 
   // A past week that already has a report is a frozen snapshot (see FUNCTIONAL_RULES.md) —
@@ -738,7 +764,7 @@ app.post('/projects/:slug/reports/generate', requireAuth, async (req, res) => {
   if (isPastWeek(year, week)) {
     const existing = db.prepare('SELECT 1 FROM reports WHERE project_id=? AND year=? AND week=?').get(proj.id, year, week);
     if (existing) {
-      return res.redirect(`/projects/${proj.slug}?${warningQuery({ source: 'confluence', message: res.locals.t('detail.err_past_week_locked') })}`);
+      return res.redirect(`/projects/${proj.slug}?${warningQuery({ source: 'app', message: res.locals.t('detail.err_past_week_locked') })}`);
     }
   }
 
@@ -760,19 +786,22 @@ app.post('/projects/:slug/reports/generate', requireAuth, async (req, res) => {
       await seedWorkstreamsFromJiraTree(proj.id, proj.jira_root_epic);
     }
   } catch (err) {
-    syncFailure = friendlyError(res.locals.t, err);
+    syncFailure = errorWarning(res.locals.t, err);
   }
 
+  let generated;
   try {
-    await generateReportRow(proj, year, week);
+    generated = await generateReportRow(proj, year, week);
   } catch (err) {
-    return res.redirect(`/projects/${proj.slug}?${warningQuery({ source: 'confluence', message: friendlyError(res.locals.t, err) })}`);
+    return res.redirect(`/projects/${proj.slug}?${warningQuery(errorWarning(res.locals.t, err))}`);
   }
 
-  if (syncFailure) {
-    return res.redirect(`/projects/${proj.slug}?${warningQuery({ source: 'confluence', message: syncFailure })}`);
-  }
-  res.redirect(`/projects/${proj.slug}/${year}-W${String(week).padStart(2,'0')}`);
+  // The report itself was generated — show it, with whatever went wrong on the way as a banner on
+  // top (a failed pre-sync means some data may be stale; a Planning Light failure means the
+  // classic Gantt stands in for it), rather than bouncing back to the project page.
+  const notices = [syncFailure, ...generated.warnings.map(err => errorWarning(res.locals.t, err))].filter(Boolean);
+  const reportUrl = `/projects/${proj.slug}/${year}-W${String(week).padStart(2,'0')}`;
+  res.redirect(notices.length ? `${reportUrl}?${warningQuery(notices[0])}` : reportUrl);
 });
 
 app.post('/projects/:slug/reports/:yearweek(\\d{4}-W\\d{2})/delete', requireAuth, (req, res) => {
@@ -786,7 +815,7 @@ app.post('/projects/:slug/reports/:yearweek(\\d{4}-W\\d{2})/delete', requireAuth
 // ── REPORT VIEW ───────────────────────────────────────────────────
 // Shared by the HTML report view and the PDF export route — a report row plus the project/owner/
 // locale context around it is everything genReport() needs, regardless of which one asked for it.
-function buildReportHtml(proj, report, year, week, isOwner, lang, userName) {
+function buildReportHtml(proj, report, year, week, isOwner, lang, userName, notice = null) {
   // A report is a frozen snapshot from the moment it was generated — never recompute the
   // matrix/Planning from the live workstreams/epics_cache tables for a row that already has one
   // (that live-recompute was the actual bug: a workstream added or changing status *after* a past
@@ -872,7 +901,7 @@ function buildReportHtml(proj, report, year, week, isOwner, lang, userName) {
     stats, health, isOwner,
     backfilled: !!report.backfilled,
     generatedAt: formatDate(new Date(report.created_at * 1000).toISOString()),
-    lang, userName, confluenceUrl
+    lang, userName, confluenceUrl, notice
   });
 }
 
@@ -905,12 +934,18 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, re
     }
     // The current week is still "live" — generating it on first visit (e.g. via the week-nav
     // arrows) reflects today's data for today's week, which is simply accurate, not backfilled.
-    try { await generateReportRow(proj, year, week); }
-    catch (err) { return res.redirect(`/projects/${req.params.slug}?${warningQuery({ source: 'confluence', message: friendlyError(res.locals.t, err) })}`); }
+    try {
+      const generated = await generateReportRow(proj, year, week);
+      if (generated.warnings.length && !req.query.syncSource) {
+        return res.redirect(`/projects/${req.params.slug}/${req.params.yearweek}?${warningQuery(errorWarning(res.locals.t, generated.warnings[0]))}`);
+      }
+    }
+    catch (err) { return res.redirect(`/projects/${req.params.slug}?${warningQuery(errorWarning(res.locals.t, err))}`); }
     report = db.prepare('SELECT * FROM reports WHERE project_id=? AND year=? AND week=?').get(proj.id, year, week);
   }
 
-  const html = buildReportHtml(proj, report, year, week, isOwner, req.lang, req.session.userName);
+  const notice = req.query.syncSource ? { source: req.query.syncSource, message: req.query.syncMessage || '' } : null;
+  const html = buildReportHtml(proj, report, year, week, isOwner, req.lang, req.session.userName, notice);
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(html);
 });

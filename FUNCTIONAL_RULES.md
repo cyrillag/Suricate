@@ -514,15 +514,49 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   to a user. Every caught error is classified (`AppError` + a stable code) and translated into an
   actionable sentence in the user's language; anything unclassified falls back to a generic
   apologetic message. The raw error is still logged server-side.
-- **A Confluence 404 with `"authorized":false` in its own response body gets a distinct,
-  retry-first message (`confluence_auth_blip`), not the generic "check your URL/rights"
-  (`confluence_not_found`).** Confluence returns 404 — not 401/403 — when the service token isn't
-  authorized to even see a space/page exists, a security-through-obscurity choice on Confluence's
-  side. Observed in production (Managed Backup for VMware, 2026-08-31) as a burst of ~14 identical
-  failures within a 90-second window that then fully resolved on its own — a short-lived
-  auth/session blip, not a wrong or moved page. Telling the PM to go re-check their project's
-  Confluence URL over what's usually transient sent them chasing a non-problem; the message now
-  says to just retry, and only suggests checking access rights if it keeps happening.
+- **One message per cause we can tell apart, each saying what happened, where, and what to do**
+  — not just which service failed. Renewing a token, fixing a page URL, granting access and simply
+  waiting are different fixes, and "retry" only helps for the last one; every message now states
+  its own next step, and the banner no longer appends a blanket "retry by clicking Generate". The
+  codes (`errors.js` + each service module, translations in `i18n.js` under `detail.err_*`):
+  - **token expired/revoked** (`*_token_invalid`, naming the exact `.env` variable to renew:
+    `JIRA_SERVICE_TOKEN`, `CONFLUENCE_SERVICE_TOKEN`, `BIGPICTURE_API_TOKEN`) — and says
+    retrying won't help. Detected even when the service doesn't answer 401: an expired Jira token
+    makes Jira run the call as anonymous, so a JQL search fails with a 400 "...cannot be viewed by
+    anonymous users"; an expired Confluence token gets a 404 `"authorized":false`. Both happened
+    for real on 2026-09-28/29, when all service tokens expired within two days.
+  - **token fine, rights missing**: `jira_forbidden`, `confluence_space_forbidden` (names the
+    space), `confluence_forbidden` (read restriction on the page itself);
+  - **Jira CAPTCHA lock** (`jira_captcha`, 403 + `X-Authentication-Denied-Reason`): someone must
+    log in once in a browser with the service account;
+  - **not found**, with the precise object: `jira_issue_not_found` ({{key}}),
+    `confluence_page_not_found` ({{space}}/{{title}}), `bigpicture_box_not_found` ({{box}});
+  - **bad JQL** (`jira_bad_query`): Jira's own `errorMessages` are passed through (they're
+    human-readable and say which part is wrong) — typically a BigPicture box's scope query;
+  - **transient**: `*_rate_limited` (429), `*_timeout` (no answer within 15 s),
+    `*_unreachable` (DNS/network — "if it works in your browser, it's the server's network"),
+    `*_unavailable` (5xx, service-side incident). BigPicture's 5xx message also hints at an invalid
+    token, since a bad token has been seen to come back as a 500 there;
+  - `bigpicture_token_missing`: a box is configured but the server has no BigPicture token.
+- **Confluence's `"authorized":false` 404 is diagnosed, not guessed.** It covers both "token
+  expired" and "no access to this space". The request is first retried once after 2 s — a genuinely
+  transient burst did happen once (Managed Backup for VMware, 2026-08-31, ~90 s, resolved on its
+  own) — then `/rest/api/user/current` tells the two apart: served as anonymous means the token is
+  dead (`confluence_token_invalid`), a real user means the account lacks access to that space
+  (`confluence_space_forbidden`). The former `confluence_auth_blip` message ("temporary, retry
+  later") is retired: on 2026-09-29 it was shown for an expired token, which never resolves by
+  itself.
+- **The banner is labelled with the service that actually failed** (`AppError.source`, derived
+  from the code's prefix) — it used to say "Confluence sync failed" for every error, Jira ones
+  included. Non-service notices (past week locked, future week...) carry no service label.
+- **A Planning Light failure is no longer silent.** The report is still generated (the Planning
+  section falls back as before), but the cause comes back from `generateReportRow` and is shown as
+  a banner on top of the freshly generated report. More generally, when the report itself was
+  generated but something failed on the way (the pre-sync, Planning Light), Generate/Refresh now
+  lands on that report with the banner instead of bouncing back to the project page.
+- **Login checks the Jira service token before saying an email doesn't exist** — with an expired
+  token, Jira's user search runs as anonymous and finds nobody, which used to read as "email not
+  found in Jira".
 
 ## Cleanup (tracking-quality check)
 
