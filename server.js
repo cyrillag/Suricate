@@ -597,11 +597,12 @@ app.get('/projects/:slug', requireAuth, (req, res) => {
   const proj = db.prepare('SELECT p.*, u.name as owner_name FROM projects p JOIN users u ON u.id=p.user_id WHERE p.slug=?').get(req.params.slug);
   if (!proj) return res.status(404).send('Project not found.');
   const isOwner = proj.user_id === req.session.userId;
-  const reports  = reportListWithGaps(proj.id, 10);
+  const history  = reportHistory(proj, 10);
+  const reports  = history.rows;
   const wsCount  = db.prepare('SELECT COUNT(*) as n FROM workstreams WHERE project_id=?').get(proj.id).n;
   const epicCount= db.prepare('SELECT COUNT(*) as n FROM epics_cache WHERE project_id=?').get(proj.id).n;
   const syncWarning = req.query.syncSource ? [{ source: req.query.syncSource, message: req.query.syncMessage || '' }] : [];
-  res.render('project-detail', { proj, reports, wsCount, epicCount, syncWarning, isOwner, userName: req.session.userName, currentWeek: currentWeekStr() });
+  res.render('project-detail', { proj, reports, dateColumns: history.dateColumns, wsCount, epicCount, syncWarning, isOwner, userName: req.session.userName, currentWeek: currentWeekStr() });
 });
 
 // ── CLEANUP (tracking-quality check) ─────────────────────────────
@@ -805,6 +806,76 @@ app.post('/projects/:slug/reports/:yearweek(\\d{4}-W\\d{2})/delete', requireAuth
   res.redirect(`/projects/${proj.slug}`);
 });
 
+// ── HEALTH ────────────────────────────────────────────────────────
+// The report's health badge — shared by the report itself and the project page's weekly history,
+// so both always agree. Workstream progress alone doesn't tell the whole story: a page can list an
+// open HIGH (or EXTREME — it used to be left out, although it ranks above High) risk while every
+// workstream is nominally on schedule, so that flips the badge too. Delayed is a fact (the date
+// already moved), At Risk a projection (it might) — Delayed wins when both are true.
+const HEALTH_RANK = { 'on-track': 0, 'at-risk': 1, 'delayed': 2 };
+function computeHealth({ etaDelayed, blockedCount, risks }) {
+  const hasHighRisk = risks.some(r => r.level === 'high' || r.level === 'extreme');
+  return etaDelayed ? 'delayed' : (blockedCount > 0 || hasHighRisk) ? 'at-risk' : 'on-track';
+}
+
+// One row per week for the project page's history table (modelled on the PMs' Confluence "Flash
+// reports history" page: weather, trend, Alpha/Beta/GA, open risks, points to clarify), read only
+// from each report's own frozen snapshot columns — never from live data, so a past week shows
+// what that week's report said. Each row is compared with the previous *existing* report (a gap
+// week is skipped, not treated as a reset): milestone/ETA moves in days, and a trend that
+// degrades when health worsens or any date slips later, improves when health gets better, and is
+// stable otherwise.
+function reportHistory(proj, limit) {
+  const rows = db.prepare(`SELECT year, week, eta_snapshot, eta_delayed, risks_json, highlights_json,
+    workstreams_snapshot_json, milestone_alpha_end, milestone_beta_end, milestone_ga_end
+    FROM reports WHERE project_id=?`).all(proj.id);
+  const byKey = new Map(rows.map(r => [`${r.year}-${r.week}`, r]));
+  const dateFields = [
+    ['alpha', 'milestone_alpha_end', proj.milestone_alpha],
+    ['beta',  'milestone_beta_end',  proj.milestone_beta],
+    ['ga',    'milestone_ga_end',    proj.milestone_ga]
+  ].filter(([, , configured]) => configured);
+  // No Alpha/Beta/GA configured: the project's single target date (ETA) stands in for them.
+  if (!dateFields.length) dateFields.push(['eta', 'eta_snapshot', true]);
+  const dayDiff = (a, b) => Math.round((new Date(a) - new Date(b)) / 86400000);
+
+  // Oldest first, so each row can be compared with the one before it.
+  const all = reportListWithGaps(proj.id, Infinity).reverse();
+  let prev = null;
+  const out = all.map(w => {
+    const r = byKey.get(`${w.year}-${w.week}`);
+    if (!r) return { ...w };
+    const risks = JSON.parse(r.risks_json || '[]');
+    const highlights = JSON.parse(r.highlights_json || '{}');
+    const ws = r.workstreams_snapshot_json ? JSON.parse(r.workstreams_snapshot_json) : null;
+    const count = st => ws.filter(x => x.status === st).length;
+    const blocked = ws ? count('blk') : null;
+    const row = {
+      ...w,
+      health: ws ? computeHealth({ etaDelayed: !!r.eta_delayed, blockedCount: blocked, risks }) : null,
+      donePct: ws && ws.length ? Math.round(count('done') / ws.length * 100) : null,
+      blocked,
+      risks: risks.length,
+      severeRisks: risks.filter(x => x.level === 'high' || x.level === 'extreme').length,
+      clarify: (highlights.clarify || []).length,
+      dates: dateFields.map(([name, col]) => {
+        const value = r[col] || null, before = prev ? prev.raw[col] || null : undefined;
+        return { name, value, before, delta: value && before ? dayDiff(value, before) : 0 };
+      }),
+      raw: r
+    };
+    if (prev && row.health && prev.health) {
+      const slipped = row.dates.some(d => d.delta > 0);
+      const worse = HEALTH_RANK[row.health] > HEALTH_RANK[prev.health];
+      const better = HEALTH_RANK[row.health] < HEALTH_RANK[prev.health];
+      row.trend = (worse || slipped) ? 'down' : better ? 'up' : 'flat';
+    }
+    prev = row;
+    return row;
+  });
+  return { dateColumns: dateFields.map(([name]) => name), rows: out.reverse().slice(0, limit) };
+}
+
 // ── REPORT VIEW ───────────────────────────────────────────────────
 // Shared by the HTML report view and the PDF export route — a report row plus the project/owner/
 // locale context around it is everything genReport() needs, regardless of which one asked for it.
@@ -849,17 +920,8 @@ function buildReportHtml(proj, report, year, week, isOwner, lang, userName, noti
   const stats = { done:0, prog:0, paus:0, blk:0, ts:0, total: resolvedWs.length };
   resolvedWs.forEach(ws => stats[ws.status] = (stats[ws.status]||0)+1);
   const risks = JSON.parse(report.risks_json);
-  // Workstream progress alone doesn't tell the whole story — a page can list an open HIGH risk
-  // while every workstream is still nominally on schedule. Surfacing that risk was the entire
-  // point of the Risk matrix section, so it must be able to flip the badge too.
-  const hasHighRisk = risks.some(r => r.level === 'high');
   const etaDelayed = !!report.eta_delayed;
-  // Delayed is a fact (the date already moved), At Risk is a projection (it might) — not the same
-  // thing, so a slip gets its own badge state rather than being folded into "At Risk". Delayed
-  // takes precedence when both are true: a confirmed slip is more informative than a risk signal.
-  const health = etaDelayed ? 'delayed'
-    : (stats.blk > 0 || hasHighRisk) ? 'at-risk'
-    : 'on-track';
+  const health = computeHealth({ etaDelayed, blockedCount: stats.blk, risks });
   let etaDelayedFrom = null;
   if (etaDelayed) {
     const prevEta = db.prepare(`

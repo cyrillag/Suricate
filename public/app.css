@@ -178,3 +178,20 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
   .auth-page{padding:16px}
   .auth-card{padding:28px 24px}
 }
+/* Weekly history table on the project page (see reportHistory in server.js). Scrolls sideways on
+   narrow screens rather than squeezing ten columns. Alert red is darkened from --blk (#D85639, only
+   3.95:1 on white) to #C0472E (5:1, still 4.57:1 on the row hover) — small text needs 4.5:1. */
+.history-table{--hist-red:#C0472E}
+.history-scroll{overflow-x:auto}
+.history-table th,.history-table td{padding:10px 14px;white-space:nowrap}
+.history-table .num{text-align:right}
+.hist-na{color:var(--tx2)}
+.hist-health{font-weight:600;font-size:14px}
+.hist-health.on-track{color:var(--done)}.hist-health.at-risk{color:var(--hist-red)}.hist-health.delayed{color:var(--hist-red)}
+.hist-trend{font-size:18px;font-weight:700;cursor:help}
+.hist-trend.up{color:var(--done)}.hist-trend.flat{color:var(--tx2)}.hist-trend.down{color:var(--hist-red)}
+.hist-delta{font-size:12px;font-weight:700;cursor:help}
+.hist-delta.late{color:var(--hist-red)}.hist-delta.early{color:var(--done)}
+.hist-alert{color:var(--hist-red);font-weight:700}
+.hist-bar{display:inline-block;width:48px;height:6px;background:var(--bd2);border-radius:3px;vertical-align:middle;overflow:hidden}
+.hist-bar span{display:block;height:100%;background:#A6D64D}
