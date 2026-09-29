@@ -423,16 +423,16 @@ path (`refreshFullEpicTree`).
 - **The project page's reports table doubles as a health history**, one row per week (most recent
   first, gap weeks kept as empty rows), modelled on the PMs' Confluence "Flash reports history"
   page (Date, Météo, Tendance, Alpha, Beta, GA, open risks, points to clarify) so they can stop
-  maintaining it by hand. Columns: **health** (the report's own badge, shown as weather: ☀️ On
-  track, ⛅ At risk, 🌧️ Delayed), **trend**, **Alpha/Beta/GA end dates** (only the milestones the
-  project configured; the single ETA when none is), **% of workstreams Done**, **Blocked
-  workstreams**, **open risks** (with how many are High/Extreme, the ones that drive the badge) and
-  **points to clarify**. Blocked and High/Extreme were added beyond the Confluence page because
-  they're what actually turns the weather.
+  maintaining it by hand. Columns: **health** (the report's own badge and wording, untranslated like
+  the report itself, with a weather icon: ☀️ On Track, ⛅ At Risk, 🌧️ Delayed), **trend**,
+  **Alpha/Beta/GA end dates** (only the milestones the project configured; the single ETA when
+  none is), **% of workstreams Done**, **open risks** and **points to clarify**. A week with no
+  report says "Pas de rapport généré" / "No report generated" right after the week (it used to
+  sit at the far right, where it went unnoticed).
 - **Every figure comes from that week's own frozen report** (`reportHistory` in server.js: its
   snapshot columns — workstreams, risks, highlights, milestone ends, `eta_snapshot`), never from live
   data: a past week shows what that week's report said, same rule as the report itself. A legacy
-  row without a workstreams snapshot shows "—" for health, trend, Done and Blocked rather than
+  row without a workstreams snapshot shows "—" for health, trend and Done rather than
   guessing.
 - **Each row is compared with the previous *existing* report** (a gap week is skipped, not treated
   as a reset). A date that moved shows the shift in days next to it — ▲ +N d (later, red) or ▼ −N d

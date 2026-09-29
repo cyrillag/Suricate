@@ -59,9 +59,11 @@
         comes from that week's own frozen report (see reportHistory in server.js). %>
     <%
       const WEATHER = { 'on-track': '☀️', 'at-risk': '⛅', 'delayed': '🌧️' };
+      // Same wording as the report's own health badge (report-gen.js), in both languages.
+      const HEALTH_LABEL = { 'on-track': 'On Track', 'at-risk': 'At Risk', 'delayed': 'Delayed' };
       const TREND = { up: '↗', flat: '→', down: '↘' };
       const fmtDate = iso => new Date(iso + 'T00:00:00Z').toLocaleDateString(lang === 'fr' ? 'fr-FR' : 'en-GB', { day: 'numeric', month: 'short', year: '2-digit', timeZone: 'UTC' });
-      const colCount = 8 + dateColumns.length;
+      const colCount = 7 + dateColumns.length;
     %>
     <div class="history-scroll">
     <table class="simple-table history-table">
@@ -71,7 +73,6 @@
         <th><%= t('detail.hist_trend') %></th>
         <% dateColumns.forEach(c => { %><th><%= t('detail.hist_date_' + c) %></th><% }) %>
         <th class="num"><%= t('detail.hist_done') %></th>
-        <th class="num"><%= t('detail.hist_blocked') %></th>
         <th class="num"><%= t('detail.hist_risks') %></th>
         <th class="num"><%= t('detail.hist_clarify') %></th>
         <th></th>
@@ -81,22 +82,19 @@
       <% if (!r.exists) { %>
       <tr>
         <td><strong style="color:var(--tx3)"><%= ws %></strong></td>
-        <td colspan="<%= colCount - 2 %>"></td>
-        <td class="td-actions">
-          <span class="empty-state-inline" style="padding:0;font-style:italic"><%= t('detail.no_report_row') %></span>
-        </td>
+        <td colspan="<%= colCount - 2 %>"><span class="hist-na" style="font-style:italic"><%= t('detail.no_report_row') %></span></td>
+        <td class="td-actions"></td>
       </tr>
       <% } else { %>
       <tr>
         <td><strong><%= ws %></strong><% if (r.backfilled) { %> <span class="tag" title="<%= t('detail.missing_generate_warning') %>"><%= t('detail.backfilled_tag') %></span><% } %></td>
-        <td><% if (r.health) { %><span class="hist-health <%= r.health %>"><span aria-hidden="true"><%= WEATHER[r.health] %></span> <%= t('detail.health_' + r.health.replace('-', '_')) %></span><% } else { %><span class="hist-na">—</span><% } %></td>
+        <td><% if (r.health) { %><span class="hist-health <%= r.health %>"><span aria-hidden="true"><%= WEATHER[r.health] %></span> <%= HEALTH_LABEL[r.health] %></span><% } else { %><span class="hist-na">—</span><% } %></td>
         <td><% if (r.trend) { %><span class="hist-trend <%= r.trend %>" title="<%= t('detail.trend_' + r.trend) %>" aria-label="<%= t('detail.trend_' + r.trend) %>"><%= TREND[r.trend] %></span><% } else { %><span class="hist-na">—</span><% } %></td>
         <% r.dates.forEach(d => { %>
         <td class="hist-date"><% if (d.value) { %><%= fmtDate(d.value) %><% if (d.delta) { %> <span class="hist-delta <%= d.delta > 0 ? 'late' : 'early' %>" title="<%= t('detail.hist_previously', { date: fmtDate(d.before) }) %>"><%= d.delta > 0 ? '▲ +' + d.delta : '▼ −' + (-d.delta) %> <%= t('detail.hist_days') %></span><% } %><% } else { %><span class="hist-na">—</span><% } %></td>
         <% }) %>
         <td class="num"><% if (r.donePct !== null) { %><span class="hist-bar" aria-hidden="true"><span style="width:<%= r.donePct %>%"></span></span> <%= r.donePct %> %<% } else { %><span class="hist-na">—</span><% } %></td>
-        <td class="num"><% if (r.blocked !== null) { %><span class="<%= r.blocked ? 'hist-alert' : '' %>"><%= r.blocked %></span><% } else { %><span class="hist-na">—</span><% } %></td>
-        <td class="num"><%= r.risks %><% if (r.severeRisks) { %> <span class="hist-alert" title="<%= t('detail.hist_severe_title') %>">(<%= t('detail.hist_severe', { count: r.severeRisks }) %>)</span><% } %></td>
+        <td class="num"><%= r.risks %></td>
         <td class="num"><%= r.clarify %></td>
         <td class="td-actions">
           <a href="/projects/<%= proj.slug %>/<%= ws %>" class="btn-ghost btn-sm"><%= t('detail.view') %></a>

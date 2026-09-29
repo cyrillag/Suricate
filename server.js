@@ -854,9 +854,7 @@ function reportHistory(proj, limit) {
       ...w,
       health: ws ? computeHealth({ etaDelayed: !!r.eta_delayed, blockedCount: blocked, risks }) : null,
       donePct: ws && ws.length ? Math.round(count('done') / ws.length * 100) : null,
-      blocked,
       risks: risks.length,
-      severeRisks: risks.filter(x => x.level === 'high' || x.level === 'extreme').length,
       clarify: (highlights.clarify || []).length,
       dates: dateFields.map(([name, col]) => {
         const value = r[col] || null, before = prev ? prev.raw[col] || null : undefined;

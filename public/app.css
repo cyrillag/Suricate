@@ -192,6 +192,5 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 .hist-trend.up{color:var(--done)}.hist-trend.flat{color:var(--tx2)}.hist-trend.down{color:var(--hist-red)}
 .hist-delta{font-size:12px;font-weight:700;cursor:help}
 .hist-delta.late{color:var(--hist-red)}.hist-delta.early{color:var(--done)}
-.hist-alert{color:var(--hist-red);font-weight:700}
 .hist-bar{display:inline-block;width:48px;height:6px;background:var(--bd2);border-radius:3px;vertical-align:middle;overflow:hidden}
 .hist-bar span{display:block;height:100%;background:#A6D64D}
