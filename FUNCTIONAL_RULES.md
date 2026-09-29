@@ -50,7 +50,10 @@ to be re-applied here by hand rather than resolved by merging code:
 - **Paused is a status of its own (`paus`, "Paused")**: work that started, then stopped for lack of
   input or because it was deprioritized — Jira's **"Waiting"** status. `mapStatus` (jira.js) maps
   any status containing "wait" or "pause" to it (so a Confluence lozenge typed "paused" works too),
-  checked before the In Progress synonyms so "Waiting for review" isn't read as In Progress. It used
+  checked before the In Progress synonyms so "Waiting for review" isn't read as In Progress.
+  **Exception: "Waiting for release" / "Waiting for deploy" maps to In Progress** — the work is
+  done and only awaits going live, which isn't a pause (agreed with the PMs, 2026-09-30; it used to
+  fall through to To Start, which was wrong too). It used
   to be folded into In Progress, which overstated activity; it isn't To Start either (it did start),
   nor Blocked (deprioritizing is a choice, not a problem) — so **it doesn't flip the health badge to
   At Risk**, only Blocked workstreams and HIGH risks do.

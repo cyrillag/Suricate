@@ -80,6 +80,9 @@ function mapStatus(jiraStatus) {
   // (also "Paused" typed on a Confluence cell). Its own bucket: not To Start (it did start), not In
   // Progress (nothing is moving), not Blocked (not necessarily a problem — deprioritizing is a
   // choice). Checked before 'progress' so e.g. "Waiting for review" doesn't read as In Progress.
+  // Except "Waiting for release/deploy" (Private boot M1): the work is done and only awaits going
+  // live — still In Progress, not paused (and it used to fall through to To Start).
+  if (s.includes('wait') && (s.includes('release') || s.includes('deploy'))) return 'prog';
   if (s.includes('wait') || s.includes('pause')) return 'paus';
   if (s.includes('progress') || s.includes('review') || s.includes('dev') || s.includes('ongoing')) return 'prog';
   // "On Hold" reads as stalled/waiting-on-something rather than a work-in-progress pause —
