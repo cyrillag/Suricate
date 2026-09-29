@@ -62,6 +62,9 @@
       // Same wording as the report's own health badge (report-gen.js), in both languages.
       const HEALTH_LABEL = { 'on-track': 'On Track', 'at-risk': 'At Risk', 'delayed': 'Delayed' };
       const TREND = { up: '↗', flat: '→', down: '↘' };
+      // Button labels carry a leading emoji ("↻ Rafraîchir") — fine as text, noise in a tooltip or
+      // an aria-label read aloud, so the icon-only actions use them without it.
+      const plain = key => t(key).replace(/^[^\p{L}]+/u, '');
       const fmtDate = iso => new Date(iso + 'T00:00:00Z').toLocaleDateString(lang === 'fr' ? 'fr-FR' : 'en-GB', { day: 'numeric', month: 'short', year: '2-digit', timeZone: 'UTC' });
       const colCount = 6 + dateColumns.length;
     %>
@@ -95,16 +98,16 @@
         <td class="num"><%= r.risks %></td>
         <td class="num"><%= r.clarify %></td>
         <td class="td-actions">
-          <a href="/projects/<%= proj.slug %>/<%= ws %>" class="hist-icon" title="<%= t('detail.view') %>" aria-label="<%= t('detail.view') %>"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></a>
+          <a href="/projects/<%= proj.slug %>/<%= ws %>" class="hist-icon" title="<%= plain('detail.view') %>" aria-label="<%= plain('detail.view') %>"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></a>
           <% if (isOwner) { %>
           <% if (ws === currentWeek) { %>
           <form method="POST" action="/projects/<%= proj.slug %>/reports/generate" style="display:inline">
             <input type="hidden" name="week" value="<%= ws %>">
-            <button type="submit" class="hist-icon" title="<%= t('detail.regenerate') %>" aria-label="<%= t('detail.regenerate') %>"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg></button>
+            <button type="submit" class="hist-icon" title="<%= plain('detail.regenerate') %>" aria-label="<%= plain('detail.regenerate') %>"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg></button>
           </form>
           <% } %>
           <form method="POST" action="/projects/<%= proj.slug %>/reports/<%= ws %>/delete" style="display:inline" onsubmit="return confirm(<%= JSON.stringify(t('detail.delete_confirm', { week: ws })) %>);">
-            <button type="submit" class="hist-icon danger" title="<%= t('detail.delete') %>" aria-label="<%= t('detail.delete') %>"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>
+            <button type="submit" class="hist-icon danger" title="<%= plain('detail.delete') %>" aria-label="<%= plain('detail.delete') %>"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>
           </form>
           <% } %>
         </td>
