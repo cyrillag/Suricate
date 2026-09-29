@@ -8,6 +8,7 @@ const bigpicture = require('./bigpicture');
 const confluence = require('./confluence');
 const genReport  = require('./report-gen');
 const { REPORTED_LEVEL_TYPES } = genReport;
+const { rollupStatus } = require('./status');
 const qualityCheck = require('./quality-check');
 const { translate, pluralize } = require('./i18n');
 const { AppError } = require('./errors');
@@ -107,9 +108,9 @@ function splitJiraKeys(raw) {
   return (raw || '').split(',').map(k => k.trim()).filter(Boolean);
 }
 
-// A workstream's status is the roll-up of every epic behind it, same precedence as the
-// deliverable-level roll-up in report-gen: Done only if ALL its epics are done, otherwise
-// Blocked if any is blocked, otherwise In Progress if any is in progress, otherwise To Start.
+// A workstream's status is the roll-up of every epic behind it — the same rule as every other
+// level (status.js's rollupStatus: Done only if ALL are done, then Blocked > In Progress > Paused
+// > To Start).
 // Returns null (caller decides the default) if jira_key is empty or none of its keys are cached
 // yet.
 function aggregateEpicStatus(jiraKeyField, epicsByKey) {
@@ -117,10 +118,7 @@ function aggregateEpicStatus(jiraKeyField, epicsByKey) {
   if (!keys.length) return null;
   const statuses = keys.map(k => epicsByKey.get(k)).filter(Boolean).map(e => jira.mapStatus(e.status));
   if (!statuses.length) return null;
-  if (statuses.every(s => s === 'done')) return 'done';
-  if (statuses.some(s => s === 'blk')) return 'blk';
-  if (statuses.some(s => s === 'prog')) return 'prog';
-  return 'ts';
+  return rollupStatus(statuses);
 }
 
 // A workstream's end date is the farthest (latest) End date among every epic behind it — a
@@ -278,13 +276,8 @@ function buildPlanningTree(epics, rootEpic) {
     node.start = (plannedLevel && node.start) || (starts.length ? starts.reduce((a, b) => a < b ? a : b) : null);
     node.end   = (plannedLevel && node.end)   || (ends.length ? ends.reduce((a, b) => a > b ? a : b) : null);
     if (plannedLevel) {
-      // Same worst-of precedence as every other status roll-up in this app (deliverable-level,
-      // multi-epic workstreams): Done only if every child is, otherwise Blocked beats In Progress
-      // beats To Start.
-      const statuses = node.children.map(c => c.status);
-      node.status = statuses.every(s => s === 'done') ? 'done'
-        : statuses.some(s => s === 'blk') ? 'blk'
-        : statuses.some(s => s === 'prog') ? 'prog' : 'ts';
+      // Same roll-up as every other level in this app (status.js).
+      node.status = rollupStatus(node.children.map(c => c.status));
     }
     return node;
   }
@@ -853,7 +846,7 @@ function buildReportHtml(proj, report, year, week, isOwner, lang, userName, noti
     .filter(m => m.key)
     .map(m => ({ ...m, done: !!(m.end && m.end < todayIso && jira.mapStatus(m.status) === 'done') }));
 
-  const stats = { done:0, prog:0, blk:0, ts:0, total: resolvedWs.length };
+  const stats = { done:0, prog:0, paus:0, blk:0, ts:0, total: resolvedWs.length };
   resolvedWs.forEach(ws => stats[ws.status] = (stats[ws.status]||0)+1);
   const risks = JSON.parse(report.risks_json);
   // Workstream progress alone doesn't tell the whole story — a page can list an open HIGH risk

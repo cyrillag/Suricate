@@ -76,10 +76,12 @@ function mapStatus(jiraStatus) {
   if (s === 'done' || s === 'closed' || s === 'resolved' || s === 'complete') return 'done';
   // "ongoing" covers PMs typing a manual status directly on a no-Jira workstream's Confluence
   // cell (a status-macro lozenge) rather than a real Jira issue status.
+  // Paused = started, then stopped for lack of input or deprioritization — Jira's "Waiting" status
+  // (also "Paused" typed on a Confluence cell). Its own bucket: not To Start (it did start), not In
+  // Progress (nothing is moving), not Blocked (not necessarily a problem — deprioritizing is a
+  // choice). Checked before 'progress' so e.g. "Waiting for review" doesn't read as In Progress.
+  if (s.includes('wait') || s.includes('pause')) return 'paus';
   if (s.includes('progress') || s.includes('review') || s.includes('dev') || s.includes('ongoing')) return 'prog';
-  // A paused epic has already started — bucketing it under "To Start" would misreport work
-  // that's underway as not yet begun.
-  if (s.includes('pause')) return 'prog';
   // "On Hold" reads as stalled/waiting-on-something rather than a work-in-progress pause —
   // closer to Blocked than to In Progress.
   if (s === 'blocked' || s === 'impediment' || s.includes('hold')) return 'blk';
