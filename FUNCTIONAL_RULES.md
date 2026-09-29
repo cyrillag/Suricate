@@ -56,7 +56,7 @@ to be re-applied here by hand rather than resolved by merging code:
   fall through to To Start, which was wrong too). It used
   to be folded into In Progress, which overstated activity; it isn't To Start either (it did start),
   nor Blocked (deprioritizing is a choice, not a problem) — so **it doesn't flip the health badge to
-  At Risk**, only Blocked workstreams and HIGH risks do.
+  At Risk**, only Blocked workstreams and High/Extreme risks do.
   - **Roll-up (one shared rule, `status.js`'s `rollupStatus`, for workstreams, deliverables and
     Planning Light parents alike):** Done only if every child is Done, otherwise Blocked > In
     Progress > Paused > To Start. A deliverable with one paused and one active workstream is still
@@ -385,8 +385,10 @@ path (`refreshFullEpicTree`).
 ## Project health badge (On Track / At Risk / Delayed)
 
 - **At Risk and Delayed are not the same thing and must not be merged.** At Risk is a projection —
-  any Blocked workstream, or the risk register carrying a risk at level `high`, suggesting the
-  target date *might* slip. (A "more than 60% of workstreams still To Start" rule used to also
+  any Blocked workstream, or the risk register carrying a risk at level `high` **or `extreme`**,
+  suggesting the target date *might* slip. (Extreme used to be left out — only `high` was checked —
+  although it ranks above High; fixed 2026-09-29.) One rule, `computeHealth` in server.js, shared
+  by the report and the project page's weekly history so they can never disagree. (A "more than 60% of workstreams still To Start" rule used to also
   trigger At Risk — dropped: too many projects are legitimately mostly-not-started early on
   without that meaning anything is actually at risk, and it fired with an empty risk register and
   nothing blocked, which read as unexplained.) Delayed is a fact —
@@ -415,6 +417,34 @@ path (`refreshFullEpicTree`).
 - Delayed renders as a filled pill (reusing the `risk-badge.high` treatment), not the plain
   dot+text the other two states use — visually more definite, on purpose, without inventing a new
   color.
+
+## Project page — weekly health history
+
+- **The project page's reports table doubles as a health history**, one row per week (most recent
+  first, gap weeks kept as empty rows), modelled on the PMs' Confluence "Flash reports history"
+  page (Date, Météo, Tendance, Alpha, Beta, GA, open risks, points to clarify) so they can stop
+  maintaining it by hand. Columns: **health** (the report's own badge and wording, untranslated like
+  the report itself, with a weather icon: ☀️ On Track, ⛅ At Risk, 🌧️ Delayed), **trend**,
+  **Alpha/Beta/GA end dates** (only the milestones the project configured; the single ETA when
+  none is), **% of workstreams Done**, **open risks** and **points to clarify**. A week with no
+  report says "Pas de rapport généré" / "No report generated" right after the week (it used to
+  sit at the far right, where it went unnoticed). To keep the table from scrolling sideways, the
+  trend arrow sits in the health cell (no column of its own) and the row actions (view / regenerate /
+  delete) are icon-only buttons — 28×28 targets, label as title + aria-label.
+- **Every figure comes from that week's own frozen report** (`reportHistory` in server.js: its
+  snapshot columns — workstreams, risks, highlights, milestone ends, `eta_snapshot`), never from live
+  data: a past week shows what that week's report said, same rule as the report itself. A legacy
+  row without a workstreams snapshot shows "—" for health, trend and Done rather than
+  guessing.
+- **Each row is compared with the previous *existing* report** (a gap week is skipped, not treated
+  as a reset). A date that moved shows the shift in days next to it — ▲ +N d (later, red) or ▼ −N d
+  (earlier, green), the previous date on hover. The **trend** degrades (↘) when the health got
+  worse *or* any date slipped later, improves (↗) when the health got better, and is stable (→)
+  otherwise; the oldest report has none. A deterministic rule on purpose — the Confluence page's
+  hand-picked "Tendance" can't be reproduced, but a slip or a worse badge is what a reader means by
+  "getting worse".
+- Alert red in this table is `#C0472E` (5:1 on white, 4.57:1 on the row hover), not the app's
+  `--blk` `#D85639`, which only reaches 3.95:1 — too low for small text (see Accessibility).
 
 ## Report generation
 
