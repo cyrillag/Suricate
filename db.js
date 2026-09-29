@@ -65,6 +65,36 @@ db.exec(`
     cached_at   INTEGER DEFAULT (unixepoch()),
     UNIQUE(project_id, jira_key)
   );
+
+  -- Retired with the Planning Light "Manage" mode (see FUNCTIONAL_RULES.md): planning_groups and
+  -- planning_overrides are no longer read or written, only kept so existing rows aren't dropped.
+  -- Planning Light (see FUNCTIONAL_RULES.md). A PM-defined aggregate group (e.g. "NCC + ECPROJ +
+  -- MANAGER together") — a synthetic parent node. Its own dates are never stored: they roll up
+  -- from its members the same way any real Jira parent's do (see resolvePlanningTree), so there's
+  -- nothing here to keep in sync. Defined before planning_overrides since that table refers to it.
+  CREATE TABLE IF NOT EXISTS planning_groups (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id  INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    name        TEXT    NOT NULL,
+    sort_order  INTEGER DEFAULT 0,
+    created_at  INTEGER DEFAULT (unixepoch())
+  );
+
+  -- A PM's local presentation decisions on top of the BigPicture-scoped tree, kept in a table of
+  -- its own precisely so a re-sync (which fully rewrites epics_cache every time, same as it always
+  -- has) never wipes them out. jira_key is a real Jira key for a node inherited from BigPicture's
+  -- scope, or a synthetic 'GROUP:<id>' for a manually-created aggregate group (planning_groups
+  -- above) — same table, same shape, since both are just "a node the PM can rename/hide/reparent".
+  CREATE TABLE IF NOT EXISTS planning_overrides (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id        INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    jira_key          TEXT    NOT NULL,
+    summary_override  TEXT,
+    hidden            INTEGER DEFAULT 0,
+    group_id          INTEGER REFERENCES planning_groups(id) ON DELETE SET NULL,
+    updated_at        INTEGER DEFAULT (unixepoch()),
+    UNIQUE(project_id, jira_key)
+  );
 `);
 
 // ── Migrations (idempotent: add columns introduced after initial deploy) ──
@@ -125,6 +155,22 @@ ensureColumn('reports', 'milestone_ga_end', 'milestone_ga_end TEXT');
 ensureColumn('reports', 'milestone_alpha_status', 'milestone_alpha_status TEXT');
 ensureColumn('reports', 'milestone_beta_status', 'milestone_beta_status TEXT');
 ensureColumn('reports', 'milestone_ga_status', 'milestone_ga_status TEXT');
+
+// Planning Light (see FUNCTIONAL_RULES.md) — a project opts in by setting its BigPicture box ID;
+// projects that leave this unset keep the existing portfolioChildrenOf-based Planning behavior
+// completely unchanged (checked at the call site in server.js, not here).
+ensureColumn('projects', 'bigpicture_box_id', 'bigpicture_box_id TEXT');
+// The Jira key of the node one level up in the BigPicture-scoped tree (resolved from each issue's
+// own portfolio-parent field), used for the parent/child date rollup. Null for anything not
+// populated via the BigPicture path — existing epics_cache readers (Cleanup, project detail epic
+// count) don't look at this column and are unaffected by its presence.
+ensureColumn('epics_cache', 'parent_key', 'parent_key TEXT');
+// The fully-resolved Planning Light tree (scope + hierarchy + rollup dates + hide/rename/group
+// overrides already applied), frozen at report-generation time — same frozen-snapshot rule as
+// workstreams_snapshot_json/epics_snapshot_json: a past week's report must never silently change
+// because a PM hides a node next week. NULL for a project not using Planning Light, and for any
+// report row generated before this column existed.
+ensureColumn('reports', 'planning_snapshot_json', 'planning_snapshot_json TEXT');
 
 // A first version of "milestones" auto-discovered them from the Jira epic hierarchy / a Confluence
 // heading convention, grouping the Deliverable matrix by whichever ones it found. Retired: on a

@@ -177,6 +177,154 @@ GA. Project Identity can show one end date per phase a project actually has.
   fields wouldn't actually solve the problem that got the old mechanism retired (see above), since
   the underlying Jira hierarchy still doesn't separate the phases either way.
 
+## Planning Light (BigPicture-scoped planning)
+
+A project can opt in (`projects.bigpicture_box_id`, Edit page — a separate field from
+`jira_root_epic`, since a BigPicture box ID isn't always shaped like a Jira key) to a hierarchical,
+2-column (Summary, Status) planning view that **replaces** the classic flat Planning/Gantt section
+entirely for that project — never shown alongside it. A project with no box ID configured is
+completely unaffected: same flat epic-list Gantt as before, same `jira.getPortfolioEpics` code
+path (`refreshFullEpicTree`).
+
+- **Scope comes from BigPicture, not a second, divergent source of truth.** The whole point of this
+  feature is that a PM has already configured which Jira sources populate their BigPicture "box" —
+  Planning Light reads that configuration (`bigpicture.js`'s `getScopeDefinition`) and runs it
+  through this app's own plain Jira search (`jira.js`'s `searchByJql`), rather than re-deriving
+  scope from a fixed root epic the way the classic Gantt does. This is also what replaced the
+  retired `extra_epics` manual-pin field (see "Milestones" above's Planning/Gantt section) — the
+  problem `extra_epics` was a workaround for (an epic belonging outside the root epic's own
+  hierarchy) is what BigPicture's own scope config already solves properly.
+  - **A non-empty `narrowingQuery` (a raw JQL string) IS the box's actual configured scope, full
+    stop — when present, it's used on its own, never OR'd together with `scopeDefinitionElements`.**
+    Verified against two real boxes, which disagreed enough to matter: `HYBR-95` had
+    `narrowingQuery: ""` and its whole ~250-issue scope came from one `JIRA_FILTER` element instead
+    (so that's the fallback when there's no `narrowingQuery`) — but `HYBR-89` had both a real,
+    specific `narrowingQuery` (itself a `portfolioChildrenOf` walk) **and** nine
+    `scopeDefinitionElements` naming entire connected Jira projects (IPAM, NCC, MANAGER, CLDAPI,
+    LVL2...). Those elements are the projects the box is *allowed to pull from*, not literal
+    scope-additive elements — OR'ing their raw `project = <id>` clauses in on top of the
+    `narrowingQuery` would have pulled every issue in every one of those projects (thousands) instead
+    of the ~500-issue portfolio the `narrowingQuery` alone correctly resolves to (confirmed by
+    running both against Jira directly before shipping this). Each `scopeDefinitionElements` type
+    maps to its own JQL clause when it IS used (`JIRA_FILTER` → `filter = <id>`, `JIRA_PROJECT` →
+    `project = <id>`, `JIRA_AGILE_BOARD` → `board = <id>`, the last one unverified end-to-end
+    against a real board-scoped box). The scope-definition endpoint's actual payload also sits under
+    an undocumented `cargo` wrapper (`{currentVersion, latestVersion, cargo: {...}}`), not the
+    response root — the first implementation missed this and every box appeared to have zero scope
+    until it was caught.
+  - **A box's scope is not epic-only.** On that same real box, 246 issues were in scope but only 31
+    were Epics — the rest (mostly Task/Bug) report into their parent Epic via the classic "Epic
+    Link" field (`customfield_10000`), not the portfolio-parent field Epic-and-above levels use
+    (see hierarchy note below). See "granular work items" below for how these are handled.
+- **BigPicture's REST API uses a different base path and a different auth scheme from the rest of
+  this app's Jira calls** — `Authorization: APIToken <token>` (env `BIGPICTURE_API_TOKEN`), not the
+  `Bearer ${JIRA_TOKEN}` used everywhere else — hence its own module (`bigpicture.js`), same
+  reasoning as `confluence.js` being separate from `jira.js` despite both being Atlassian-adjacent.
+  Self-hosted installs before ~8.32 use a different URL path
+  (`/rest/softwareplant-bigpicture/1.0` vs `/rest/bigpicture/1.0`) — `bpFetch` tries the new one
+  first and falls back to the old one on a 404, since neither this app nor whoever configures a
+  project's box ID necessarily knows which version the instance is on.
+- **Hierarchy is derived from Jira's own parent fields/links, not from any BigPicture box-to-box
+  endpoint.** BigPicture's own dedicated "list tasks in a box" endpoint only returns bare IDs and is
+  Cloud-only (confirmed unavailable for this on-premise instance) — reusing Jira's own hierarchy
+  mechanisms against the BigPicture-scoped issue set was the only viable path, and it also means
+  Planning Light didn't need to learn BigPicture's own internal task model at all. **Three different
+  mechanisms are checked, in priority order, since which one is populated depends on the issue's own
+  level and on how a given PM built their hierarchy**:
+  1. a plain Jira issue link of type **"Parent-Child"** (`issuelinks`, checked on its *inward* side
+     only — "is child of" — never the outward "is parent of" side, which would read backwards).
+     BGP Service was deliberately restructured as **Epic LPM > Phase > Deliverable > New Feature >
+     Epic (NCC, PSM, NSA…)** entirely through these links, so a link is the PM's explicit, current
+     statement of the hierarchy and wins over the custom fields below — many of the same issues
+     still carry a `cf[16100]` left over from the older Advanced Roadmaps structure (e.g. a New
+     Feature pointing straight at the Epic LPM root), which would attach them to the wrong level.
+     (It used to be the last-resort fallback, back when it only wired a box's top level.);
+  2. the portfolio-parent field (`cf[16100]`/`customfield_16100` — the field the classic tree-walk
+     already uses) for Epic-and-above levels;
+  3. the classic "Epic Link" field (`customfield_10000`) for Task/Bug/Story-level issues pointing at
+     their parent Epic — on one real box, only 37 of 246 issues had `customfield_16100` set at all,
+     the other 209 all used `customfield_10000` instead.
+
+  All three land in a single `parentKey` per issue (`jira.js`'s `searchByJql`) so the
+  hierarchy/rollup pass (`buildPlanningTree`) doesn't need to know which one applies for a given
+  issue. Because the priority order is fixed, a PM who wires the *same* relationship two different
+  ways always gets a consistent result rather than one that depends on fetch order. The scope search
+  is paginated — a box can exceed one 500-issue page (BGP's is about that size), and a silently
+  truncated page would drop arbitrary nodes.
+- **On a Phase/Deliverable-structured box, only those two levels get a row** (plus synthetic
+  groups). A box counts as structured when at least one **Phase is linked ("is child of") directly
+  under the project's root epic** (`jira_root_epic`) — not merely when a Phase/Deliverable issue
+  appears somewhere in scope: Encryption at Rest's box (HYBR-95) carries one stray Deliverable in an
+  otherwise Epic-based tree, and a presence check (shipped briefly on preview) collapsed its ~35
+  rows down to 2. The flag is computed in `buildPlanningTree` and frozen on every node of the
+  snapshot (`structured`), so a past week keeps rendering the way it was generated. The Epic LPM
+  root above, and the New Features/delivery-team Epics/Tasks below, are still fetched and still
+  feed the rollup — they just aren't drawn. Indentation counts displayed ancestors only (Phase at
+  depth 0, Deliverable at depth 1, whatever the raw Jira depth), and a Deliverable gets no collapse
+  caret since nothing renders under it. Any other box keeps the Epic-level rule below, and none of
+  the Phase/Deliverable date/status rules further down apply to it either.
+- **Granular work items (Task/Bug/Story/Sub-task/Improvement) still count toward their parent
+  Epic's rolled-up dates, but never get their own row.** A box's configured scope commonly includes
+  hundreds of these (see above) — rendering every one of them would be the exact opposite of
+  "light". `report-gen.js`'s `flattenPlanningTree` fetches and keeps them in the tree (so the
+  rollup pass in `buildPlanningTree` still sees them) but skips emitting a row for any node whose
+  Jira issue type is in a fixed `GRANULAR_TYPES` set (on a Phase/Deliverable-structured box, the
+  Phase/Deliverable rule above applies instead).
+- **A parent's Start/End dates are never read from Jira — they're always computed as the MIN start
+  / MAX end of their children**, recursively, bottom-up (`buildPlanningTree`'s `rollup`). This
+  applies to both a real Jira parent epic and a synthetic aggregate group (see below) — a group has
+  no dates of its own by definition, only ever rolled-up ones. A leaf epic keeps its own real Jira
+  dates.
+  - **Exception: Phase and Deliverable issues keep their own Jira Start/End when set** — they're the
+    levels a PM plans on directly (BGP: Technical delivery set to 01/12/25 → 03/11/26 in Jira,
+    while its children only covered 02/03/26 → 15/09/26). Each field independently: a missing Start
+    or End is still computed from below. A Phase with no dates of its own therefore rolls up from its
+    Deliverables' *effective* dates (own-or-computed).
+  - **Their status, however, is always computed from below** (same worst-of rule as a group: Done
+    only if every child is, then Blocked > In Progress > To Start) — their Jira workflow status is a
+    placeholder ("Request" on every BGP Phase/Deliverable), which would otherwise show everything as
+    To Start. A Phase/Deliverable with no child in scope keeps its own mapped status.
+  - **On a Phase/Deliverable-structured box, the hierarchy follows "Parent-Child" links only** — the
+    `cf[16100]`/Epic Link fallbacks are ignored (`searchByJql`'s `linkParentKey`). Verified on BGP:
+    old NETDC epics still attached to the ALPHA phase via Parent Link only (no link) pushed its end
+    from Dec 2025 to Jul 2026. An issue in the box's scope but with no link parent simply becomes a
+    non-displayed root, contributing to nothing. Conversely, an issue linked into the tree but
+    outside the BigPicture box's scope is not fetched at all — the scope still comes from the box
+    (BGP: 7 link-only issues such as XDEP-202/203 aren't reached by a `portfolioChildrenOf` walk of
+    LVL2-3688); adding them is a box-configuration fix, not a Suricate one.
+- **No local overrides (the "Manage" mode is retired).** Planning Light used to let the owner
+  hide, rename and group rows in Suricate itself (`planning_overrides`/`planning_groups`, four
+  `/planning/*` routes, a CSS-only Manage toggle). Removed at the PM's request once the Jira
+  structure itself (Phase > Deliverable via links) gave the report the right rows and labels: the
+  planning now shows exactly what Jira says, and fixing the plan means fixing Jira. Both tables are
+  kept in the schema with their existing rows, just no longer read or written. A report frozen
+  while the mode existed can still carry hidden rows (left out, as they were) or synthetic
+  `GROUP:<id>` nodes (still rendered) in its snapshot. Nothing was ever written back to Jira;
+  bi-directional Start/End date sync remains a separate, later topic.
+- **The whole resolved tree (scope + hierarchy + rollup dates) is frozen per report row**
+  (`reports.planning_snapshot_json`), same reasoning as every other snapshot column here — a past
+  week's report must not change because Jira changes afterward. `null` for a project that hasn't opted in, or for a legacy row predating this
+  column — the renderer falls back to the classic flat Gantt only when `planningTree` itself is
+  `null`; an opted-in project whose BigPicture box resolves to zero items still gets the Planning
+  Light section (with a "No items in the configured scope" message), never a silent fallback to the
+  old view, since falling back there would mask a real misconfiguration.
+- **Same fiscal-quarter month axis as the classic Gantt (`buildGanttMonths`), but its own window:
+  from 3 months before today (not the classic Gantt's 6) to the end of the month of the latest date
+  shown, at least 3 months ahead** — no fixed end date (the old hardcoded 30/11/2026 already clipped
+  HYBR-95 and HYBR-122). An item that ended before the window gets a "◂ Ended <date>" label instead
+  of a clamped sliver on the left edge. Unlike the classic Gantt, the timeline bars here are
+  rendered server-side as plain HTML (not built from a JSON blob by client-side JS); only
+  collapse/expand needs any client JS.
+- **Only the timeline scrolls horizontally; the Summary/Status column stays fixed.** Each month has
+  a fixed width (`PLANNING_MONTH_PX`), stretched to the full width when the plan is short. The PDF
+  export can't scroll, so its print CSS squeezes the whole timeline into the page width instead.
+- **Rows are sorted chronologically at every level** (siblings only — the hierarchy is kept), on
+  effective dates (own or rolled up): by end date, or by start when there's no end, then by start;
+  undated items last. Jira's search order meant nothing here (BGP's GA phase appeared above
+  ALPHA/BETA). Applies to every Planning Light box.
+- **Collapse/expand is client-side only and deliberately not persisted** — it resets on reload;
+  it's just a reading convenience for the person currently looking at the page.
+
 ## Report export
 
 - **PDF export (re-added) renders the exact live report page server-side, never a separate
@@ -366,15 +514,49 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   to a user. Every caught error is classified (`AppError` + a stable code) and translated into an
   actionable sentence in the user's language; anything unclassified falls back to a generic
   apologetic message. The raw error is still logged server-side.
-- **A Confluence 404 with `"authorized":false` in its own response body gets a distinct,
-  retry-first message (`confluence_auth_blip`), not the generic "check your URL/rights"
-  (`confluence_not_found`).** Confluence returns 404 — not 401/403 — when the service token isn't
-  authorized to even see a space/page exists, a security-through-obscurity choice on Confluence's
-  side. Observed in production (Managed Backup for VMware, 2026-08-31) as a burst of ~14 identical
-  failures within a 90-second window that then fully resolved on its own — a short-lived
-  auth/session blip, not a wrong or moved page. Telling the PM to go re-check their project's
-  Confluence URL over what's usually transient sent them chasing a non-problem; the message now
-  says to just retry, and only suggests checking access rights if it keeps happening.
+- **One message per cause we can tell apart, each saying what happened, where, and what to do**
+  — not just which service failed. Renewing a token, fixing a page URL, granting access and simply
+  waiting are different fixes, and "retry" only helps for the last one; every message now states
+  its own next step, and the banner no longer appends a blanket "retry by clicking Generate". The
+  codes (`errors.js` + each service module, translations in `i18n.js` under `detail.err_*`):
+  - **token expired/revoked** (`*_token_invalid`, naming the exact `.env` variable to renew:
+    `JIRA_SERVICE_TOKEN`, `CONFLUENCE_SERVICE_TOKEN`, `BIGPICTURE_API_TOKEN`) — and says
+    retrying won't help. Detected even when the service doesn't answer 401: an expired Jira token
+    makes Jira run the call as anonymous, so a JQL search fails with a 400 "...cannot be viewed by
+    anonymous users"; an expired Confluence token gets a 404 `"authorized":false`. Both happened
+    for real on 2026-09-28/29, when all service tokens expired within two days.
+  - **token fine, rights missing**: `jira_forbidden`, `confluence_space_forbidden` (names the
+    space), `confluence_forbidden` (read restriction on the page itself);
+  - **Jira CAPTCHA lock** (`jira_captcha`, 403 + `X-Authentication-Denied-Reason`): someone must
+    log in once in a browser with the service account;
+  - **not found**, with the precise object: `jira_issue_not_found` ({{key}}),
+    `confluence_page_not_found` ({{space}}/{{title}}), `bigpicture_box_not_found` ({{box}});
+  - **bad JQL** (`jira_bad_query`): Jira's own `errorMessages` are passed through (they're
+    human-readable and say which part is wrong) — typically a BigPicture box's scope query;
+  - **transient**: `*_rate_limited` (429), `*_timeout` (no answer within 15 s),
+    `*_unreachable` (DNS/network — "if it works in your browser, it's the server's network"),
+    `*_unavailable` (5xx, service-side incident). BigPicture's 5xx message also hints at an invalid
+    token, since a bad token has been seen to come back as a 500 there;
+  - `bigpicture_token_missing`: a box is configured but the server has no BigPicture token.
+- **Confluence's `"authorized":false` 404 is diagnosed, not guessed.** It covers both "token
+  expired" and "no access to this space". The request is first retried once after 2 s — a genuinely
+  transient burst did happen once (Managed Backup for VMware, 2026-08-31, ~90 s, resolved on its
+  own) — then `/rest/api/user/current` tells the two apart: served as anonymous means the token is
+  dead (`confluence_token_invalid`), a real user means the account lacks access to that space
+  (`confluence_space_forbidden`). The former `confluence_auth_blip` message ("temporary, retry
+  later") is retired: on 2026-09-29 it was shown for an expired token, which never resolves by
+  itself.
+- **The banner is labelled with the service that actually failed** (`AppError.source`, derived
+  from the code's prefix) — it used to say "Confluence sync failed" for every error, Jira ones
+  included. Non-service notices (past week locked, future week...) carry no service label.
+- **A Planning Light failure is no longer silent.** The report is still generated (the Planning
+  section falls back as before), but the cause comes back from `generateReportRow` and is shown as
+  a banner on top of the freshly generated report. More generally, when the report itself was
+  generated but something failed on the way (the pre-sync, Planning Light), Generate/Refresh now
+  lands on that report with the banner instead of bouncing back to the project page.
+- **Login checks the Jira service token before saying an email doesn't exist** — with an expired
+  token, Jira's user search runs as anonymous and finds nobody, which used to read as "email not
+  found in Jira".
 
 ## Cleanup (tracking-quality check)
 

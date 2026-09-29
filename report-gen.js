@@ -6,7 +6,7 @@ const { translate } = require('./i18n');
 // "settings" glyph — a well-known, simple outline shape.
 const GEAR_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>';
 
-function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, milestones = [], epics, stats, health, isOwner, etaDelayed, etaDelayedFrom, etaDisplay, lang, userName, backfilled, generatedAt, confluenceUrl = null }) {
+function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, milestones = [], epics, planningTree = null, stats, health, isOwner, etaDelayed, etaDelayedFrom, etaDisplay, lang, userName, backfilled, generatedAt, confluenceUrl = null, notice = null }) {
   // milestones: up to 3 fixed, manually-configured phases (Alpha/Beta/GA — see
   // FUNCTIONAL_RULES.md "Milestones") as [{name, key, end}], already filtered to only the ones a
   // project actually set. Drives only the Project Identity quick-view chips below — the
@@ -102,6 +102,33 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
   const ganttEpics = epics.filter(e => !e.end || e.end >= historyFloorIso);
   const hasPartialDates = ganttEpics.some(e => (e.start && !e.end) || (!e.start && e.end));
 
+  // Planning Light (see FUNCTIONAL_RULES.md) — when the project is opted in (planningTree isn't
+  // null), it REPLACES the flat ganttEpics section above rather than sitting alongside it. Same
+  // fiscal-quarter month axis as the classic Gantt, computed server-side here (not client-side like
+  // GANTT_JS below), with no client JS needed beyond collapse/expand. The axis starts 3 months before
+  // today (not the classic Gantt's 6) and runs to the end of the month of the latest date shown —
+  // at least 3 months ahead — instead of a fixed end: the timeline scrolls horizontally on its own
+  // (see renderPlanningSection), so a long plan no longer has to be clipped or squeezed to fit.
+  const planningRows = planningTree ? flattenPlanningTree(planningTree) : null;
+  const nowUtc = new Date();
+  const planningTstart = new Date(Date.UTC(nowUtc.getUTCFullYear(), nowUtc.getUTCMonth() - 3, 1));
+  const latestPlanningDate = (planningRows || []).flatMap(r => [r.start, r.end]).filter(Boolean)
+    .reduce((a, b) => a > b ? a : b, new Date(Date.UTC(nowUtc.getUTCFullYear(), nowUtc.getUTCMonth() + 3, 1)).toISOString().slice(0, 10));
+  // Exclusive end: the 1st of the month after the latest date, so that whole last month is drawn.
+  const planningTend = new Date(Date.UTC(Number(latestPlanningDate.slice(0, 4)), Number(latestPlanningDate.slice(5, 7)), 1));
+  const pctDate = d => {
+    if (!d) return null;
+    const p = (new Date(d) - planningTstart) / (planningTend - planningTstart) * 100;
+    return Math.max(0, Math.min(100, p));
+  };
+  const planningTstartIso = planningTstart.toISOString().slice(0, 10);
+  // The Manage mode (hide/rename/group) is retired; a snapshot frozen while it existed can still
+  // carry hidden rows, which stay out of that past report for everyone, as they were.
+  const visiblePlanningRows = planningRows ? planningRows.filter(r => !r.hidden) : null;
+  const hasPartialDatesPlanning = visiblePlanningRows ? visiblePlanningRows.some(r => (r.start && !r.end) || (!r.start && r.end)) : false;
+  // buildGanttMonths' end is inclusive — pass the last day of the last month, not the exclusive end.
+  const { months: planningMonths, quarterLines: planningQuarterLines } = planningTree ? buildGanttMonths(planningTstart, new Date(planningTend - 86400000)) : { months: [], quarterLines: [] };
+
   // Donut data
   const donutJSON = JSON.stringify([
     { v: stats.done, c: '#A6D64D' },
@@ -156,6 +183,8 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
 </nav>
 
 <div class="app-body">
+${notice ? `
+  <div class="auth-error" role="alert">⚠ ${['jira', 'confluence', 'bigpicture'].includes(notice.source) ? `<strong>${esc(translate(lang, `detail.source_${notice.source}`))}</strong> — ` : ''}${esc(notice.message)}</div>` : ''}
 
   <div class="page-header">
     <div>
@@ -252,7 +281,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
     </div>
   </div>
 
-  ${ganttEpics.length ? `
+  ${planningTree !== null ? renderPlanningSection({ visiblePlanningRows, hasPartialDatesPlanning, planningMonths, planningQuarterLines, pctDate, planningTstartIso }) : (ganttEpics.length ? `
   <div class="matrix-section">
     <div class="section-label">Planning — team epics</div>
     <div class="gantt-mobile-note">📊 The planning timeline needs a wider screen — view this report on a desktop or tablet to see it.</div>
@@ -270,7 +299,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
       <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#BEC0C6;border:1px dashed #C8CAD4"></div>To Start</div>
       ${hasPartialDates ? '<div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:linear-gradient(to right,transparent,#87878C)"></div>Only one date known (hover for detail)</div>' : ''}
     </div>
-  </div>` : ''}
+  </div>` : '')}
 
 </div>
 
@@ -315,7 +344,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
   }
   requestAnimationFrame(step);
 })();
-${ganttEpics.length ? GANTT_JS(ganttEpics) : ''}
+${planningTree !== null ? (visiblePlanningRows.length ? PLANNING_COLLAPSE_JS() : '') : (ganttEpics.length ? GANTT_JS(ganttEpics) : '')}
 </script>
 </body>
 </html>`;
@@ -341,6 +370,164 @@ function buildGanttMonths(tstart, tend) {
     cur = new Date(Date.UTC(cy, cm + 1, 1));
   }
   return { months, quarterLines };
+}
+
+// Planning Light (see FUNCTIONAL_RULES.md) — pre-order walk of the frozen, already-overridden
+// tree resolvePlanningTree/buildPlanningTree produced (server.js), turning it into one flat row
+// per visible node with a depth for indentation. Deliberately does NOT skip a hidden node's
+// children (see the comment at planningRows' call site above) — only the hidden node's own row is
+// left for the caller to filter out.
+//
+// A BigPicture box's configured scope isn't epic-only — verified against a real box (HYBR-95):
+// 246 issues in scope, only 31 of them Epics, the rest Task/Bug/Story/etc. reporting into those
+// epics via the classic Epic Link field (see jira.js's searchByJql). Rendering all 246 as rows
+// would be the exact opposite of "light" — GRANULAR_TYPES are still fetched and still count
+// toward their parent's rollup dates (server.js's buildPlanningTree runs before this, over the
+// full set), they just never get their own row here.
+const GRANULAR_TYPES = new Set(['Task', 'Sub-task', 'Subtask', 'Bug', 'Story', 'Improvement']);
+// A box built on the "Epic LPM > Phase > Deliverable > New Feature > Epic" structure (BGP Service)
+// is reported at the Phase/Deliverable levels only — everything above (the Epic LPM root) and below
+// (New Feature, delivery-team Epics, their Tasks) is still fetched and still feeds the rollup dates
+// and statuses, it just never gets a row. Only on a tree buildPlanningTree (server.js) flagged as
+// structured (a Phase linked directly under the root epic) — a box with a plain Epic-based
+// hierarchy (HYBR-95, even with a stray Deliverable in it) keeps the GRANULAR_TYPES rule above.
+const REPORTED_LEVEL_TYPES = new Set(['Phase', 'Deliverable']);
+function flattenPlanningTree(tree) {
+  const levelsOnly = tree.some(n => n.structured);
+  // GROUP: nodes only exist in snapshots frozen while the retired Manage mode was around.
+  const isRow = node => node.key.startsWith('GROUP:')
+    || (levelsOnly ? REPORTED_LEVEL_TYPES.has(node.type) : !GRANULAR_TYPES.has(node.type));
+  const out = [];
+  // depth counts emitted ancestors only, not raw tree depth — a Phase under the skipped Epic LPM
+  // root still renders at depth 0, and a Deliverable under it at depth 1.
+  (function walk(nodes, depth) {
+    nodes.forEach(node => {
+      if (!isRow(node)) { walk(node.children, depth); return; }
+      const row = {
+        key: node.key, summary: node.summary, status: node.status || 'ts',
+        start: node.start, end: node.end, depth, hasChildren: false, hidden: !!node.hidden
+      };
+      out.push(row);
+      const before = out.length;
+      walk(node.children, depth + 1);
+      // Caret only when something actually renders underneath — a Deliverable whose children are
+      // all skipped New Features/Epics is a leaf as far as the report is concerned.
+      row.hasChildren = out.length > before;
+    });
+  })(tree, 0);
+  return out;
+}
+
+const PLANNING_STATUS_LABEL = { done: 'Done', prog: 'In Progress', blk: 'Blocked', ts: 'To Start' };
+
+// Same full/fade-left/fade-right/no-date bar logic as GANTT_JS's client-side version, just
+// rendered server-side here (see planningTstart/pctDate at the call site).
+function planningBarHtml(r, pctDate, tstartIso) {
+  // Entirely before the 3-month window: clamping would leave a meaningless sliver on the left edge.
+  if (r.end && r.end < tstartIso) {
+    return `<span class="gantt-nodates" title="${esc(r.key)} — ${esc(r.summary)}&#10;${esc(r.start || '?')} → ${esc(r.end)}">◂ Ended ${esc(r.end)}</span>`;
+  }
+  if (r.start && r.end) {
+    const l = pctDate(r.start), w = Math.max(0.5, pctDate(r.end) - l);
+    return `<div class="gantt-bar ${r.status}" style="left:${l.toFixed(2)}%;width:${w.toFixed(2)}%" title="${esc(r.key)} — ${esc(r.summary)}&#10;${r.start} → ${r.end}"></div>`;
+  }
+  if (r.start || r.end) {
+    const isEndOnly = !!r.end, PARTIAL_W = 6;
+    let l, w;
+    if (isEndOnly) { const right = pctDate(r.end); l = Math.max(0, right - PARTIAL_W); w = right - l; }
+    else { l = pctDate(r.start); const right = Math.min(100, l + PARTIAL_W); w = right - l; }
+    const tip = isEndOnly ? `No start date — ends ${r.end}` : `No end date — starts ${r.start}`;
+    return `<div class="gantt-bar ${r.status} ${isEndOnly ? 'fade-left' : 'fade-right'}" style="left:${l.toFixed(2)}%;width:${w.toFixed(2)}%" title="${esc(r.key)} — ${esc(r.summary)}&#10;${esc(tip)}"></div>`;
+  }
+  return `<span class="gantt-nodates">No dates yet</span>`;
+}
+
+// Full Planning Light section (see FUNCTIONAL_RULES.md) — replaces the classic flat Gantt when a
+// project has an opted-in bigpicture_box_id. Rows/bars are plain server-rendered HTML (not built
+// from a JSON blob client-side like GANTT_JS); only collapse/expand needs any client JS
+// (PLANNING_COLLAPSE_JS).
+// Fixed width per month: the Summary/Status column stays put while only the timeline scrolls
+// horizontally (.planning-rscroll) once the months no longer fit — min-width:100% still stretches a
+// short plan to the full available width.
+const PLANNING_MONTH_PX = 110;
+function renderPlanningSection({ visiblePlanningRows, hasPartialDatesPlanning, planningMonths, planningQuarterLines, pctDate, planningTstartIso }) {
+  if (!visiblePlanningRows.length) {
+    return `
+  <div class="matrix-section planning-section">
+    <div class="section-label"><span>Planning</span></div>
+    <div style="padding:14px 20px;font-size:13px;color:#636369">No items in the configured BigPicture scope.</div>
+  </div>`;
+  }
+  const monthsHtml = planningMonths.map(m => `<div class="gantt-mcell${m.q ? ' qs' : ''}">${m.q ? `<span class="gantt-mqtr">${esc(m.q)}</span>` : ''}<span class="gantt-mname">${esc(m.m)} ${esc(m.y)}</span></div>`).join('');
+  const qtrLinesHtml = planningQuarterLines.map(d => `<div class="gantt-vline qtr" style="left:${pctDate(d).toFixed(2)}%"></div>`).join('');
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayLineHtml = `<div class="gantt-vline vtoday" style="left:${pctDate(todayIso).toFixed(2)}%"><span class="gantt-vlabel" style="color:#ED733D">today</span></div>`;
+
+  const lrows = visiblePlanningRows.map(r => `
+    <div class="planning-lrow" data-depth="${r.depth}">
+      ${r.hasChildren ? `<span class="pl-caret">▾</span>` : `<span class="pl-caret-spacer"></span>`}
+      <span class="pl-summary" style="padding-left:${r.depth * 16}px" title="${esc(r.summary)}">${esc(r.summary)}</span>
+      <span class="pl-status st ${r.status}">${PLANNING_STATUS_LABEL[r.status] || r.status}</span>
+    </div>`).join('');
+  const rrows = visiblePlanningRows.map(r => `
+    <div class="planning-row">${planningBarHtml(r, pctDate, planningTstartIso)}</div>`).join('');
+
+  return `
+  <div class="matrix-section planning-section">
+    <div class="section-label">
+      <span>Planning</span>
+    </div>
+    <div class="gantt-mobile-note">📊 The planning timeline needs a wider screen — view this report on a desktop or tablet to see it.</div>
+    <div class="gantt-outer planning-outer">
+      <div class="gantt-lcol planning-lcol" id="planning-lcol">
+        <div class="gantt-lhdr planning-lhdr"><span class="pl-hdr-summary">Summary</span><span class="pl-hdr-status">Status</span></div>
+        ${lrows}
+      </div>
+      <div class="planning-rscroll">
+        <div class="gantt-rcol" style="width:${planningMonths.length * PLANNING_MONTH_PX}px">
+          <div class="gantt-months">${monthsHtml}</div>
+          <div class="gantt-body" id="planning-body">${qtrLinesHtml}${todayLineHtml}${rrows}</div>
+        </div>
+      </div>
+    </div>
+    <div class="gantt-legend">
+      <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#A6D64D"></div>Done</div>
+      <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#0050D5"></div>In Progress</div>
+      <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#ED733D"></div>Blocked</div>
+      <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#BEC0C6;border:1px dashed #C8CAD4"></div>To Start</div>
+      ${hasPartialDatesPlanning ? '<div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:linear-gradient(to right,transparent,#87878C)"></div>Only one date known (hover for detail)</div>' : ''}
+    </div>
+  </div>`;
+}
+
+// Collapse/expand only (see FUNCTIONAL_RULES.md "Planning Light") — deliberately not persisted
+// (resets on reload). Walks the left/right row lists in lockstep
+// by index (both rendered from the exact same visiblePlanningRows array, in the same order, so
+// their nth-child positions always line up) and hides every row deeper than the clicked one, up to
+// the next row at the same depth or shallower.
+function PLANNING_COLLAPSE_JS() {
+  return `
+(function(){
+  var lrows=document.querySelectorAll('#planning-lcol .planning-lrow');
+  var rrows=document.querySelectorAll('#planning-body .planning-row');
+  document.querySelectorAll('.pl-caret').forEach(function(caret){
+    caret.addEventListener('click',function(){
+      var row=caret.closest('.planning-lrow');
+      var idx=Array.prototype.indexOf.call(lrows,row);
+      var depth=parseInt(row.getAttribute('data-depth'),10);
+      var collapsed=caret.classList.toggle('pl-collapsed');
+      caret.textContent=collapsed?'▸':'▾';
+      var i=idx+1;
+      while(i<lrows.length){
+        var d=parseInt(lrows[i].getAttribute('data-depth'),10);
+        if(d<=depth)break;
+        lrows[i].style.display=collapsed?'none':'';
+        if(rrows[i])rrows[i].style.display=collapsed?'none':'';
+        i++;
+      }
+    });
+  });
+})();`;
 }
 
 function GANTT_JS(epics) {
@@ -612,6 +799,26 @@ const CSS = `
   .gantt-mobile-note{display:none}
   .gantt-leg-item{display:flex;align-items:center;gap:5px;font-size:13.5px;color:var(--tx2)}
   .gantt-leg-swatch{width:14px;height:10px;border-radius:1px;flex-shrink:0}
+  /* Planning Light (see FUNCTIONAL_RULES.md) — reuses .gantt-outer/.gantt-rcol/.gantt-months/
+     .gantt-body/.gantt-bar/.gantt-vline/.gantt-legend as-is; only the left label column becomes a
+     wider 2-sub-column (Summary, Status) tree instead of the classic single team/key/name row. */
+  .planning-lcol{width:340px}
+  /* Only the timeline scrolls; the label column is outside the scroller, so it stays fixed. */
+  .planning-outer{overflow-x:visible}
+  .planning-rscroll{flex:1;min-width:0;overflow-x:auto}
+  .planning-rscroll .gantt-rcol{min-width:100%}
+  .planning-lhdr{display:flex;align-items:center;padding:0 12px;gap:8px}
+  .pl-hdr-summary{flex:1;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tx3)}
+  .pl-hdr-status{width:84px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tx3)}
+  .planning-lrow{height:24px;display:flex;align-items:center;padding:0 12px 0 8px;border-bottom:1px solid var(--bd2);gap:4px;overflow:visible}
+  .planning-lrow:last-child{border-bottom:none}
+  .pl-caret{width:14px;flex-shrink:0;cursor:pointer;font-size:10px;color:var(--tx3);text-align:center;user-select:none}
+  .pl-caret-spacer{width:14px;flex-shrink:0}
+  .pl-summary{flex:1;min-width:0;font-size:13.5px;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pl-status{width:84px;flex-shrink:0;font-size:12px}
+  .planning-row{height:24px;border-bottom:1px solid var(--bd2);position:relative;overflow:visible}
+  .planning-row:nth-child(odd){background:var(--gnd)}
+  .planning-row:last-child{border-bottom:none}
   .doc-footer{background:var(--mb);color:rgba(255,255,255,.4);text-align:center;padding:18px 32px;font-size:13.5px;letter-spacing:.04em}
   @media(max-width:700px){
     .identity-grid{grid-template-columns:1fr 1fr}
@@ -632,6 +839,8 @@ const CSS = `
      arrows are hidden here, not the whole .week-nav — .ref-week (the "W35 · 2026" label) is the
      one piece of that widget that's informational rather than an action, and must stay. */
   @media print{.week-arrow,.nav-user,a[href$="/pdf"],a[href$="/edit"],form[action$="/reports/generate"],.confluence-link-wrap{display:none!important}}
+  /* A PDF can't scroll: squeeze the whole Planning Light timeline into the page width instead. */
+  @media print{.planning-rscroll{overflow:visible}.planning-rscroll .gantt-rcol{width:auto!important;min-width:0}}
   /* Deliberately subtle — a secondary way to reach more detail, not a primary action next to
      Refresh/Export PDF. Underline-on-hover only, inherits the muted .page-sub text color rather
      than getting its own accent treatment. */
@@ -640,3 +849,4 @@ const CSS = `
 `;
 
 module.exports = generateReport;
+module.exports.REPORTED_LEVEL_TYPES = REPORTED_LEVEL_TYPES;

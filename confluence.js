@@ -1,41 +1,70 @@
 const fetch = require('node-fetch');
-const { AppError, httpErrorCode } = require('./errors');
+const { AppError, httpErrorCode, networkErrorCode } = require('./errors');
 const BASE = process.env.CONFLUENCE_BASE || 'https://confluence.ovhcloud.tools';
 
-async function confluenceFetch(url, token) {
-  let res;
+async function rawFetch(url, token) {
   try {
-    res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, timeout: 15000 });
+    return await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, timeout: 15000 });
   } catch (err) {
-    throw new AppError('confluence_unavailable', `Confluence unreachable: ${err.message}`);
+    throw new AppError(networkErrorCode('confluence', err), `Confluence unreachable: ${err.message}`);
+  }
+}
+
+// Whether Confluence still recognizes the service token at all — an expired token doesn't fail
+// outright, Confluence just serves the call as the anonymous user.
+async function tokenIsRecognized(token) {
+  try {
+    const res = await rawFetch(`${BASE}/rest/api/user/current`, token);
+    if (!res.ok) return false;
+    const me = await res.json();
+    return me.type !== 'anonymous' && !!(me.username || me.userKey);
+  } catch (e) {
+    return true; // can't tell — don't claim the token is bad on a network hiccup
+  }
+}
+
+async function confluenceFetch(url, token, context = {}) {
+  let res = await rawFetch(url, token);
+  // A genuinely transient authorized:false burst did happen once (2026-08-31, ~90s, resolved on
+  // its own) — one retry after a short pause absorbs that case before any diagnosis below.
+  if (res.status === 404) {
+    const peek = await res.clone().text().catch(() => '');
+    if (/"authorized"\s*:\s*false/.test(peek)) {
+      await new Promise(r => setTimeout(r, 2000));
+      res = await rawFetch(url, token);
+    }
   }
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    // Confluence returns a 404 — not a 401/403 — when the caller isn't authorized to even see a
-    // space/page exists (a deliberate security-through-obscurity choice: don't confirm to an
-    // unauthorized caller that something exists at all), marked by "authorized":false in its own
-    // response body. Seen in practice as a short-lived blip (auth cache/session hiccup, resolves
-    // on its own within minutes) rather than a genuinely wrong/moved page, so it gets its own
-    // retry-first message instead of sending the PM to second-guess their project's URL over
-    // what's usually transient.
+    const log = `Confluence ${res.status}: ${body.slice(0, 200)}`;
+    // Confluence returns a 404 — not a 401/403 — when the caller isn't allowed to even see that a
+    // space/page exists, marked by "authorized":false in the body. That covers two very different
+    // causes, told apart with one extra call: the service token expired (Confluence then treats
+    // us as anonymous — what actually happened in Sept 2026, reported at the time as a
+    // "temporary blip, retry later", which it never was), or the token is fine but the service
+    // account has no access to that particular space.
     if (res.status === 404 && /"authorized"\s*:\s*false/.test(body)) {
-      throw new AppError('confluence_auth_blip', `Confluence 404 (authorized:false): ${body.slice(0, 200)}`);
+      if (!(await tokenIsRecognized(token))) throw new AppError('confluence_token_invalid', log);
+      throw new AppError('confluence_space_forbidden', log, context);
     }
-    throw new AppError(httpErrorCode('confluence', res.status), `Confluence ${res.status}: ${body.slice(0, 200)}`);
+    if (res.status === 401) throw new AppError('confluence_token_invalid', log);
+    if (res.status === 404) throw new AppError('confluence_page_not_found', log, context);
+    throw new AppError(httpErrorCode('confluence', res.status), log, context);
   }
   return res.json();
 }
 
 async function fetchPageBody(token, spaceKey, title) {
   const url = `${BASE}/rest/api/content?spaceKey=${encodeURIComponent(spaceKey)}&title=${encodeURIComponent(title)}&expand=body.storage,version`;
-  const data = await confluenceFetch(url, token);
-  if (!data.results?.length) throw new AppError('confluence_not_found', `Confluence page not found: ${spaceKey} / "${title}"`);
+  const context = { space: spaceKey, title };
+  const data = await confluenceFetch(url, token, context);
+  if (!data.results?.length) throw new AppError('confluence_page_not_found', `Confluence page not found: ${spaceKey} / "${title}"`, context);
   const page = data.results[0];
   return { id: page.id, version: page.version?.number, html: page.body?.storage?.value || '' };
 }
 
 async function fetchContentById(token, id) {
-  const data = await confluenceFetch(`${BASE}/rest/api/content/${id}?expand=space`, token);
+  const data = await confluenceFetch(`${BASE}/rest/api/content/${id}?expand=space`, token, { space: '?', title: `pageId=${id}` });
   return { space: data.space?.key || null, title: data.title || null };
 }
 
