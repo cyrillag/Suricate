@@ -428,7 +428,9 @@ path (`refreshFullEpicTree`).
   **Alpha/Beta/GA end dates** (only the milestones the project configured; the single ETA when
   none is), **% of workstreams Done**, **open risks** and **points to clarify**. A week with no
   report says "Pas de rapport généré" / "No report generated" right after the week (it used to
-  sit at the far right, where it went unnoticed).
+  sit at the far right, where it went unnoticed). To keep the table from scrolling sideways, the
+  trend arrow sits in the health cell (no column of its own) and the row actions (view / regenerate /
+  delete) are icon-only buttons — 28×28 targets, label as title + aria-label.
 - **Every figure comes from that week's own frozen report** (`reportHistory` in server.js: its
   snapshot columns — workstreams, risks, highlights, milestone ends, `eta_snapshot`), never from live
   data: a past week shows what that week's report said, same rule as the report itself. A legacy

@@ -88,7 +88,6 @@ const DICT = {
     week_col: { fr: 'Semaine',                    en: 'Week' },
     // Weekly history columns (project page) — modelled on the PMs’ Confluence "Flash reports history".
     hist_health: { fr: 'Météo', en: 'Health' },
-    hist_trend: { fr: 'Tendance', en: 'Trend' },
     hist_date_alpha: { fr: 'Alpha', en: 'Alpha' },
     hist_date_beta: { fr: 'Beta', en: 'Beta' },
     hist_date_ga: { fr: 'GA', en: 'GA' },
