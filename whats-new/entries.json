@@ -7,6 +7,10 @@
       "fr": "Planning : vue Phases & Deliverables",
       "en": "Planning: Phases & Deliverables view"
     },
+    "short": {
+      "fr": "Phases reliées à l’epic racine ? Le Planning n’affiche plus que Phases et Deliverables, triés par date de fin.",
+      "en": "Phases linked to the root epic? Planning now shows only Phases and Deliverables, sorted by end date."
+    },
     "body": {
       "fr": "Quand les Phases d’un projet sont reliées à son epic racine par des liens « is child of », la section Planning n’affiche plus que les Phases et leurs Deliverables, triés par date de fin. Les dates saisies dans Jira sur une Phase ou un Deliverable priment ; leur statut est calculé à partir des tickets en dessous. La frise démarre 3 mois avant aujourd’hui et défile horizontalement, la colonne de gauche reste figée. À activer via ⚙ Configurer › Box BigPicture.",
       "en": "When a project’s Phases are linked to its root epic with “is child of” links, the Planning section only shows the Phases and their Deliverables, sorted by end date. Dates set in Jira on a Phase or Deliverable win; their status is computed from the tickets below. The timeline starts 3 months before today and scrolls horizontally, with the left column frozen. Turn it on in ⚙ Configure › BigPicture box."
@@ -25,6 +29,10 @@
     "title": {
       "fr": "Historique de santé sur la page projet",
       "en": "Health history on the project page"
+    },
+    "short": {
+      "fr": "Météo, dates Alpha/Beta/GA, % Done, risques et points à clarifier, semaine après semaine.",
+      "en": "Health, Alpha/Beta/GA dates, % Done, risks and points to clarify, week after week."
     },
     "body": {
       "fr": "La liste des rapports d’un projet montre maintenant, semaine par semaine, la météo (On Track / At Risk / Delayed) et sa tendance, les dates Alpha / Beta / GA avec leurs glissements en jours, le % de workstreams Done, les risques ouverts et les points à clarifier. Tout est lu depuis les rapports figés de chaque semaine.",
@@ -45,6 +53,10 @@
       "fr": "Nouveau statut « Paused »",
       "en": "New “Paused” status"
     },
+    "short": {
+      "fr": "Les tickets « Waiting » ou « Pause » dans Jira ne sont plus comptés In Progress.",
+      "en": "“Waiting” or “Pause” Jira tickets no longer count as In Progress."
+    },
     "body": {
       "fr": "Un workstream démarré puis stoppé (manque d’input, dépriorisation) — statut « Waiting » ou « Pause » dans Jira — s’affiche désormais « Paused » au lieu d’être compté In Progress. Il ne fait pas passer la météo en At Risk. « Waiting for release » reste In Progress.",
       "en": "A workstream that started then stopped (missing input, deprioritized) — “Waiting” or “Pause” in Jira — now shows as “Paused” instead of counting as In Progress. It doesn’t turn the health to At Risk. “Waiting for release” stays In Progress."
@@ -58,6 +70,10 @@
     "title": {
       "fr": "Des messages d’erreur qui disent quoi faire",
       "en": "Error messages that say what to do"
+    },
+    "short": {
+      "fr": "Un Refresh qui échoue indique quel service est en cause et quoi faire.",
+      "en": "A failed Refresh now says which service is at fault and what to do."
     },
     "body": {
       "fr": "Quand un Refresh échoue, le message indique le service en cause (Jira, Confluence, BigPicture), l’élément précis (page, ticket, box) et la marche à suivre : token expiré à renouveler, droits manquants, page renommée, simple indisponibilité passagère… Si le Planning BigPicture ne peut pas être construit, le rapport est quand même généré, avec un bandeau qui explique pourquoi.",

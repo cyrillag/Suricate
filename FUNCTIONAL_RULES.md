@@ -449,7 +449,8 @@ path (`refreshFullEpicTree`).
 ## What's new (release notes)
 
 - **One source, two channels.** Every user-facing change gets an entry in `whats-new/entries.json`
-  (id, date, audience `all`/`creators`, FR/EN title and body, optional link and screenshot),
+  (id, date, audience `all`/`creators`, FR/EN title, one-line `short` and longer `body`, optional
+  link and screenshot),
   **added in the same change as the feature itself** — same convention as this file. Both the in-app
   page and the Webex digest read from it, so nothing is written twice and they can't drift. Write
   entries for what a PM notices and does differently, not for internal refactors. The file order is
@@ -467,9 +468,11 @@ path (`refreshFullEpicTree`).
   "Paused: 0" donut was dropped for that reason).
 - **Webex digest, on demand, never on a schedule** — a fixed cadence would often land after people
   already noticed the changes. `scripts/send-digest.js` posts every entry not sent yet
-  (`digest_sent`) to the Project Manager Community space: one message with all entries (French,
-  links to Suricate), then each screenshot as a reply in its thread (Webex attaches one file per
-  message; uploading keeps screenshots off any public URL). Dry run by default, `--send` to post,
+  (`digest_sent`) to the Project Manager Community space, **deliberately terse** (the PMs found a
+  first, fuller version too verbose): one message per entry — its screenshot, its title in bold and
+  its one-line `short` description, in French, no links — the first one headed "✨ Quoi de neuf dans
+  Suricate". The in-app page keeps the longer `body`. Screenshots are uploaded to Webex (one file
+  per message), which keeps them off any public URL. Dry run by default, `--send` to post,
   `--mark-sent` to record entries announced another way. `--test <space>` posts the real message to another space (typically your 1:1 with the bot) without marking anything as sent — to check the rendering in Webex before the real send. A space given as a bare UUID is looked up among the bot's own spaces: the API id is region-specific (ours is EU, `urn:TEAM:eu-central-1_k`), so it can't be derived from the UUID reliably. It uses its own dedicated bot
   (`DIGEST_WEBEX_BOT_TOKEN`, `DIGEST_WEBEX_ROOM_ID` — the API id, or the UUID of a
   `webexteams://im?space=…` link), not the app's other Webex bot, which serves another purpose.
