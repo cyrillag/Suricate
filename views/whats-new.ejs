@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="<%= lang %>">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title><%= t('whatsNew.title') %> — Suricate</title>
+<link rel="stylesheet" href="/app.css">
+<link rel="icon" type="image/png" href="/favicon-32.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+</head>
+<body>
+<%- include('_nav', { userName }) %>
+<div class="app-body">
+  <div class="page-header">
+    <div>
+      <a href="/" class="back-link"><%= t('newProject.back') %></a>
+      <h1 class="page-title"><%= t('whatsNew.title') %></h1>
+      <p class="page-sub"><%= t('whatsNew.subtitle') %></p>
+    </div>
+  </div>
+
+  <% const fmt = iso => new Date(iso + 'T00:00:00Z').toLocaleDateString(lang === 'fr' ? 'fr-FR' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }); %>
+  <% if (!entries.length) { %>
+  <div class="section-card"><div class="empty-state-inline"><%= t('whatsNew.empty') %></div></div>
+  <% } %>
+  <% entries.forEach(e => { const isNew = !lastSeen || e.date > lastSeen; %>
+  <article class="section-card wn-entry">
+    <div class="wn-head">
+      <h2 class="wn-title"><%= e.title[lang] || e.title.fr %></h2>
+      <span class="wn-meta">
+        <% if (isNew) { %><span class="wn-new"><%= t('whatsNew.new_tag') %></span><% } %>
+        <% if (e.audience === 'creators') { %><span class="tag"><%= t('whatsNew.for_creators') %></span><% } %>
+        <time datetime="<%= e.date %>"><%= fmt(e.date) %></time>
+      </span>
+    </div>
+    <p class="wn-body"><%= e.body[lang] || e.body.fr %></p>
+    <% if (e.screenshot) { %>
+    <img class="wn-shot" src="/whats-new/img/<%= e.screenshot.file %>" alt="<%= t('whatsNew.shot_alt', { title: e.title[lang] || e.title.fr }) %>" loading="lazy">
+    <% } %>
+    <% if (e.link) { %><a class="wn-link" href="<%= e.link %>"><%= t('whatsNew.see_example') %> →</a><% } %>
+  </article>
+  <% }) %>
+</div>
+</body>
+</html>

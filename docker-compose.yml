@@ -15,5 +15,9 @@ services:
       - CONFLUENCE_SERVICE_TOKEN=${CONFLUENCE_SERVICE_TOKEN}
       - CONFLUENCE_BASE=${CONFLUENCE_BASE}
       - BIGPICTURE_API_TOKEN=${BIGPICTURE_API_TOKEN}
+      # What's new digest (scripts/send-digest.js) — a bot dedicated to it, and its target space.
+      - DIGEST_WEBEX_BOT_TOKEN=${DIGEST_WEBEX_BOT_TOKEN}
+      - DIGEST_WEBEX_ROOM_ID=${DIGEST_WEBEX_ROOM_ID}
+      - SURICATE_PUBLIC_URL=${SURICATE_PUBLIC_URL}
 volumes:
   app-data:

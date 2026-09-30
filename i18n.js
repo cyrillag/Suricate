@@ -4,6 +4,17 @@ const DICT = {
     tagline: { fr: 'OVHcloud project reports',    en: 'OVHcloud project reports' },
     logout:  { fr: 'Déconnexion',                 en: 'Logout' }
   },
+  whatsNew: {
+    nav:          { fr: 'Nouveautés',             en: 'What’s new' },
+    nav_aria:     { fr: 'Nouveautés : {{count}} non lue(s)', en: 'What’s new: {{count}} unread' },
+    title:        { fr: 'Nouveautés',             en: 'What’s new' },
+    subtitle:     { fr: 'Les dernières évolutions de Suricate, les plus récentes en premier.', en: 'The latest Suricate changes, newest first.' },
+    empty:        { fr: 'Rien de neuf pour l’instant.', en: 'Nothing new yet.' },
+    new_tag:      { fr: 'Nouveau',                en: 'New' },
+    for_creators: { fr: 'Créateurs de rapports',  en: 'Report creators' },
+    shot_alt:     { fr: 'Capture d’écran : {{title}}', en: 'Screenshot: {{title}}' },
+    see_example:  { fr: 'Voir un exemple',        en: 'See an example' }
+  },
   login: {
     subtitle: { fr: 'Connecte-toi avec ton email OVHcloud', en: 'Sign in with your OVHcloud email' },
     email_label: { fr: 'Email OVHcloud',          en: 'OVHcloud email' },

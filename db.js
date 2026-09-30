@@ -244,4 +244,12 @@ if (wsUniqueCols2.includes('milestone_key')) {
   `);
 }
 
+// "What's new" (see whats-new.js): the date of the newest entry a user has seen on the page, and
+// which entries already went out in a Webex digest — so a digest never repeats itself.
+ensureColumn('users', 'whats_new_seen_at', 'whats_new_seen_at TEXT');
+db.exec(`CREATE TABLE IF NOT EXISTS digest_sent (
+  entry_id TEXT PRIMARY KEY,
+  sent_at  INTEGER DEFAULT (unixepoch())
+)`);
+
 module.exports = db;

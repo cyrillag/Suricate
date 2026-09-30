@@ -10,6 +10,7 @@ const genReport  = require('./report-gen');
 const { REPORTED_LEVEL_TYPES } = genReport;
 const { rollupStatus } = require('./status');
 const qualityCheck = require('./quality-check');
+const whatsNew   = require('./whats-new');
 const { translate, pluralize } = require('./i18n');
 const { AppError } = require('./errors');
 
@@ -403,6 +404,11 @@ app.use((req, res, next) => {
   res.locals.lang = req.lang;
   res.locals.t = (key, vars) => translate(req.lang, key, vars);
   res.locals.tPlural = (count, oneKey, otherKey) => pluralize(req.lang, count, oneKey, otherKey);
+  // "What's new" badge in the nav — report creators only (see whats-new.js).
+  res.locals.whatsNewCount = 0;
+  if (req.session && req.session.userId && whatsNew.isCreator(req.session.userId)) {
+    res.locals.whatsNewCount = whatsNew.unseenCount(req.session.userId);
+  }
   next();
 });
 app.get('/lang/:code', (req, res) => {
@@ -461,6 +467,22 @@ app.post('/logout', (req, res) => req.session.destroy(() => res.redirect('/login
 // Every project is visible to every authenticated OVHcloud user (see FUNCTIONAL_RULES.md
 // "Visibility & permissions") — only the creator (projects.user_id) can edit/delete/generate.
 // The dashboard is a read-only shared listing, not a private "my projects" view.
+// ── WHAT'S NEW ────────────────────────────────────────────────────
+// Readable by anyone logged in, but only creators get the nav badge pointing here. Opening the
+// page is what marks everything as seen.
+app.get('/whats-new', requireAuth, (req, res) => {
+  const lastSeen = (db.prepare('SELECT whats_new_seen_at FROM users WHERE id=?').get(req.session.userId) || {}).whats_new_seen_at || null;
+  whatsNew.markSeen(req.session.userId);
+  res.locals.whatsNewCount = 0;
+  res.render('whats-new', { entries: whatsNew.ENTRIES, lastSeen, userName: req.session.userName });
+});
+
+// Screenshots sit behind login (they show real project data), unlike public/ assets.
+app.get('/whats-new/img/:file', requireAuth, (req, res) => {
+  if (!/^[a-z0-9-]+\.png$/.test(req.params.file)) return res.status(404).end();
+  res.sendFile(path.join(whatsNew.IMG_DIR, req.params.file), err => { if (err) res.status(404).end(); });
+});
+
 app.get('/', requireAuth, (req, res) => {
   const projects = db.prepare(`
     SELECT p.*, u.name as owner_name,
