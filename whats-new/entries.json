@@ -8,8 +8,8 @@
       "en": "Planning: Phases & Deliverables view"
     },
     "short": {
-      "fr": "Phases reliées à l’epic racine ? Le Planning n’affiche plus que Phases et Deliverables, triés par date de fin.",
-      "en": "Phases linked to the root epic? Planning now shows only Phases and Deliverables, sorted by end date."
+      "fr": "Le Planning reprend la structure validée pour le Gantt BigPicture, à savoir Phases > Deliverables, triés par date de fin.",
+      "en": "Planning follows the structure agreed for the BigPicture Gantt — Phases > Deliverables, sorted by end date."
     },
     "body": {
       "fr": "Quand les Phases d’un projet sont reliées à son epic racine par des liens « is child of », la section Planning n’affiche plus que les Phases et leurs Deliverables, triés par date de fin. Les dates saisies dans Jira sur une Phase ou un Deliverable priment ; leur statut est calculé à partir des tickets en dessous. La frise démarre 3 mois avant aujourd’hui et défile horizontalement, la colonne de gauche reste figée. À activer via ⚙ Configurer › Box BigPicture.",
@@ -54,8 +54,8 @@
       "en": "New “Paused” status"
     },
     "short": {
-      "fr": "Les tickets « Waiting » ou « Pause » dans Jira ne sont plus comptés In Progress.",
-      "en": "“Waiting” or “Pause” Jira tickets no longer count as In Progress."
+      "fr": "Les tickets « Waiting » ou « Pause » dans Jira ne sont plus comptés In Progress mais « Paused ».",
+      "en": "“Waiting” or “Pause” Jira tickets no longer count as In Progress but as “Paused”."
     },
     "body": {
       "fr": "Un workstream démarré puis stoppé (manque d’input, dépriorisation) — statut « Waiting » ou « Pause » dans Jira — s’affiche désormais « Paused » au lieu d’être compté In Progress. Il ne fait pas passer la météo en At Risk. « Waiting for release » reste In Progress.",
