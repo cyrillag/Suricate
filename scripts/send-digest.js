@@ -13,11 +13,13 @@
 //
 // Env: DIGEST_WEBEX_BOT_TOKEN (a bot dedicated to this, member of the target space),
 //      DIGEST_WEBEX_ROOM_ID (the space's API id, or the UUID from a webexteams://im?space=… link).
-// Deliberately terse, as asked by the PMs: ONE message — a header, then each entry's title in bold
-// and its one-line `short` description, no links — with ONE image. Webex only takes one file per
-// message, so the entries' screenshots are stacked into a single image (each under its title),
-// rendered with the same headless Chromium as the PDF export. Uploaded to Webex, so nothing needs
-// to be public.
+// Deliberately terse, as asked by the PMs: ONE message with ONE image in which every entry reads
+// as its own block — screenshot, then title, then one-line `short` description — so each capture
+// sits right next to the text explaining it. Webex takes one file per message and can't interleave
+// text and images, hence the text living in the image; stacking bare screenshots with the text in
+// the message instead read as a montage of isolated pieces. The message text itself is just the
+// header and the list of titles (for notifications and Webex search). No links. Rendered with the
+// PDF export's headless Chromium; uploaded to Webex, so nothing needs to be public.
 const fs = require('fs');
 const path = require('path');
 const whatsNew = require('../whats-new');
@@ -50,8 +52,9 @@ if (!entries.length) { console.log('Nothing new to announce: every entry was alr
 const noShort = entries.filter(e => !(e.short && e.short[LANG]));
 if (noShort.length) { console.error(`Entries without a "short" ${LANG} description: ${noShort.map(e => e.id).join(', ')}`); process.exit(1); }
 
-const markdown = ['✨ **Quoi de neuf dans Suricate**', ...entries.map(e => `**${e.title[LANG]}**  \n${e.short[LANG]}`)].join('\n\n');
-const shots = entries.filter(e => e.screenshot).map(e => ({ title: e.title[LANG], file: path.join(whatsNew.IMG_DIR, e.screenshot.file) }));
+const markdown = `✨ **Quoi de neuf dans Suricate** — ${entries.map(e => e.title[LANG]).join(' · ')}`;
+const blocks = entries.map(e => ({ title: e.title[LANG], short: e.short[LANG], file: e.screenshot ? path.join(whatsNew.IMG_DIR, e.screenshot.file) : null }));
+const shots = blocks.filter(b => b.file);
 
 const missing = shots.filter(s => !fs.existsSync(s.file));
 if (missing.length) {
@@ -59,16 +62,21 @@ if (missing.length) {
   process.exit(1);
 }
 
-// The screenshots are already 2x captures; laid out at 1000 CSS px wide and rendered at 2x, they
-// keep their full sharpness. Titles in the app's own navy/Source Sans stack, on white.
+// One block per entry: screenshot (if any), title, one-line description, blocks separated by a
+// rule. Screenshots are already 2x captures; laid out at 1000 CSS px and rendered at 2x they keep
+// their sharpness. App colours and font stack (navy titles, grey text) on white, under a header.
 async function buildImage(outFile) {
   const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
     body{margin:0;background:#FFFFFF;font-family:'Source Sans Pro','Segoe UI',Arial,sans-serif;width:1000px}
-    .wrap{padding:28px 32px 8px}
-    h2{font-size:24px;font-weight:700;color:#00185E;margin:0 0 12px}
-    img{display:block;width:100%;height:auto;border:1px solid #E5E7ED;border-radius:2px;margin-bottom:32px}
-  </style></head><body><div class="wrap">${shots.map(s => `<h2>${esc(s.title)}</h2><img src="file://${s.file}">`).join('')}</div></body></html>`;
+    .head{background:#000E9C;color:#FFFFFF;padding:22px 32px;font-size:26px;font-weight:700;letter-spacing:.01em}
+    .wrap{padding:8px 32px 4px}
+    .block{padding:28px 0;border-bottom:1px solid #E5E7ED}
+    .block:last-child{border-bottom:none}
+    img{display:block;width:100%;height:auto;border:1px solid #E5E7ED;border-radius:2px;margin-bottom:16px}
+    h2{font-size:24px;font-weight:700;color:#00185E;margin:0 0 6px}
+    p{font-size:19px;line-height:1.45;color:#3F3F46;margin:0}
+  </style></head><body><div class="head">Quoi de neuf dans Suricate</div><div class="wrap">${blocks.map(b => `<div class="block">${b.file ? `<img src="file://${b.file}">` : ''}<h2>${esc(b.title)}</h2><p>${esc(b.short)}</p></div>`).join('')}</div></body></html>`;
   const tmpHtml = path.join(whatsNew.IMG_DIR, '.digest.html');
   fs.writeFileSync(tmpHtml, html);
   const puppeteer = require('puppeteer-core');
@@ -96,12 +104,12 @@ async function post(token, body) {
     console.log(`Marked as sent without posting: ${entries.map(e => e.id).join(', ')}`);
     return;
   }
-  const imageFile = shots.length ? path.join(whatsNew.IMG_DIR, '.digest.png') : null;
-  if (imageFile) await buildImage(imageFile);
+  const imageFile = path.join(whatsNew.IMG_DIR, '.digest.png');
+  await buildImage(imageFile);
   if (!send) {
     console.log('── DRY RUN — nothing posted. Add --send to post. ──\n');
     console.log(markdown);
-    if (imageFile) console.log(`\n[+ 1 image: ${shots.map(s => s.title).join(' / ')} — written to ${path.relative(process.cwd(), imageFile)}]`);
+    console.log(`\n[+ 1 image, ${blocks.length} blocks (${shots.length} with a screenshot) — written to ${path.relative(process.cwd(), imageFile)}]`);
     return;
   }
   const token = process.env.DIGEST_WEBEX_BOT_TOKEN;
