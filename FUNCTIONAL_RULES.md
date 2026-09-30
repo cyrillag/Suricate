@@ -470,7 +470,7 @@ path (`refreshFullEpicTree`).
   (`digest_sent`) to the Project Manager Community space: one message with all entries (French,
   links to Suricate), then each screenshot as a reply in its thread (Webex attaches one file per
   message; uploading keeps screenshots off any public URL). Dry run by default, `--send` to post,
-  `--mark-sent` to record entries announced another way. It uses its own dedicated bot
+  `--mark-sent` to record entries announced another way. `--test <space>` posts the real message to another space (typically your 1:1 with the bot) without marking anything as sent — to check the rendering in Webex before the real send. A space given as a bare UUID is looked up among the bot's own spaces: the API id is region-specific (ours is EU, `urn:TEAM:eu-central-1_k`), so it can't be derived from the UUID reliably. It uses its own dedicated bot
   (`DIGEST_WEBEX_BOT_TOKEN`, `DIGEST_WEBEX_ROOM_ID` — the API id, or the UUID of a
   `webexteams://im?space=…` link), not the app's other Webex bot, which serves another purpose.
 

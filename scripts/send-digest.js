@@ -7,6 +7,8 @@
 //   docker exec project-reports-app-app-1 node scripts/send-digest.js --send     # post + mark sent
 //   ... --only id1,id2      restrict to some entries
 //   ... --mark-sent         record entries as sent without posting (e.g. announced by hand)
+//   ... --test <space>      post to another space (e.g. your 1:1 with the bot) to see the real
+//                           rendering first — nothing is marked as sent
 //
 // Env: DIGEST_WEBEX_BOT_TOKEN (a bot dedicated to this, member of the target space),
 //      DIGEST_WEBEX_ROOM_ID (the space's API id, or the UUID from a webexteams://im?space=… link),
@@ -18,17 +20,25 @@ const path = require('path');
 const whatsNew = require('../whats-new');
 
 const args = process.argv.slice(2);
-const send = args.includes('--send');
+const testRoom = (() => { const i = args.indexOf('--test'); return i >= 0 ? args[i + 1] : null; })();
+const send = args.includes('--send') || !!testRoom;
 const markOnly = args.includes('--mark-sent');
 const onlyArg = (() => { const i = args.indexOf('--only'); return i >= 0 ? args[i + 1].split(',') : null; })();
 const BASE = (process.env.SURICATE_PUBLIC_URL || 'http://gw.lab.core.ovh.net:31621').replace(/\/$/, '');
 const LANG = 'fr'; // the Project Manager Community space is French-speaking
 
-// A webexteams://im?space=<uuid> link carries the raw UUID; the API wants the base64 of its
-// "ciscospark://us/ROOM/<uuid>" form.
-function roomId(raw) {
+// A webexteams://im?space=<uuid> link carries only the raw UUID; the API id is the base64 of a
+// region-specific URI (ours is "ciscospark://urn:TEAM:eu-central-1_k/ROOM/<uuid>", not the US
+// "ciscospark://us/ROOM/<uuid>" — guessing it failed with a 404). So a UUID is resolved among the
+// spaces the bot actually belongs to, which also catches "the bot wasn't added to that space".
+async function resolveRoom(token, raw) {
   if (!raw) return null;
-  return /^[0-9a-f-]{36}$/i.test(raw) ? Buffer.from(`ciscospark://us/ROOM/${raw}`).toString('base64') : raw;
+  if (!/^[0-9a-f-]{36}$/i.test(raw)) return raw;
+  const res = await fetch('https://webexapis.com/v1/rooms?max=1000', { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) throw new Error(`Webex ${res.status} while listing the bot's spaces: ${(await res.text()).slice(0, 200)}`);
+  const room = (await res.json()).items.find(r => Buffer.from(r.id, 'base64').toString().endsWith(`/ROOM/${raw.toLowerCase()}`));
+  if (!room) throw new Error(`The bot isn't a member of space ${raw} — add it to the space first.`);
+  return room.id;
 }
 
 let entries = whatsNew.pendingForDigest();
@@ -77,8 +87,8 @@ async function post(token, body) {
     return;
   }
   const token = process.env.DIGEST_WEBEX_BOT_TOKEN;
-  const room = roomId(process.env.DIGEST_WEBEX_ROOM_ID);
-  if (!token || !room) throw new Error('DIGEST_WEBEX_BOT_TOKEN and DIGEST_WEBEX_ROOM_ID must be set.');
+  if (!token || !(testRoom || process.env.DIGEST_WEBEX_ROOM_ID)) throw new Error('DIGEST_WEBEX_BOT_TOKEN and DIGEST_WEBEX_ROOM_ID must be set.');
+  const room = await resolveRoom(token, testRoom || process.env.DIGEST_WEBEX_ROOM_ID);
 
   const parent = await post(token, (() => { const f = new FormData(); f.append('roomId', room); f.append('markdown', main); return f; })());
   for (const s of shots) {
@@ -88,6 +98,10 @@ async function post(token, body) {
     f.append('markdown', s.caption);
     f.append('files', new Blob([fs.readFileSync(s.file)], { type: 'image/png' }), path.basename(s.file));
     await post(token, f);
+  }
+  if (testRoom) {
+    console.log(`TEST posted to ${testRoom}: 1 message + ${shots.length} screenshot(s). Nothing marked as sent.`);
+    return;
   }
   whatsNew.markDigestSent(entries.map(e => e.id));
   console.log(`Posted: 1 message + ${shots.length} screenshot(s). Marked as sent: ${entries.map(e => e.id).join(', ')}`);
