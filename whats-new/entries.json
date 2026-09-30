@@ -12,7 +12,11 @@
       "en": "When a project’s Phases are linked to its root epic with “is child of” links, the Planning section only shows the Phases and their Deliverables, sorted by end date. Dates set in Jira on a Phase or Deliverable win; their status is computed from the tickets below. The timeline starts 3 months before today and scrolls horizontally, with the left column frozen. Turn it on in ⚙ Configure › BigPicture box."
     },
     "link": "/projects/bgp-as-a-service",
-    "screenshot": { "file": "planning-phases.png", "page": "/projects/bgp-as-a-service/2026-W40", "selector": ".planning-section" }
+    "screenshot": {
+      "file": "planning-phases.png",
+      "page": "/projects/bgp-as-a-service/2026-W40",
+      "selector": ".planning-section"
+    }
   },
   {
     "id": "2026-09-health-history",
@@ -27,7 +31,11 @@
       "en": "A project’s report list now shows, week by week, the health (On Track / At Risk / Delayed) and its trend, the Alpha / Beta / GA dates with their slips in days, the % of workstreams Done, open risks and points to clarify — all read from each week’s frozen report."
     },
     "link": "/projects/private-boot-m1",
-    "screenshot": { "file": "health-history.png", "page": "/projects/private-boot-m1", "selector": ".history-table" }
+    "screenshot": {
+      "file": "health-history.png",
+      "page": "/projects/private-boot-m1",
+      "selector": ".history-table"
+    }
   },
   {
     "id": "2026-09-paused-status",
@@ -41,8 +49,7 @@
       "fr": "Un workstream démarré puis stoppé (manque d’input, dépriorisation) — statut « Waiting » ou « Pause » dans Jira — s’affiche désormais « Paused » au lieu d’être compté In Progress. Il ne fait pas passer la météo en At Risk. « Waiting for release » reste In Progress.",
       "en": "A workstream that started then stopped (missing input, deprioritized) — “Waiting” or “Pause” in Jira — now shows as “Paused” instead of counting as In Progress. It doesn’t turn the health to At Risk. “Waiting for release” stays In Progress."
     },
-    "link": "/projects/bgp-as-a-service/2026-W40",
-    "screenshot": { "file": "paused-status.png", "page": "/projects/bgp-as-a-service/2026-W40", "selector": ".chart-pane" }
+    "link": "/projects/bgp-as-a-service/2026-W40"
   },
   {
     "id": "2026-09-explicit-errors",
