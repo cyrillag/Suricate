@@ -239,9 +239,8 @@ async function resolvePlanningTree(projectId, boxId, rootEpic) {
 // Builds the hierarchy from a freshly-fetched BigPicture-scoped epic set — not re-read from
 // epics_cache, which can carry rows from other sync paths sharing that same table (Confluence
 // Sync Jira, seedWorkstreamsFromJiraTree, refreshFullEpicTree) that have nothing to do with this
-// project's Planning Light scope. Rolls dates up from leaves to root (a parent's own dates are never used, only computed — see
-// FUNCTIONAL_RULES.md "level above inherits from below" — except on a Phase/Deliverable, whose own
-// Jira dates win when set).
+// project's Planning Light scope. Rolls dates up from leaves to root, but only to fill a date a
+// parent doesn't have in Jira — its own Jira dates always win (see FUNCTIONAL_RULES.md).
 function buildPlanningTree(epics, rootEpic) {
   // A Phase/Deliverable-structured box (BGP Service) is built entirely from "Parent-Child" links —
   // an issue attached only through a leftover Parent Link/Epic Link isn't part of that structure and
@@ -277,13 +276,15 @@ function buildPlanningTree(epics, rootEpic) {
     node.children.forEach(rollup);
     const starts = node.children.map(c => c.start).filter(Boolean);
     const ends   = node.children.map(c => c.end).filter(Boolean);
-    // Phases/Deliverables are the levels a PM plans on directly in Jira: their own Start/End date
-    // wins, each field independently, and only a missing one is computed from below. Their Jira
-    // status, on the other hand, is a workflow placeholder ("Request" on every BGP one) — it's
-    // always computed from below.
+    // A parent's own Jira Start/End date wins, each field independently; only a missing one is
+    // computed from its children. It used to be the reverse (always computed) — but children are
+    // mostly undated Tasks/Stories, so on Private boot M1 32 epics with real Jira dates showed
+    // "No dates yet" (e.g. PUBM-53549) and 5 more showed dates that weren't the ones in Jira.
+    node.start = node.start || (starts.length ? starts.reduce((a, b) => a < b ? a : b) : null);
+    node.end   = node.end   || (ends.length ? ends.reduce((a, b) => a > b ? a : b) : null);
+    // A Phase/Deliverable's Jira status, on the other hand, is a workflow placeholder ("Request" on
+    // every BGP one) — it's always computed from below.
     const plannedLevel = node.structured && REPORTED_LEVEL_TYPES.has(node.type);
-    node.start = (plannedLevel && node.start) || (starts.length ? starts.reduce((a, b) => a < b ? a : b) : null);
-    node.end   = (plannedLevel && node.end)   || (ends.length ? ends.reduce((a, b) => a > b ? a : b) : null);
     if (plannedLevel) {
       // Same roll-up as every other level in this app (status.js).
       node.status = rollupStatus(node.children.map(c => c.status));
