@@ -469,15 +469,17 @@ path (`refreshFullEpicTree`).
 - **Webex digest, on demand, never on a schedule** — a fixed cadence would often land after people
   already noticed the changes. `scripts/send-digest.js` posts every entry not sent yet
   (`digest_sent`) to the Project Manager Community space, **deliberately terse** (the PMs found a
-  first, fuller version too verbose): **a single message with a single image**, in which every
-  entry is its own block — screenshot, then title, then its one-line `short` description — so each
-  capture sits right next to the text explaining it. Webex takes one file per message and can't
-  interleave text and images, hence the text living inside the image; two earlier attempts were
-  rejected — one message per entry (too fragmented), then bare screenshots stacked in one image with
-  the text in the message (read as a montage of isolated pieces). The message text is just the header
-  and the list of titles (for notifications and Webex search). French, no links. The in-app page
-  keeps the longer `body`. The image is rendered by the PDF export's headless Chromium at 2× and
-  uploaded to Webex, which keeps it off any public URL. Dry run by default, `--send` to post,
+  first, fuller version too verbose): **one post per entry** — its screenshot, its title in bold
+  and its one-line `short` description, in French, no links — the first post headed "✨ Quoi de neuf
+  dans Suricate". Settled after trying the alternatives, all rejected: one message with every entry
+  and the screenshots as thread replies (text and captures disconnected); all screenshots stacked
+  in one image (a montage of isolated pieces); every entry as a block inside one image (too dense,
+  lots of zooming); a single Webex Adaptive Card interleaving images and text — impossible here:
+  Webex's cloud fetches a card's images itself at post time and can't reach this internal server
+  (it rejected a probe card with "Unable to retrieve content"), and publishing screenshots of real
+  projects on the internet to work around it isn't acceptable. The in-app page keeps the longer
+  `body`. Screenshots are uploaded to Webex as the post's attachment, which keeps them off any
+  public URL. Dry run by default, `--send` to post,
   `--mark-sent` to record entries announced another way. `--test <space>` posts the real message to another space (typically your 1:1 with the bot) without marking anything as sent — to check the rendering in Webex before the real send. A space given as a bare UUID is looked up among the bot's own spaces: the API id is region-specific (ours is EU, `urn:TEAM:eu-central-1_k`), so it can't be derived from the UUID reliably. It uses its own dedicated bot
   (`DIGEST_WEBEX_BOT_TOKEN`, `DIGEST_WEBEX_ROOM_ID` — the API id, or the UUID of a
   `webexteams://im?space=…` link), not the app's other Webex bot, which serves another purpose.
