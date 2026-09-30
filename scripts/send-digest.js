@@ -50,7 +50,7 @@ if (!entries.length) { console.log('Nothing new to announce: every entry was alr
 const noShort = entries.filter(e => !(e.short && e.short[LANG]));
 if (noShort.length) { console.error(`Entries without a "short" ${LANG} description: ${noShort.map(e => e.id).join(', ')}`); process.exit(1); }
 
-const markdown = ['✨ **Quoi de neuf dans Suricate**', '', ...entries.map(e => `**${e.title[LANG]}**  \n${e.short[LANG]}`)].join('\n\n');
+const markdown = ['✨ **Quoi de neuf dans Suricate**', ...entries.map(e => `**${e.title[LANG]}**  \n${e.short[LANG]}`)].join('\n\n');
 const shots = entries.filter(e => e.screenshot).map(e => ({ title: e.title[LANG], file: path.join(whatsNew.IMG_DIR, e.screenshot.file) }));
 
 const missing = shots.filter(s => !fs.existsSync(s.file));
