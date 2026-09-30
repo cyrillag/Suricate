@@ -138,7 +138,8 @@ to be re-applied here by hand rather than resolved by merging code:
 Some projects (not all) have distinct phases with their own target dates — typically Alpha / Beta /
 GA. Project Identity can show one end date per phase a project actually has.
 
-- **Manually configured, never auto-discovered.** A project optionally names up to 3 fixed epics —
+- **Manually configured, never auto-discovered.** A project optionally names up to 3 fixed LVL2
+  issues — at OVHcloud these are **New Features** (LVL2 issue type), not epics, and the UI says so —
   `milestone_alpha`/`milestone_beta`/`milestone_ga` (Edit page, "Project milestones") — each a
   single Jira key, all independently optional since not every project has all three phases (or any
   of them). A first version tried auto-discovering an arbitrary-named, arbitrary-count set of
@@ -445,6 +446,45 @@ path (`refreshFullEpicTree`).
   "getting worse".
 - Alert red in this table is `#C0472E` (5:1 on white, 4.57:1 on the row hover), not the app's
   `--blk` `#D85639`, which only reaches 3.95:1 — too low for small text (see Accessibility).
+
+## What's new (release notes)
+
+- **One source, two channels.** Every user-facing change gets an entry in `whats-new/entries.json`
+  (id, date, audience `all`/`creators`, FR/EN title, one-line `short` and longer `body`, optional
+  link and screenshot),
+  **added in the same change as the feature itself** — same convention as this file. Both the in-app
+  page and the Webex digest read from it, so nothing is written twice and they can't drift. Write
+  entries for what a PM notices and does differently, not for internal refactors. The file order is
+  the editorial order (most important first): the digest keeps it, the page shows newest first.
+- **In-app: a "Nouveautés / What's new" page, not a guided tour.** A permanent nav link, with a
+  badge carrying the unread count when there is any, shown only to report creators (users owning at least one project) — readers care less about
+  functional news and never see it; the page itself stays viewable by anyone logged in. Opening the
+  page marks everything as seen (`users.whats_new_seen_at`); a creator who never opened it only
+  counts the last 30 days as new. A guided tour was considered and dropped: each step is pinned to a
+  screen element and breaks whenever the layout moves (weekly, currently), and people tend to skip it.
+- **Screenshots are captured from the running app**, not by hand: `scripts/capture-whats-new.js`
+  (the PDF export's headless Chromium, 2× resolution, one element per entry via a CSS selector),
+  then committed under `whats-new/img/`. Served behind login (`/whats-new/img/*`), unlike `public/`
+  assets, since they show real project data. Only add one when it actually shows the change (a
+  "Paused: 0" donut was dropped for that reason).
+- **Webex digest, on demand, never on a schedule** — a fixed cadence would often land after people
+  already noticed the changes. `scripts/send-digest.js` posts every entry not sent yet
+  (`digest_sent`) to the Project Manager Community space, **deliberately terse** (the PMs found a
+  first, fuller version too verbose): **one post per entry** — its screenshot, its title in bold
+  and its one-line `short` description, in French — the first post headed "✨ Quoi de neuf dans
+  Suricate" with the only link, to the in-app What's new page (per-entry "see in Suricate" links
+  were dropped as noise). Settled after trying the alternatives, all rejected: one message with every entry
+  and the screenshots as thread replies (text and captures disconnected); all screenshots stacked
+  in one image (a montage of isolated pieces); every entry as a block inside one image (too dense,
+  lots of zooming); a single Webex Adaptive Card interleaving images and text — impossible here:
+  Webex's cloud fetches a card's images itself at post time and can't reach this internal server
+  (it rejected a probe card with "Unable to retrieve content"), and publishing screenshots of real
+  projects on the internet to work around it isn't acceptable. The in-app page keeps the longer
+  `body`. Screenshots are uploaded to Webex as the post's attachment, which keeps them off any
+  public URL. Dry run by default, `--send` to post,
+  `--mark-sent` to record entries announced another way. `--test <space>` posts the real message to another space (typically your 1:1 with the bot) without marking anything as sent — to check the rendering in Webex before the real send. A space given as a bare UUID is looked up among the bot's own spaces: the API id is region-specific (ours is EU, `urn:TEAM:eu-central-1_k`), so it can't be derived from the UUID reliably. It uses its own dedicated bot
+  (`DIGEST_WEBEX_BOT_TOKEN`, `DIGEST_WEBEX_ROOM_ID` — the API id, or the UUID of a
+  `webexteams://im?space=…` link), not the app's other Webex bot, which serves another purpose.
 
 ## Report generation
 

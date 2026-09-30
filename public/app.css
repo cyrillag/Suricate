@@ -202,3 +202,17 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 .hist-icon.danger:hover,.hist-icon.danger:focus-visible{color:var(--hist-red);border-color:var(--hist-red)}
 .hist-icon:focus-visible{outline:2px solid var(--cobalt);outline-offset:1px}
 .history-table td.td-actions form{display:inline}
+/* What's new — nav badge (report creators only) and the /whats-new page. The badge reuses the
+   brand's yellow CTA pairing (navy on yellow, 11:1), already reserved in this app for "look here". */
+.nav-whatsnew{display:inline-flex;align-items:center;gap:6px;color:#fff;text-decoration:none;font-size:13px;font-weight:600;padding:4px 8px;border-radius:var(--r)}
+.nav-whatsnew:hover,.nav-whatsnew:focus-visible{background:rgba(255,255,255,.12)}
+.nav-badge{background:var(--yellow);color:var(--db);font-size:11px;font-weight:700;min-width:18px;height:18px;padding:0 5px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center}
+.wn-entry{padding:20px 24px;margin-bottom:16px}
+.wn-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 16px}
+.wn-title{font-size:18px;font-weight:700;color:var(--db);margin:0}
+.wn-meta{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--tx2)}
+.wn-new{background:var(--yellow);color:var(--db);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border-radius:var(--r)}
+.wn-body{font-size:15px;line-height:1.55;color:var(--tx);margin:10px 0 14px}
+.wn-shot{display:block;max-width:100%;height:auto;border:1px solid var(--bd2);border-radius:var(--r);box-shadow:0 1px 4px rgba(0,24,94,.08)}
+.wn-link{display:inline-block;margin-top:12px;font-size:14px;font-weight:600;color:var(--cobalt);text-decoration:none}
+.wn-link:hover{text-decoration:underline}

@@ -4,6 +4,17 @@ const DICT = {
     tagline: { fr: 'OVHcloud project reports',    en: 'OVHcloud project reports' },
     logout:  { fr: 'Déconnexion',                 en: 'Logout' }
   },
+  whatsNew: {
+    nav:          { fr: 'Nouveautés',             en: 'What’s new' },
+    nav_aria:     { fr: 'Nouveautés : {{count}} non lue(s)', en: 'What’s new: {{count}} unread' },
+    title:        { fr: 'Nouveautés',             en: 'What’s new' },
+    subtitle:     { fr: 'Les dernières évolutions de Suricate, les plus récentes en premier.', en: 'The latest Suricate changes, newest first.' },
+    empty:        { fr: 'Rien de neuf pour l’instant.', en: 'Nothing new yet.' },
+    new_tag:      { fr: 'Nouveau',                en: 'New' },
+    for_creators: { fr: 'Créateurs de rapports',  en: 'Report creators' },
+    shot_alt:     { fr: 'Capture d’écran : {{title}}', en: 'Screenshot: {{title}}' },
+    see_example:  { fr: 'Voir un exemple',        en: 'See an example' }
+  },
   login: {
     subtitle: { fr: 'Connecte-toi avec ton email OVHcloud', en: 'Sign in with your OVHcloud email' },
     email_label: { fr: 'Email OVHcloud',          en: 'OVHcloud email' },
@@ -64,7 +75,7 @@ const DICT = {
     err_confluence_url: { fr: 'Une URL de page Confluence valide est requise — colle-la depuis la barre d’adresse de ton navigateur en visitant la page (ex : https://confluence.ovhcloud.tools/display/SPACE/Titre, ou un lien avec pageId=).', en: 'A valid Confluence page URL is required — paste it from your browser’s address bar while viewing the page (e.g. https://confluence.ovhcloud.tools/display/SPACE/Page+Title, or a pageId= link).' },
     milestones_label: { fr: 'Jalons du projet', en: 'Project milestones' },
     milestones_optional: { fr: '(optionnels)', en: '(optional)' },
-    milestones_hint: { fr: 'Clé Jira ou URL de l’epic Alpha / Beta / GA, si le projet a ces étapes — remplace la Target ETA par une date par étape dans l’identité du projet.', en: 'Jira key or URL of the Alpha / Beta / GA epic, if the project has those phases — replaces the Target ETA with one date per phase in the project identity.' },
+    milestones_hint: { fr: 'Clé Jira ou URL de la New Feature LVL2 Alpha / Beta / GA, si le projet a ces étapes — remplace la Target ETA par une date par étape dans l’identité du projet.', en: 'Jira key or URL of the Alpha / Beta / GA LVL2 New Feature, if the project has those phases — replaces the Target ETA with one date per phase in the project identity.' },
     bigpicture_label: { fr: 'Box BigPicture', en: 'BigPicture box' },
     bigpicture_optional: { fr: '(optionnel)', en: '(optional)' },
     bigpicture_hint: { fr: 'Identifiant de la box BigPicture du projet (ex : HYBR-95). Si renseigné, la section Planning du report utilise le scope configuré dans cette box au lieu de la liste plate des epics.', en: 'The project’s BigPicture box ID (e.g. HYBR-95). When set, the report’s Planning section uses that box’s configured scope instead of the flat epic list.' }
