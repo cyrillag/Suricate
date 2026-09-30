@@ -7,13 +7,14 @@ const { STATUS_LABEL, rollupStatus } = require('./status');
 // "settings" glyph — a well-known, simple outline shape.
 const GEAR_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>';
 
-function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, milestones = [], epics, planningTree = null, stats, health, isOwner, etaDelayed, etaDelayedFrom, etaDisplay, lang, userName, backfilled, generatedAt, confluenceUrl = null, notice = null }) {
+function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, milestones = [], epics, planningTree = null, stats, health, isOwner, etaDelayed, etaDelayedFrom, etaDisplay, lang, userName, backfilled, generatedAt, confluenceUrl = null, notice = null, isPreview = false }) {
   // milestones: up to 3 fixed, manually-configured phases (Alpha/Beta/GA — see
   // FUNCTIONAL_RULES.md "Milestones") as [{name, key, end}], already filtered to only the ones a
-  // project actually set. Drives only the Project Identity quick-view chips below — the
-  // Deliverable matrix is always flat, never grouped by milestone (an earlier attempt at
-  // auto-grouping the matrix by an auto-discovered milestone was retired: on a real project the
-  // Jira hierarchy it relied on didn't actually separate the phases a PM has in mind).
+  // project actually set. When non-empty, replaces the single Target ETA value in Project Identity
+  // with one line per phase — the Deliverable matrix is always flat, never grouped by milestone (an
+  // earlier attempt at auto-grouping the matrix by an auto-discovered milestone was retired: on a
+  // real project the Jira hierarchy it relied on didn't actually separate the phases a PM has in
+  // mind).
   const weekStr = `W${String(week).padStart(2, '0')}`;
   const yearWeek = `${year}-${weekStr}`;
   const dateLabel = isoWeekMonday(year, week);
@@ -146,14 +147,14 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${esc(project.name)} — Weekly Report ${weekStr}/${year}</title>
+<title>${isPreview ? '[PREVIEW] ' : ''}${esc(project.name)} — Weekly Report ${weekStr}/${year}</title>
 <link rel="stylesheet" href="/app.css">
 <link rel="icon" type="image/png" href="/favicon-32.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>${CSS}</style>
 </head>
 <body>
-<nav class="app-nav">
+<nav class="app-nav${isPreview ? ' is-preview' : ''}">
   <svg class="nav-deco" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 56" preserveAspectRatio="none">
     <polygon points="300,0 300,56 180,56" fill="rgba(255,255,255,0.04)"/>
     <polygon points="300,0 300,32 230,0" fill="rgba(255,255,255,0.05)"/>
@@ -166,6 +167,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
       <span class="nav-brand-name">${brandName}</span>
       <span class="nav-brand-tagline">${tagline}</span>
     </span>
+    ${isPreview ? '<span class="env-badge">Preview</span>' : ''}
   </a>
   <div class="nav-user">
     <div class="lang-switch">

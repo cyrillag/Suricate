@@ -8,6 +8,15 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 
 /* NAV */
 .app-nav{background:var(--mb);height:90px;display:flex;align-items:center;padding:0 24px;gap:24px;position:sticky;top:0;z-index:100;overflow:hidden}
+/* Prod and preview are the same app on the same host, told apart only by a port number in the
+   URL — easy to lose track of, especially with both open in different tabs (see
+   FUNCTIONAL_RULES.md "Environment badge"). A recolored nav is the "glance and know" signal;
+   the text badge is the unambiguous one for anyone who can't tell color intent apart. Deliberately
+   NOT hidden in print/PDF export — if a preview-sourced PDF ever gets shared further, the mark
+   should travel with it rather than making it indistinguishable from a real prod export. */
+.app-nav.is-preview{background:#9A4B12}
+.app-nav.is-preview::after{content:'';position:absolute;left:0;right:0;bottom:0;height:4px;background:repeating-linear-gradient(135deg,var(--yellow) 0 12px,#1A1A1A 12px 24px)}
+.env-badge{display:inline-flex;align-items:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:#1A1A1A;color:var(--yellow);padding:3px 10px;border-radius:2px;margin-left:12px;flex-shrink:0}
 .nav-deco{position:absolute;right:0;top:0;width:280px;height:100%;pointer-events:none}
 .nav-brand{display:flex;align-items:center;gap:18px;text-decoration:none;color:#fff;flex-shrink:0}
 .nav-brand svg,.nav-brand img{flex-shrink:0}

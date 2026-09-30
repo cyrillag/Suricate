@@ -739,6 +739,43 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   control jump to a different spot depending on whether that particular week happens to have a
   report or not.
 
+## Environment badge
+
+Prod (`:31621`) and preview (`:31622`) run identical code on the same host, told apart on the
+outside only by a port number — easy to lose track of, especially with both open in different
+browser tabs.
+
+- Driven by `APP_ENV=preview`, read once at boot into a module-level `IS_PREVIEW` in `server.js`
+  and exposed to every page as `res.locals.isPreview` (EJS views) / a `genReport()` param (the
+  report page, which builds its own HTML rather than using EJS).
+- **Set only as a local, uncommitted addition to the preview host's own `docker-compose.yml`** —
+  never in the tracked file, and never via `.env` either (the two hosts' `.env` files are already
+  identical copies by design, see the lab-deployment reference). This is the same pattern already
+  used for that file's port number: a permanent local diff that a normal `git checkout`/`git pull`
+  never touches because no branch's tracked version of that file differs from what's already
+  there. This is deliberate: it means there is no code path by which merging any branch to master
+  could make the badge appear on prod.
+- When on, every authenticated page's `.app-nav` recolors (`.is-preview`, a warm
+  amber/near-brown instead of the brand navy, plus a diagonal hazard-stripe bottom edge) and gets a
+  small "PREVIEW" text badge next to the brand name — recolor for an instant glance, text for
+  anyone relying on it rather than color alone. The login page (which has no `.app-nav`) gets the
+  same text badge next to its `.auth-brand` lockup instead. Every page's `<title>` also gets a
+  `[PREVIEW] ` prefix — the most useful cue of all once two tabs are open side by side, since it's
+  the one part still visible when a tab isn't focused.
+- **Deliberately NOT hidden in the PDF export's `@media print` rule**, unlike the interactive-only
+  controls that are (Export PDF button, Refresh, week-nav arrows, Confluence link) — if a
+  preview-sourced PDF ever gets shared further, the mark should travel with it rather than making a
+  preview export indistinguishable from a real prod one.
+
+- **The badge code lives on `master`, and the flag in each environment's `.env`.** It first shipped
+  only on its feature branch, never merged — so it disappeared from the preview every time another
+  branch was deployed there (noticed 2026-09-30). Now: the code is on `master`, hence on every
+  branch; `docker-compose.yml` reads `APP_ENV` and the host port (`HOST_PORT`, default 31621)
+  from the checkout's own `.env`; only the preview's `.env` sets `APP_ENV=preview` and
+  `HOST_PORT=31622`. The tracked compose file is identical on both, so a deploy no longer has to
+  preserve a local modification (it used to hold the port and the flag, stashed and restored by hand
+  on every deploy).
+
 ## Responsive / mobile
 
 - Below 700px, `.app-nav` drops the tagline and the username (not essential — the brand name alone
