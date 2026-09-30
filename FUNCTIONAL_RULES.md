@@ -284,16 +284,20 @@ path (`refreshFullEpicTree`).
   rollup pass in `buildPlanningTree` still sees them) but skips emitting a row for any node whose
   Jira issue type is in a fixed `GRANULAR_TYPES` set (on a Phase/Deliverable-structured box, the
   Phase/Deliverable rule above applies instead).
-- **A parent's Start/End dates are never read from Jira — they're always computed as the MIN start
-  / MAX end of their children**, recursively, bottom-up (`buildPlanningTree`'s `rollup`). This
-  applies to both a real Jira parent epic and a synthetic aggregate group (see below) — a group has
-  no dates of its own by definition, only ever rolled-up ones. A leaf epic keeps its own real Jira
-  dates.
-  - **Exception: Phase and Deliverable issues keep their own Jira Start/End when set** — they're the
-    levels a PM plans on directly (BGP: Technical delivery set to 01/12/25 → 03/11/26 in Jira,
-    while its children only covered 02/03/26 → 15/09/26). Each field independently: a missing Start
-    or End is still computed from below. A Phase with no dates of its own therefore rolls up from its
-    Deliverables' *effective* dates (own-or-computed).
+- **A parent's own Jira Start/End dates win; they're only computed from its children when missing**
+  — each field independently, recursively, bottom-up (`buildPlanningTree`'s `rollup`), at every
+  level (epic, New Feature, Phase, Deliverable…). A computed date is the MIN start / MAX end of the
+  children's *effective* dates (own-or-computed), so a parent with no dates of its own inherits from
+  below. A leaf keeps its own Jira dates.
+  - **This was the reverse until 2026-09-30** ("a parent's dates are never read from Jira, always
+    computed"), with an exception for Phases/Deliverables only. It broke as soon as a box's scope
+    included the epics' Tasks/Stories, which are almost never dated: on Private boot M1 (box
+    HYBR-97), 32 epics with real Jira dates showed "No dates yet" — e.g. PUBM-53549, 14/09 → 24/09
+    in Jira, with 4 undated Tasks — and 5 more showed computed dates that weren't the ones in Jira.
+    PMs plan by typing dates on the epic; that's what the Planning must show.
+  - The Phase/Deliverable case that first motivated the exception still holds under the general
+    rule (BGP: Technical delivery set to 01/12/25 → 03/11/26 in Jira, while its children only covered
+    02/03/26 → 15/09/26 — Jira's dates are shown).
   - **Their status, however, is always computed from below** (same worst-of rule as a group: Done
     only if every child is, then Blocked > In Progress > To Start) — their Jira workflow status is a
     placeholder ("Request" on every BGP Phase/Deliverable), which would otherwise show everything as
