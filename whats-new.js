@@ -7,8 +7,11 @@ const db = require('./db');
 
 const DIR = path.join(__dirname, 'whats-new');
 const IMG_DIR = path.join(DIR, 'img');
-// Newest first. Loaded once at startup: entries ship with the code that introduces the feature.
-const ENTRIES = require('./whats-new/entries.json').slice().sort((a, b) => b.date.localeCompare(a.date));
+// Loaded once at startup: entries ship with the code that introduces the feature. The file's own
+// order is the editorial one (most important first) — the digest keeps it; the page shows newest
+// first (a stable sort, so same-day entries keep that editorial order).
+const FILE_ORDER = require('./whats-new/entries.json');
+const ENTRIES = FILE_ORDER.slice().sort((a, b) => b.date.localeCompare(a.date));
 
 // Only people who own at least one project get the badge — the audience for functional news is
 // report creators; readers mostly don't care (the page itself stays viewable by anyone).
@@ -29,10 +32,10 @@ function markSeen(userId) {
   if (newest) db.prepare('UPDATE users SET whats_new_seen_at=? WHERE id=?').run(newest, userId);
 }
 
-// Entries never included in a sent digest yet (digest_sent), oldest first for reading order.
+// Entries never included in a sent digest yet (digest_sent), in the file's editorial order.
 function pendingForDigest() {
   const sent = new Set(db.prepare('SELECT entry_id FROM digest_sent').all().map(r => r.entry_id));
-  return ENTRIES.filter(e => !sent.has(e.id)).reverse();
+  return FILE_ORDER.filter(e => !sent.has(e.id));
 }
 
 function markDigestSent(ids) {

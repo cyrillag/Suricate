@@ -446,6 +446,34 @@ path (`refreshFullEpicTree`).
 - Alert red in this table is `#C0472E` (5:1 on white, 4.57:1 on the row hover), not the app's
   `--blk` `#D85639`, which only reaches 3.95:1 — too low for small text (see Accessibility).
 
+## What's new (release notes)
+
+- **One source, two channels.** Every user-facing change gets an entry in `whats-new/entries.json`
+  (id, date, audience `all`/`creators`, FR/EN title and body, optional link and screenshot),
+  **added in the same change as the feature itself** — same convention as this file. Both the in-app
+  page and the Webex digest read from it, so nothing is written twice and they can't drift. Write
+  entries for what a PM notices and does differently, not for internal refactors. The file order is
+  the editorial order (most important first): the digest keeps it, the page shows newest first.
+- **In-app: a "Nouveautés / What's new" page, not a guided tour.** A nav badge with the unread
+  count, shown only to report creators (users owning at least one project) — readers care less about
+  functional news and never see it; the page itself stays viewable by anyone logged in. Opening the
+  page marks everything as seen (`users.whats_new_seen_at`); a creator who never opened it only
+  counts the last 30 days as new. A guided tour was considered and dropped: each step is pinned to a
+  screen element and breaks whenever the layout moves (weekly, currently), and people tend to skip it.
+- **Screenshots are captured from the running app**, not by hand: `scripts/capture-whats-new.js`
+  (the PDF export's headless Chromium, 2× resolution, one element per entry via a CSS selector),
+  then committed under `whats-new/img/`. Served behind login (`/whats-new/img/*`), unlike `public/`
+  assets, since they show real project data. Only add one when it actually shows the change (a
+  "Paused: 0" donut was dropped for that reason).
+- **Webex digest, on demand, never on a schedule** — a fixed cadence would often land after people
+  already noticed the changes. `scripts/send-digest.js` posts every entry not sent yet
+  (`digest_sent`) to the Project Manager Community space: one message with all entries (French,
+  links to Suricate), then each screenshot as a reply in its thread (Webex attaches one file per
+  message; uploading keeps screenshots off any public URL). Dry run by default, `--send` to post,
+  `--mark-sent` to record entries announced another way. It uses its own dedicated bot
+  (`DIGEST_WEBEX_BOT_TOKEN`, `DIGEST_WEBEX_ROOM_ID` — the API id, or the UUID of a
+  `webexteams://im?space=…` link), not the app's other Webex bot, which serves another purpose.
+
 ## Report generation
 
 - The root epic's End date (`projects.eta`) is re-read from Jira on every generate/regenerate, not
