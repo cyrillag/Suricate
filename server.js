@@ -28,6 +28,14 @@ if (!CONFLUENCE_TOKEN) console.warn('WARNING: CONFLUENCE_SERVICE_TOKEN not set �
 const BIGPICTURE_TOKEN = process.env.BIGPICTURE_API_TOKEN;
 if (!BIGPICTURE_TOKEN) console.warn('WARNING: BIGPICTURE_API_TOKEN not set — Planning Light will be unavailable.');
 
+// Prod and preview run identical code/branches on the same host, distinguished on the outside
+// only by port number — too easy to lose track of which tab is which (see FUNCTIONAL_RULES.md
+// "Environment badge"). APP_ENV comes from each checkout's own .env (never committed) through
+// docker-compose.yml — only the preview's sets it, so merging or deploying any branch can't make
+// it appear on prod. The code itself is on master: when it only lived on its feature branch, the
+// badge vanished every time another branch was deployed to the preview.
+const IS_PREVIEW = process.env.APP_ENV === 'preview';
+
 // No fallback: a hardcoded default here would let anyone who reads this (public) source forge
 // session cookies for any deployment that forgot to set the real secret.
 const SESSION_SECRET = process.env.SESSION_SECRET;
@@ -408,6 +416,7 @@ app.use((req, res, next) => {
   res.locals.whatsNewCount = 0;
   res.locals.isCreator = !!(req.session && req.session.userId && whatsNew.isCreator(req.session.userId));
   if (res.locals.isCreator) res.locals.whatsNewCount = whatsNew.unseenCount(req.session.userId);
+  res.locals.isPreview = IS_PREVIEW;
   next();
 });
 app.get('/lang/:code', (req, res) => {
@@ -975,7 +984,7 @@ function buildReportHtml(proj, report, year, week, isOwner, lang, userName, noti
     stats, health, isOwner,
     backfilled: !!report.backfilled,
     generatedAt: formatDate(new Date(report.created_at * 1000).toISOString()),
-    lang, userName, confluenceUrl, notice
+    lang, userName, confluenceUrl, notice, isPreview: IS_PREVIEW
   });
 }
 

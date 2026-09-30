@@ -3,12 +3,16 @@ services:
   app:
     build: .
     restart: unless-stopped
+    # Per-environment values live in each checkout's .env (never committed), so this file is the
+    # same on prod and preview: prod leaves them unset (defaults below), preview sets
+    # HOST_PORT=31622 and APP_ENV=preview (orange nav + "Preview" badge).
     ports:
-      - "31621:3000"
+      - "${HOST_PORT:-31621}:3000"
     volumes:
       - app-data:/data
     environment:
       - NODE_ENV=production
+      - APP_ENV=${APP_ENV:-}
       - DATA_DIR=/data
       - SESSION_SECRET=${SESSION_SECRET}
       - JIRA_SERVICE_TOKEN=${JIRA_SERVICE_TOKEN}
