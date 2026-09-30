@@ -16,8 +16,10 @@
     <div class="lang-switch">
       <a href="/lang/fr" class="lang-opt <%= lang==='fr' ? 'active' : '' %>">FR</a><span class="lang-sep">/</span><a href="/lang/en" class="lang-opt <%= lang==='en' ? 'active' : '' %>">EN</a>
     </div>
-    <% if (typeof whatsNewCount !== 'undefined' && whatsNewCount > 0) { %>
-    <a href="/whats-new" class="nav-whatsnew" aria-label="<%= t('whatsNew.nav_aria', { count: whatsNewCount }) %>"><%= t('whatsNew.nav') %> <span class="nav-badge"><%= whatsNewCount %></span></a>
+    <%# Always there for report creators (so the page stays reachable once read); the count badge
+        only when something is unread. Readers never see it. %>
+    <% if (typeof isCreator !== 'undefined' && isCreator) { %>
+    <a href="/whats-new" class="nav-whatsnew"<% if (whatsNewCount > 0) { %> aria-label="<%= t('whatsNew.nav_aria', { count: whatsNewCount }) %>"<% } %>><%= t('whatsNew.nav') %><% if (whatsNewCount > 0) { %> <span class="nav-badge"><%= whatsNewCount %></span><% } %></a>
     <% } %>
     <span class="nav-username"><%= userName %></span>
     <form method="POST" action="/logout" style="display:inline">

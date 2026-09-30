@@ -138,7 +138,8 @@ to be re-applied here by hand rather than resolved by merging code:
 Some projects (not all) have distinct phases with their own target dates — typically Alpha / Beta /
 GA. Project Identity can show one end date per phase a project actually has.
 
-- **Manually configured, never auto-discovered.** A project optionally names up to 3 fixed epics —
+- **Manually configured, never auto-discovered.** A project optionally names up to 3 fixed LVL2
+  issues — at OVHcloud these are **New Features** (LVL2 issue type), not epics, and the UI says so —
   `milestone_alpha`/`milestone_beta`/`milestone_ga` (Edit page, "Project milestones") — each a
   single Jira key, all independently optional since not every project has all three phases (or any
   of them). A first version tried auto-discovering an arbitrary-named, arbitrary-count set of
@@ -455,8 +456,8 @@ path (`refreshFullEpicTree`).
   page and the Webex digest read from it, so nothing is written twice and they can't drift. Write
   entries for what a PM notices and does differently, not for internal refactors. The file order is
   the editorial order (most important first): the digest keeps it, the page shows newest first.
-- **In-app: a "Nouveautés / What's new" page, not a guided tour.** A nav badge with the unread
-  count, shown only to report creators (users owning at least one project) — readers care less about
+- **In-app: a "Nouveautés / What's new" page, not a guided tour.** A permanent nav link, with a
+  badge carrying the unread count when there is any, shown only to report creators (users owning at least one project) — readers care less about
   functional news and never see it; the page itself stays viewable by anyone logged in. Opening the
   page marks everything as seen (`users.whats_new_seen_at`); a creator who never opened it only
   counts the last 30 days as new. A guided tour was considered and dropped: each step is pinned to a
@@ -470,8 +471,9 @@ path (`refreshFullEpicTree`).
   already noticed the changes. `scripts/send-digest.js` posts every entry not sent yet
   (`digest_sent`) to the Project Manager Community space, **deliberately terse** (the PMs found a
   first, fuller version too verbose): **one post per entry** — its screenshot, its title in bold
-  and its one-line `short` description, in French, no links — the first post headed "✨ Quoi de neuf
-  dans Suricate". Settled after trying the alternatives, all rejected: one message with every entry
+  and its one-line `short` description, in French — the first post headed "✨ Quoi de neuf dans
+  Suricate" with the only link, to the in-app What's new page (per-entry "see in Suricate" links
+  were dropped as noise). Settled after trying the alternatives, all rejected: one message with every entry
   and the screenshots as thread replies (text and captures disconnected); all screenshots stacked
   in one image (a montage of isolated pieces); every entry as a block inside one image (too dense,
   lots of zooming); a single Webex Adaptive Card interleaving images and text — impossible here:

@@ -406,9 +406,8 @@ app.use((req, res, next) => {
   res.locals.tPlural = (count, oneKey, otherKey) => pluralize(req.lang, count, oneKey, otherKey);
   // "What's new" badge in the nav — report creators only (see whats-new.js).
   res.locals.whatsNewCount = 0;
-  if (req.session && req.session.userId && whatsNew.isCreator(req.session.userId)) {
-    res.locals.whatsNewCount = whatsNew.unseenCount(req.session.userId);
-  }
+  res.locals.isCreator = !!(req.session && req.session.userId && whatsNew.isCreator(req.session.userId));
+  if (res.locals.isCreator) res.locals.whatsNewCount = whatsNew.unseenCount(req.session.userId);
   next();
 });
 app.get('/lang/:code', (req, res) => {

@@ -31,12 +31,12 @@
       "en": "Alpha / Beta / GA dates in the report"
     },
     "short": {
-      "fr": "Renseignez vos epics Alpha, Beta et GA (⚙ Configurer) : le rapport affiche leur date de fin, ou DONE une fois terminées.",
-      "en": "Set your Alpha, Beta and GA epics (⚙ Configure): the report shows their end date, or DONE once completed."
+      "fr": "Renseignez vos New Features LVL2 Alpha, Beta et GA (⚙ Configurer) : le rapport affiche leur date de fin, ou DONE une fois terminées.",
+      "en": "Set your Alpha, Beta and GA LVL2 New Features (⚙ Configure): the report shows their end date, or DONE once completed."
     },
     "body": {
-      "fr": "Dans ⚙ Configurer, trois champs optionnels permettent de désigner l’epic Alpha, Beta et GA du projet (clé Jira ou URL collée depuis le navigateur). Le rapport affiche alors une date de fin par jalon à la place de la Target ETA unique, figée à la génération comme le reste du rapport. Un jalon dont la date est passée et dont l’epic est terminée s’affiche DONE. Ces dates alimentent aussi l’historique de santé de la page projet.",
-      "en": "In ⚙ Configure, three optional fields let you name the project’s Alpha, Beta and GA epics (Jira key or a URL pasted from the browser). The report then shows one end date per milestone instead of the single Target ETA, frozen at generation like the rest of the report. A milestone whose date has passed and whose epic is done shows DONE. These dates also feed the project page’s health history."
+      "fr": "Dans ⚙ Configurer, trois champs optionnels permettent de désigner les New Features LVL2 Alpha, Beta et GA du projet (clé Jira ou URL collée depuis le navigateur). Le rapport affiche alors une date de fin par jalon à la place de la Target ETA unique, figée à la génération comme le reste du rapport. Un jalon dont la date est passée et dont la New Feature est terminée s’affiche DONE. Ces dates alimentent aussi l’historique de santé de la page projet.",
+      "en": "In ⚙ Configure, three optional fields let you name the project’s Alpha, Beta and GA LVL2 New Features (Jira key or a URL pasted from the browser). The report then shows one end date per milestone instead of the single Target ETA, frozen at generation like the rest of the report. A milestone whose date has passed and whose New Feature is done shows DONE. These dates also feed the project page’s health history."
     },
     "link": "/projects/bgp-as-a-service/2026-W40",
     "screenshot": {

@@ -11,9 +11,10 @@
 //                           rendering first — nothing is marked as sent
 //
 // Env: DIGEST_WEBEX_BOT_TOKEN (a bot dedicated to this, member of the target space),
-//      DIGEST_WEBEX_ROOM_ID (the space's API id, or the UUID from a webexteams://im?space=… link).
-// One post per entry — its screenshot, its title in bold and its one-line `short` description, no
-// links — the first post carrying a one-line header. Chosen by the PMs after trying the
+//      DIGEST_WEBEX_ROOM_ID (the space's API id, or the UUID from a webexteams://im?space=… link),
+//      SURICATE_PUBLIC_URL (base of the What's new link, default the prod URL).
+// One post per entry — its screenshot, its title in bold and its one-line `short` description — the
+// first post carrying a one-line header with the only link: the in-app What's new page. Chosen by the PMs after trying the
 // alternatives: everything stacked into one image was too dense (lots of zooming), and a Webex
 // card can't show our screenshots (Webex's cloud fetches card images itself and can't reach this
 // internal server). Screenshots are uploaded to Webex, so nothing needs to be public.
@@ -27,6 +28,7 @@ const send = args.includes('--send') || !!testRoom;
 const markOnly = args.includes('--mark-sent');
 const onlyArg = (() => { const i = args.indexOf('--only'); return i >= 0 ? args[i + 1].split(',') : null; })();
 const LANG = 'fr'; // the Project Manager Community space is French-speaking
+const BASE = (process.env.SURICATE_PUBLIC_URL || 'http://gw.lab.core.ovh.net:31621').replace(/\/$/, '');
 
 // A webexteams://im?space=<uuid> link carries only the raw UUID; the API id is the base64 of a
 // region-specific URI (ours is "ciscospark://urn:TEAM:eu-central-1_k/ROOM/<uuid>", not the US
@@ -50,7 +52,7 @@ const noShort = entries.filter(e => !(e.short && e.short[LANG]));
 if (noShort.length) { console.error(`Entries without a "short" ${LANG} description: ${noShort.map(e => e.id).join(', ')}`); process.exit(1); }
 
 const messages = entries.map((e, i) => ({
-  markdown: [i === 0 ? '✨ **Quoi de neuf dans Suricate**' : null, `**${e.title[LANG]}**`, e.short[LANG]].filter(Boolean).join('  \n'),
+  markdown: [i === 0 ? `✨ **Quoi de neuf dans Suricate** · [toutes les nouveautés](${BASE}/whats-new)` : null, `**${e.title[LANG]}**`, e.short[LANG]].filter(Boolean).join('  \n'),
   file: e.screenshot ? path.join(whatsNew.IMG_DIR, e.screenshot.file) : null
 }));
 
