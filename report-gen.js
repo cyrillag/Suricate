@@ -718,9 +718,9 @@ const CSS = `
   .abc-items{list-style:none;display:flex;flex-direction:column;gap:8px}
   .abc-items li{font-size:13px;line-height:1.5;color:var(--tx2);padding-left:14px;position:relative}
   /* PM formatting carried over from Confluence (confluence-format.js): links get the app's link colour;
-     colours, bold, italics, underline and strikethrough come inline from the page. */
+     colours, bold, italics, underline and strikethrough come inline from the page — bold inherits
+     the surrounding colour, so a PM's grey-and-bold bullet stays grey. */
   .abc-items li a:not(.ji){color:var(--cobalt);text-decoration:underline}
-  .abc-items li strong{color:var(--tx)}
   .abc-items li::before{content:'–';position:absolute;left:0;color:var(--tx3);font-size:12.5px;top:0}
   .ji{font-family:var(--fm);font-size:12.5px;color:var(--cobalt);background:var(--prog-bg);padding:1px 5px;border-radius:2px;text-decoration:none;margin-left:4px}
   .ji:hover{text-decoration:underline}
