@@ -60,7 +60,9 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
     if (!items.length) return '<li>Nothing to report this week.</li>';
     return items.map(it => {
       const jiraLink = it.jira_key ? ` <a class="ji" href="https://jira.ovhcloud.tools/browse/${esc(it.jira_key)}" target="_blank" rel="noopener">${esc(it.jira_key)}</a>` : '';
-      return `<li>${esc(it.text)}${jiraLink}</li>`;
+      // `html` is the PM's formatting, already reduced to a safe allowlist when the report was
+      // generated (confluence-format.js); a report frozen before it existed only has plain `text`.
+      return `<li>${it.html || esc(it.text)}${jiraLink}</li>`;
     }).join('');
   };
 
@@ -715,6 +717,10 @@ const CSS = `
   .abc-col.clr .abc-head{color:var(--cobalt);border-color:var(--cobalt)}
   .abc-items{list-style:none;display:flex;flex-direction:column;gap:8px}
   .abc-items li{font-size:13px;line-height:1.5;color:var(--tx2);padding-left:14px;position:relative}
+  /* PM formatting carried over from Confluence (confluence-format.js): links get the app's link colour;
+     colours, bold, italics, underline and strikethrough come inline from the page. */
+  .abc-items li a:not(.ji){color:var(--cobalt);text-decoration:underline}
+  .abc-items li strong{color:var(--tx)}
   .abc-items li::before{content:'–';position:absolute;left:0;color:var(--tx3);font-size:12.5px;top:0}
   .ji{font-family:var(--fm);font-size:12.5px;color:var(--cobalt);background:var(--prog-bg);padding:1px 5px;border-radius:2px;text-decoration:none;margin-left:4px}
   .ji:hover{text-decoration:underline}
