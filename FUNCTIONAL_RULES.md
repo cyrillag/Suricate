@@ -820,6 +820,44 @@ browser tabs.
   login form and back out on success — `safeReturnTo()` only ever accepts an internal path (never
   an absolute or protocol-relative URL) so this can't become an open redirect.
 
+## OVHcloud visual identity
+
+Reviewed against the OVHcloud Visual Identity Guidelines (2023) and PPT Toolbox on 2026-10-01; these
+rules keep the app aligned. Check a new screen against them before shipping it.
+
+- **One typeface: Source Sans Pro, served by the app** (`public/fonts`, @fontsource build, SIL OFL —
+  `public/fonts/OFL.txt`; `@font-face` in `app.css`, which the report page also loads). It used to
+  be declared with `local()` only, so it only showed where installed: most viewers, and the PDF
+  export, actually got Segoe UI / Arial / a generic sans. **No monospace either** — Jira keys and
+  risk refs were Courier New; they use the brand font with `font-variant-numeric: tabular-nums`.
+- **Sentence case, emphasis by weight — no ALL CAPS** on buttons, section titles, labels, the
+  tagline or the health badge. Capitals stay only where the PPT Toolbox uses them: table headers
+  (matrix, report list, Planning columns, quarter labels), team codes, and the Preview badge (a
+  deliberate warning).
+- **The triangle is the only recurring motif; no coloured bar/stripe accents.** Cards and report
+  sections carry a small Masterbrand corner triangle instead of the 3px top stripe they had;
+  headings that used emoji (Cleanup's 🔴 📅 🟡) or coloured underlines (Highlights) use a small
+  triangle marker (`.tri` in `app.css`, `.abc-head::before` in the report); warnings use the orange
+  one in place of ⚠; empty states show a brand triangle instead of 📋 / 🗓️; the dashboard's delete
+  button uses the same Feather icon as the rest of the app instead of 🗑. Legend swatches are small
+  squares (Toolbox), not vertical bars.
+- **Secondary colours are accents, never large fills.** The Highlights columns are white (colour
+  on the title and its marker only, they used to be green/red/blue tinted); the Confluence-format
+  callout is light grey with an orange triangle, not a yellow box. Yellow stays the primary-action
+  colour (buttons), orange the alert accent (today line, Blocked).
+- **Palette.** Masterbrand `#000E9C` dominant, white surfaces, borders in Soft Grey `#BEC0C6` and
+  Light Grey `#E5E7ED`; the page background `#F3F4FA` matches the Toolbox's light zebra grey.
+  Accepted, documented exceptions: `#C0472E` / `#1A6FB0` (alert red and Paused blue darkened for
+  4.5:1 text contrast), `#9A4B12` (the preview's orange nav, a deliberate environment warning), and
+  light tints of the palette for small chips/pills.
+- **Status colours in charts are a deliberate exception** to the Toolbox's dark→light blue series:
+  in the donut, legends and Gantt the colour carries a meaning (Done green, In Progress blue, Paused
+  light blue, Blocked orange, To Start grey), which a blue ramp would lose.
+- **Weather icons in the health history (☀️ ⛅ 🌧️) are an accepted exception** to "no third-party
+  icons": chosen by the PMs to mirror their Confluence "Flash reports history" page.
+- **Report footer follows the OVHcloud pattern**: small mark on the left, thin vertical divider,
+  document name, date on the right.
+
 ## Accessibility
 
 Target: WCAG 2.2 Level AA. Concrete, checkable thresholds — not "make it accessible" in the

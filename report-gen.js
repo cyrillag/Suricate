@@ -7,7 +7,7 @@ const { STATUS_LABEL, rollupStatus } = require('./status');
 // "settings" glyph — a well-known, simple outline shape.
 const GEAR_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>';
 
-function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, milestones = [], epics, planningTree = null, stats, health, isOwner, etaDelayed, etaDelayedFrom, etaDisplay, lang, userName, backfilled, generatedAt, confluenceUrl = null, notice = null, isPreview = false }) {
+function generateReport({ project, year, week, pmName, execSummary, highlights, risks, workstreams, milestones = [], epics, planningTree = null, stats, health, isOwner, etaDelayed, etaDelayedFrom, etaDisplay, lang, userName, backfilled, generatedAt, confluenceUrl = null, notice = null, isPreview = false, nav = {} }) {
   // milestones: up to 3 fixed, manually-configured phases (Alpha/Beta/GA — see
   // FUNCTIONAL_RULES.md "Milestones") as [{name, key, end}], already filtered to only the ones a
   // project actually set. When non-empty, replaces the single Target ETA value in Project Identity
@@ -173,6 +173,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
     <div class="lang-switch">
       <a href="/lang/fr" class="lang-opt ${lang === 'fr' ? 'active' : ''}">FR</a><span class="lang-sep">/</span><a href="/lang/en" class="lang-opt ${lang === 'en' ? 'active' : ''}">EN</a>
     </div>
+    ${nav.isCreator ? `<a href="/whats-new" class="nav-whatsnew">${esc(translate(lang, 'whatsNew.nav'))}${nav.whatsNewCount > 0 ? ` <span class="nav-badge">${nav.whatsNewCount}</span>` : ''}</a>` : ''}
     <span class="nav-username">${esc(userName)}</span>
     <form method="POST" action="/logout" style="display:inline">
       <button type="submit" class="btn-ghost btn-sm">${logoutLabel}</button>
@@ -182,7 +183,7 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
 
 <div class="app-body">
 ${notice ? `
-  <div class="auth-error" role="alert">⚠ ${['jira', 'confluence', 'bigpicture'].includes(notice.source) ? `<strong>${esc(translate(lang, `detail.source_${notice.source}`))}</strong> — ` : ''}${esc(notice.message)}</div>` : ''}
+  <div class="auth-error" role="alert"><span class="tri high" aria-hidden="true"></span>${['jira', 'confluence', 'bigpicture'].includes(notice.source) ? `<strong>${esc(translate(lang, `detail.source_${notice.source}`))}</strong> — ` : ''}${esc(notice.message)}</div>` : ''}
 
   <div class="page-header">
     <div>
@@ -217,13 +218,13 @@ ${notice ? `
       : `<div class="exec-summary">${escKeepEmphasis(execSummary)}</div>`) : ''}
     <div class="identity-grid">
       <div class="identity-cell"><div class="f-label">Project</div><div class="f-value">${esc(project.name)}</div></div>
-      <div class="identity-cell"><div class="f-label">Project Manager</div><div class="f-value">${esc(pmName || '')}</div></div>
+      <div class="identity-cell"><div class="f-label">Project manager</div><div class="f-value">${esc(pmName || '')}</div></div>
       <div class="identity-cell">
         <div class="f-label">Target ETA</div>
         ${milestones.length
           ? `<div class="f-value-list">${milestones.map(m => `<div class="f-value">${esc(m.name)} — ${m.done ? 'DONE' : (m.end ? formatShortDate(m.end) : 'TBD')}</div>`).join('')}</div>`
           : `<div class="f-value">${esc(etaDisplay || 'TBD')}</div>`}
-        ${etaDelayed ? `<div class="eta-delayed-note">${etaDelayedFrom ? `⚠ Previous date: ${esc(etaDelayedFrom)}` : '⚠ Delayed'}</div>` : ''}
+        ${etaDelayed ? `<div class="eta-delayed-note">${etaDelayedFrom ? `Previous date: ${esc(etaDelayedFrom)}` : '⚠ Delayed'}</div>` : ''}
         <div class="health ${health} health-sub"><div class="health-dot"></div>${health === 'delayed' ? 'Delayed' : health === 'at-risk' ? 'At Risk' : 'On Track'}</div>
       </div>
       <div class="identity-cell">
@@ -267,7 +268,7 @@ ${notice ? `
   <div class="matrix-section">
     <div class="section-label"><span>Deliverable matrix</span></div>
     <div class="matrix-scroll">
-      <table class="mx">
+      <div class="mx-scroll"><table class="mx">
         <thead><tr>
           <th style="width:18%">Deliverable</th>
           <th style="width:34%">Workstream</th>
@@ -276,14 +277,14 @@ ${notice ? `
           <th style="width:17%">Status</th>
         </tr></thead>
         <tbody>${matrixRows}</tbody>
-      </table>
+      </table></div>
     </div>
   </div>
 
   ${planningTree !== null ? renderPlanningSection({ visiblePlanningRows, hasPartialDatesPlanning, planningMonths, planningQuarterLines, pctDate, planningTstartIso }) : (ganttEpics.length ? `
   <div class="matrix-section">
     <div class="section-label">Planning — team epics</div>
-    <div class="gantt-mobile-note">📊 The planning timeline needs a wider screen — view this report on a desktop or tablet to see it.</div>
+    <div class="gantt-mobile-note">The planning timeline needs a wider screen — view this report on a desktop or tablet to see it.</div>
     <div class="gantt-outer">
       <div class="gantt-lcol" id="gantt-lcol"><div class="gantt-lhdr"></div></div>
       <div class="gantt-rcol">
@@ -296,7 +297,7 @@ ${notice ? `
       <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#0050D5"></div>In Progress</div>
       <div class="gantt-leg-item"><div class="gantt-leg-swatch paus-swatch"></div>Paused</div>
       <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#ED733D"></div>Blocked</div>
-      <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#BEC0C6;border:1px dashed #C8CAD4"></div>To Start</div>
+      <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#BEC0C6;border:1px dashed var(--bd)"></div>To Start</div>
       ${hasPartialDates ? '<div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:linear-gradient(to right,transparent,#87878C)"></div>Only one date known (hover for detail)</div>' : ''}
     </div>
   </div>` : '')}
@@ -304,7 +305,10 @@ ${notice ? `
 </div>
 
 <footer class="doc-footer">
-  ${esc(project.name)} · Weekly Report ${weekStr}/${year} · OVHcloud Internal — Confidential · ${dateLabel}
+  <img src="/logo-white.png" height="28" alt="" class="doc-footer-mark">
+  <span class="doc-footer-divider" aria-hidden="true"></span>
+  <span class="doc-footer-doc">${esc(project.name)} · Weekly Report ${weekStr}/${year} · OVHcloud Internal — Confidential</span>
+  <span class="doc-footer-date">${dateLabel}</span>
 </footer>
 <script>
 (function(){
@@ -477,7 +481,7 @@ function renderPlanningSection({ visiblePlanningRows, hasPartialDatesPlanning, p
     <div class="section-label">
       <span>Planning</span>
     </div>
-    <div class="gantt-mobile-note">📊 The planning timeline needs a wider screen — view this report on a desktop or tablet to see it.</div>
+    <div class="gantt-mobile-note">The planning timeline needs a wider screen — view this report on a desktop or tablet to see it.</div>
     <div class="gantt-outer planning-outer">
       <div class="gantt-lcol planning-lcol" id="planning-lcol">
         <div class="gantt-lhdr planning-lhdr"><span class="pl-hdr-summary">Summary</span><span class="pl-hdr-status">Status</span></div>
@@ -495,7 +499,7 @@ function renderPlanningSection({ visiblePlanningRows, hasPartialDatesPlanning, p
       <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#0050D5"></div>In Progress</div>
       <div class="gantt-leg-item"><div class="gantt-leg-swatch paus-swatch"></div>Paused</div>
       <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#ED733D"></div>Blocked</div>
-      <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#BEC0C6;border:1px dashed #C8CAD4"></div>To Start</div>
+      <div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:#BEC0C6;border:1px dashed var(--bd)"></div>To Start</div>
       ${hasPartialDatesPlanning ? '<div class="gantt-leg-item"><div class="gantt-leg-swatch" style="background:linear-gradient(to right,transparent,#87878C)"></div>Only one date known (hover for detail)</div>' : ''}
     </div>
   </div>`;
@@ -669,11 +673,8 @@ function currentIsoWeek() {
 // ── CSS ──────────────────────────────────────────────────────────
 
 const CSS = `
-  @font-face{font-family:'Source Sans Pro';font-weight:300;src:local('Source Sans Pro Light'),local('SourceSansPro-Light'),local('Source Sans 3 Light')}
-  @font-face{font-family:'Source Sans Pro';font-weight:400;src:local('Source Sans Pro'),local('SourceSansPro-Regular'),local('Source Sans 3')}
-  @font-face{font-family:'Source Sans Pro';font-weight:600;src:local('Source Sans Pro SemiBold'),local('SourceSansPro-SemiBold'),local('Source Sans 3 SemiBold')}
-  @font-face{font-family:'Source Sans Pro';font-weight:700;src:local('Source Sans Pro Bold'),local('SourceSansPro-Bold'),local('Source Sans 3 Bold')}
-  :root{--mb:#000E9C;--db:#00185E;--cobalt:#0050D5;--royal:#147DE8;--sky:#73E3FF;--yellow:#FFD124;--dyellow:#FFBB22;--orange:#ED733D;--dorange:#D85639;--green:#A6D64D;--dgr:#636369;--mgr:#87878C;--sgr:#BEC0C6;--lgr:#E5E7ED;--done-c:#4A7C1C;--done-bg:#EEF7E0;--done-s:#A6D64D;--prog-c:#0050D5;--prog-bg:#E8EFFF;--prog-s:#0050D5;--blk-c:#D85639;--blk-bg:#FEF0EE;--blk-s:#ED733D;--paus-c:#1A6FB0;--paus-bg:#E6F4FE;--paus-s:#4AB0F5;--ts-c:#636369;--ts-bg:#F2F3F7;--ts-s:#BEC0C6;--sur:#FFFFFF;--gnd:#F3F4FA;--bd:#C8CAD4;--bd2:#E5E7ED;--tx:#00185E;--tx2:#636369;--tx3:#87878C;--f:'Source Sans Pro','Segoe UI',Arial,sans-serif;--fm:'Courier New',Courier,monospace;--r:2px}
+  /* @font-face for Source Sans Pro lives in /app.css (self-hosted files), loaded before this. */
+  :root{--mb:#000E9C;--db:#00185E;--cobalt:#0050D5;--royal:#147DE8;--sky:#73E3FF;--yellow:#FFD124;--dyellow:#FFBB22;--orange:#ED733D;--dorange:#D85639;--green:#A6D64D;--dgr:#636369;--mgr:#87878C;--sgr:#BEC0C6;--lgr:#E5E7ED;--done-c:#4A7C1C;--done-bg:#EEF7E0;--done-s:#A6D64D;--prog-c:#0050D5;--prog-bg:#E8EFFF;--prog-s:#0050D5;--blk-c:#D85639;--blk-bg:#FEF0EE;--blk-s:#ED733D;--paus-c:#1A6FB0;--paus-bg:#E6F4FE;--paus-s:#4AB0F5;--ts-c:#636369;--ts-bg:#F2F3F7;--ts-s:#BEC0C6;--sur:#FFFFFF;--gnd:#F3F4FA;--bd:#BEC0C6;--bd2:#E5E7ED;--tx:#00185E;--tx2:#636369;--tx3:#87878C;--f:'Source Sans Pro','Segoe UI',Arial,sans-serif;--fm:'Source Sans Pro','Segoe UI',Arial,sans-serif;--r:2px}
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--gnd);color:var(--tx);font-family:var(--f);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased}
   /* .week-nav/.week-arrow/.ref-week now live in app.css (shared with report-missing.ejs) — see
@@ -681,20 +682,27 @@ const CSS = `
      under 1.7:1, nowhere near the 3:1 non-text contrast minimum, which is why the arrows use
      var(--tx2) (~5.9:1) instead. */
   .backfill-notice{background:#fcf4d6;border:1px solid #f1c21b;color:var(--db);border-radius:var(--r);padding:9px 14px;font-size:13px;font-weight:600;margin-bottom:16px}
-  .doc-section{background:var(--sur);border:1px solid var(--bd);border-top:3px solid var(--mb);border-radius:var(--r);margin-bottom:16px;overflow:hidden}
-  .section-label{font-size:15px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mb);padding:11px 20px 10px;border-bottom:1px solid var(--bd2);background:var(--sur);display:flex;align-items:center;justify-content:space-between}
+  /* OVHcloud's recurring motif is the triangle, and its identity has no coloured bar/stripe accents:
+     cards and sections get a small Masterbrand corner triangle instead of the 3px top stripe they had. */
+  .doc-section,.matrix-section{position:relative}
+  .doc-section::before,.matrix-section::before{content:'';position:absolute;top:0;left:0;width:14px;height:14px;background:var(--mb);clip-path:polygon(0 0,100% 0,0 100%);z-index:2;pointer-events:none}
+  .doc-section{background:var(--sur);border:1px solid var(--bd);border-radius:var(--r);margin-bottom:16px;overflow:hidden}
+  .section-label{font-size:17px;font-weight:700;color:var(--mb);padding:11px 20px 10px;border-bottom:1px solid var(--bd2);background:var(--sur);display:flex;align-items:center;justify-content:space-between}
   .section-label .sl-right{color:var(--tx3);font-weight:400;letter-spacing:.04em}
   .exec-summary{padding:14px 20px;font-size:13px;color:var(--tx2);line-height:1.5;border-bottom:1px solid var(--bd2);font-style:italic}
   .exec-summary-readmore{display:none}
   .identity-grid{display:grid;grid-template-columns:repeat(4,1fr)}
   .identity-cell{padding:16px 20px;border-right:1px solid var(--bd2)}
   .identity-cell:last-child{border-right:none}
-  .f-label{font-size:12.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--tx3);margin-bottom:5px}
+  .f-label{font-size:13.5px;font-weight:600;color:var(--tx3);margin-bottom:5px}
   .f-value{font-size:13px;font-weight:600;color:var(--tx);line-height:1.3}
+  /* Jira keys / risk refs used to be Courier New — OVHcloud allows one typeface only; tabular digits keep
+     them aligned instead (--fm is now the brand stack). */
+  .f-value.mono,.ji,.risk-ref,.jtag,.g-key{font-variant-numeric:tabular-nums}
   .f-value.mono{font-family:var(--fm);font-size:13px;font-weight:400;color:var(--cobalt)}
   .f-value-list{display:flex;flex-direction:column;gap:3px}
   .eta-delayed-note{font-size:12px;font-weight:600;color:var(--blk-c);margin-top:4px}
-  .health{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+  .health{display:inline-flex;align-items:center;gap:6px;font-size:14.5px;font-weight:700;}
   .health-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
   .health.at-risk .health-dot{background:var(--orange)}.health.at-risk{color:var(--blk-c)}
   .health.on-track .health-dot{background:var(--done-s)}.health.on-track{color:var(--done-c)}
@@ -708,11 +716,14 @@ const CSS = `
   .doc-section--abc{border-top:1px solid var(--bd)}
   .abc-col{padding:18px 20px;border-right:1px solid rgba(0,0,0,.07)}
   .abc-col:last-child{border-right:none}
-  .abc-col.ach{background:#EBF5DD}.abc-col.blk{background:#FDEEE9}.abc-col.clr{background:#E5EDFF}
-  .abc-head{font-size:15px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid transparent}
-  .abc-col.ach .abc-head{color:var(--done-c);border-color:var(--done-s)}
-  .abc-col.blk .abc-head{color:var(--blk-c);border-color:var(--blk-s)}
-  .abc-col.clr .abc-head{color:var(--cobalt);border-color:var(--cobalt)}
+  /* White columns: secondary colours are accents only, so they colour the title and its triangle
+     marker, not the whole column (it used to be green/red/blue tinted, with a coloured underline). */
+  .abc-col.ach,.abc-col.blk,.abc-col.clr{background:var(--sur)}
+  .abc-head{font-size:16px;font-weight:700;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--bd2);display:flex;align-items:center;gap:8px}
+  .abc-head::before{content:'';width:10px;height:10px;flex-shrink:0;clip-path:polygon(0 0,100% 50%,0 100%);background:currentColor}
+  .abc-col.ach .abc-head{color:var(--done-c)}
+  .abc-col.blk .abc-head{color:var(--blk-c)}
+  .abc-col.clr .abc-head{color:var(--cobalt)}
   .abc-items{list-style:none;display:flex;flex-direction:column;gap:8px}
   .abc-items li{font-size:13px;line-height:1.5;color:var(--tx2);padding-left:14px;position:relative}
   .abc-items li::before{content:'–';position:absolute;left:0;color:var(--tx3);font-size:12.5px;top:0}
@@ -723,7 +734,7 @@ const CSS = `
   .chart-pane{padding:24px;display:flex;flex-direction:column;align-items:center;gap:20px}
   .chart-legend{display:flex;flex-direction:column;gap:9px;width:100%}
   .leg-row{display:flex;align-items:center;gap:6px}
-  .leg-strip{width:4px;height:16px;border-radius:1px;flex-shrink:0}
+  .leg-strip{width:10px;height:10px;border-radius:1px;flex-shrink:0}
   .leg-strip.paus{background:var(--paus-s)}.leg-strip.done{background:var(--done-s)}.leg-strip.prog{background:var(--prog-s)}.leg-strip.blk{background:var(--blk-s)}.leg-strip.ts{background:var(--ts-s)}
   .leg-lbl{font-size:15px;color:var(--tx2);flex:1;min-width:0}
   .leg-n{font-size:13px;font-weight:700;color:var(--tx);font-variant-numeric:tabular-nums;min-width:20px;text-align:right;flex-shrink:0}
@@ -733,7 +744,7 @@ const CSS = `
   .risk-item:last-child{border-bottom:none}
   .risk-l{display:flex;flex-direction:column;gap:6px;align-items:flex-start;flex-shrink:0;min-width:80px}
   .risk-ref{font-family:var(--fm);font-size:12.5px;color:var(--tx3);letter-spacing:.05em}
-  .risk-badge{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:3px 8px;border-radius:2px;white-space:nowrap}
+  .risk-badge{font-size:12px;font-weight:700;padding:3px 8px;border-radius:2px;white-space:nowrap}
   /* Extreme is a step above High on the Confluence risk matrix's own Yellow/Orange/Red scale, not
      a synonym for it — a filled solid badge (same idea as the Delayed health badge) reads as more
      severe than High's light-fill-plus-border treatment, instead of the two looking identical. */
@@ -744,7 +755,10 @@ const CSS = `
   .risk-desc{font-size:13px;color:var(--tx);font-weight:600;line-height:1.4;margin-bottom:4px}
   .risk-mit{font-size:13px;color:var(--tx2);line-height:1.4}
   .risk-mit::before{content:'→ ';color:var(--tx3)}
-  .matrix-section{background:var(--sur);border:1px solid var(--bd);border-top:3px solid var(--mb);border-radius:var(--r);margin-bottom:16px;overflow:hidden}
+  /* On narrow screens the matrix scrolls inside its section rather than being cropped (it was, at 390px). */
+  .mx-scroll{overflow-x:auto}
+  .mx-scroll .mx{min-width:640px}
+  .matrix-section{background:var(--sur);border:1px solid var(--bd);border-radius:var(--r);margin-bottom:16px;overflow:hidden}
   .matrix-scroll{overflow-x:auto}
   .mx{width:100%;min-width:640px;border-collapse:collapse;font-size:13px}
   .mx thead th{background:var(--mb);color:#fff;padding:11px 16px;text-align:left;font-size:15px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
@@ -757,7 +771,7 @@ const CSS = `
   tbody tr.del-first:not(:first-child) td{border-top:2px solid var(--mb)}
   tbody tr:last-child td{border-bottom:none}
   tbody tr:nth-child(even) td{background:var(--gnd)}
-  tbody tr:hover td{background:#ECEEF8}
+  tbody tr:hover td{background:var(--gnd)}
   tbody tr:hover .td-del{background:var(--gnd)!important}
   .ws-name{font-size:13px;color:var(--tx);line-height:1.3}
   .cell-n{display:flex;align-items:center}
@@ -823,7 +837,10 @@ const CSS = `
   .planning-row{height:24px;border-bottom:1px solid var(--bd2);position:relative;overflow:visible}
   .planning-row:nth-child(odd){background:var(--gnd)}
   .planning-row:last-child{border-bottom:none}
-  .doc-footer{background:var(--mb);color:rgba(255,255,255,.4);text-align:center;padding:18px 32px;font-size:13.5px;letter-spacing:.04em}
+  /* OVHcloud footer pattern: small mark left + thin vertical divider + document name, date right. */
+  .doc-footer{background:var(--mb);color:rgba(255,255,255,.75);display:flex;align-items:center;gap:14px;padding:14px 32px;font-size:13.5px}
+  .doc-footer-divider{width:1px;height:24px;background:rgba(255,255,255,.3)}
+  .doc-footer-date{margin-left:auto;white-space:nowrap}
   @media(max-width:700px){
     .identity-grid{grid-template-columns:1fr 1fr}
     .sr-grid{grid-template-columns:1fr}

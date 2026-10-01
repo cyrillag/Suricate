@@ -908,7 +908,7 @@ function reportHistory(proj, limit) {
 // ── REPORT VIEW ───────────────────────────────────────────────────
 // Shared by the HTML report view and the PDF export route — a report row plus the project/owner/
 // locale context around it is everything genReport() needs, regardless of which one asked for it.
-function buildReportHtml(proj, report, year, week, isOwner, lang, userName, notice = null) {
+function buildReportHtml(proj, report, year, week, isOwner, lang, userName, notice = null, nav = {}) {
   // A report is a frozen snapshot from the moment it was generated — never recompute the
   // matrix/Planning from the live workstreams/epics_cache tables for a row that already has one
   // (that live-recompute was the actual bug: a workstream added or changing status *after* a past
@@ -985,7 +985,7 @@ function buildReportHtml(proj, report, year, week, isOwner, lang, userName, noti
     stats, health, isOwner,
     backfilled: !!report.backfilled,
     generatedAt: formatDate(new Date(report.created_at * 1000).toISOString()),
-    lang, userName, confluenceUrl, notice, isPreview: IS_PREVIEW
+    lang, userName, confluenceUrl, notice, isPreview: IS_PREVIEW, nav
   });
 }
 
@@ -1029,7 +1029,8 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, re
   }
 
   const notice = req.query.syncSource ? { source: req.query.syncSource, message: req.query.syncMessage || '' } : null;
-  const html = buildReportHtml(proj, report, year, week, isOwner, req.lang, req.session.userName, notice);
+  const html = buildReportHtml(proj, report, year, week, isOwner, req.lang, req.session.userName, notice,
+    { isCreator: res.locals.isCreator, whatsNewCount: res.locals.whatsNewCount });
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(html);
 });

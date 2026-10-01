@@ -52,7 +52,7 @@ const DICT = {
     step3_hint: { fr: 'Colle l’URL depuis la barre d’adresse de ton navigateur (tous les formats de lien fonctionnent, y compris un lien avec "pageId="). L’espace et le titre sont extraits automatiquement. Tout n’est pas dans Jira : les sections «Deliverables status», «Week summary» et «Risk matrix» de cette page sont analysées pour créer les workstreams et pré-remplir chaque rapport hebdomadaire.', en: 'Paste the page’s URL from your browser’s address bar (any link format works, including a plain "pageId=" link) — space and title are extracted automatically. Not everything lives in Jira: sections "Deliverables status", "Week summary" and "Risk matrix" on this page are parsed to seed workstreams and pre-fill each weekly report.' },
     step4: { fr: 'Clique sur «Créer» ci-dessous', en: 'Click "Create" below' },
     step4_hint: { fr: 'L’app va récupérer la date cible depuis Jira, puis importer tes workstreams depuis la page Confluence. Tu arriveras sur la page de ton projet quelques secondes plus tard — avec un message d’erreur clair plutôt qu’un projet vide si le format ne correspond pas.', en: 'The app will fetch the epic’s ETA from Jira, then import your workstreams from the Confluence page. You’ll land on your project page a few seconds later — with a clear error message instead of an empty project if something doesn’t match the expected format.' },
-    callout: { fr: '⚠ Ça ne marche que si ta page suit une structure précise — ce n’est pas du texte libre.', en: '⚠ This only works if your page follows a specific structure — it is <strong>not</strong> free-form.' },
+    callout: { fr: 'Ça ne marche que si ta page suit une structure précise — ce n’est pas du texte libre.', en: 'This only works if your page follows a specific structure — it is <strong>not</strong> free-form.' },
     callout_link: { fr: 'Partir du modèle →',      en: 'Start from the template page →' },
     cancel: { fr: 'Annuler',                      en: 'Cancel' },
     submit: { fr: 'Créer et importer les epics',  en: 'Create & import epics' },
@@ -66,11 +66,11 @@ const DICT = {
     epic_label: { fr: 'Epic Jira racine (LVL2)',  en: 'Root Jira epic (LVL2)' },
     epic_hint:  { fr: 'La date cible est relue depuis son champ «End date» à la sauvegarde.', en: 'Target ETA is re-read from its End date field when you save.' },
     confluence_label: { fr: 'URL de la page Confluence', en: 'Confluence page URL' },
-    callout: { fr: '⚠ Doit suivre la structure requise.', en: '⚠ Must follow the required structure.' },
+    callout: { fr: 'Doit suivre la structure requise.', en: 'Must follow the required structure.' },
     callout_link: { fr: 'Voir le modèle →',       en: 'See the template page →' },
     cancel: { fr: 'Annuler',                      en: 'Cancel' },
     submit: { fr: 'Enregistrer',                  en: 'Save changes' },
-    note: { fr: '<strong>Note :</strong> la sauvegarde ne met à jour que le nom, l’epic et la référence Confluence du projet — elle ne resynchronise pas les workstreams. Si tu as changé l’epic ou la page, utilise «↻ Sync Jira» / «↻ Sync Confluence» sur la page du projet ensuite.', en: '<strong>Note:</strong> saving only updates the project’s name, epic and Confluence page reference — it does not re-sync workstreams. If you changed the epic or page, use "↻ Sync Jira" / "↻ Sync Confluence" on the project page afterwards.' },
+    note: { fr: '<strong>Note :</strong> la sauvegarde ne met à jour que le nom, l’epic et la référence Confluence du projet — elle ne resynchronise pas les workstreams. Si tu as changé l’epic ou la page, régénère ensuite le rapport de la semaine (↻ Refresh) pour en tenir compte.', en: '<strong>Note:</strong> saving only updates the project’s name, epic and Confluence page reference — it does not re-sync workstreams. If you changed the epic or page, regenerate the current week’s report afterwards (↻ Refresh) to pick it up.' },
     err_required: { fr: 'Le nom du projet et l’epic racine sont obligatoires.', en: 'Project name and root epic are required.' },
     err_confluence_url: { fr: 'Une URL de page Confluence valide est requise — colle-la depuis la barre d’adresse de ton navigateur en visitant la page (ex : https://confluence.ovhcloud.tools/display/SPACE/Titre, ou un lien avec pageId=).', en: 'A valid Confluence page URL is required — paste it from your browser’s address bar while viewing the page (e.g. https://confluence.ovhcloud.tools/display/SPACE/Page+Title, or a pageId= link).' },
     milestones_label: { fr: 'Jalons du projet', en: 'Project milestones' },
@@ -82,7 +82,7 @@ const DICT = {
   },
   detail: {
     owner:     { fr: 'Responsable : {{name}}',    en: 'Owner: {{name}}' },
-    cleanup_link: { fr: '🩺 Cleanup',             en: '🩺 Cleanup' },
+    cleanup_link: { fr: 'Cleanup',                en: 'Cleanup' },
     configure: { fr: 'Configurer',                en: 'Configure' },
     generate_report: { fr: 'Générer le rapport',  en: 'Generate report' },
     week_input_title: { fr: 'AAAA-Wss',           en: 'YYYY-Www' },
@@ -122,7 +122,7 @@ const DICT = {
     // instead of the old silent auto-backfill-on-visit behaviour (see FUNCTIONAL_RULES.md).
     missing_title: { fr: 'Aucun rapport pour {{week}}', en: 'No report for {{week}}' },
     missing_explanation: { fr: 'Personne n’a généré de rapport pour cette semaine passée. Contrairement à la semaine en cours, une semaine passée n’est jamais générée automatiquement.', en: 'Nobody generated a report for this past week. Unlike the current week, a past week is never generated automatically.' },
-    backfilled_notice: { fr: '⚠ Généré le {{date}}, après coup — reflète les données au moment de la génération, pas nécessairement l’état réel de la semaine {{week}}.', en: '⚠ Generated on {{date}}, after the fact — reflects data as of generation, not necessarily what was true during week {{week}}.' },
+    backfilled_notice: { fr: 'Généré le {{date}}, après coup — reflète les données au moment de la génération, pas nécessairement l’état réel de la semaine {{week}}.', en: 'Generated on {{date}}, after the fact — reflects data as of generation, not necessarily what was true during week {{week}}.' },
 
     // Human-readable translations of every classified sync/integration failure (see errors.js
     // AppError codes) — a PM must never see a raw HTTP status or JSON API payload in the UI.
@@ -176,7 +176,7 @@ const DICT = {
     last_synced: { fr: 'Dernière synchro Jira : {{when}}', en: 'Last Jira sync: {{when}}' },
     never_synced: { fr: 'jamais',                 en: 'never' },
     refresh_hint: { fr: 'Utilise «{{action}}» sur la page du projet pour rafraîchir ces données.', en: 'Use “{{action}}” on the project page to refresh this data.' },
-    no_issues: { fr: 'Aucune anomalie détectée. 🎉', en: 'No issues found. 🎉' },
+    no_issues: { fr: 'Aucune anomalie détectée.', en: 'No issues found.' },
 
     high_priority: { fr: 'Priorité haute',        en: 'High priority' },
     upcoming: { fr: 'Échéances à venir',          en: 'Upcoming deadlines' },

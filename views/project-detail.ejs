@@ -45,7 +45,7 @@
     <% syncWarning.forEach(w => { %>
       <%# Each message already says what to do (retry, fix the page, renew a token…) — no blanket
           "retry by clicking Generate" suffix, which was wrong for most causes. %>
-      <div>⚠ <% if (['jira', 'confluence', 'bigpicture'].includes(w.source)) { %><strong><%= t('detail.source_' + w.source) %></strong> — <% } %><%= w.message %></div>
+      <div><span class="tri high" aria-hidden="true"></span><% if (['jira', 'confluence', 'bigpicture'].includes(w.source)) { %><strong><%= t('detail.source_' + w.source) %></strong> — <% } %><%= w.message %></div>
     <% }) %>
   </div>
   <% } %>

@@ -1,11 +1,22 @@
-@font-face{font-family:'Source Sans Pro';font-weight:400;src:local('Source Sans Pro'),local('SourceSansPro-Regular'),local('Source Sans 3')}
-@font-face{font-family:'Source Sans Pro';font-weight:600;src:local('Source Sans Pro SemiBold'),local('SourceSansPro-SemiBold')}
-@font-face{font-family:'Source Sans Pro';font-weight:700;src:local('Source Sans Pro Bold'),local('SourceSansPro-Bold')}
+/* Source Sans Pro, the OVHcloud typeface, served by the app itself (public/fonts, @fontsource
+   build, SIL Open Font License — see public/fonts/OFL.txt). It used to be declared with local()
+   only, i.e. used solely when installed on the viewer's machine: most people (and the PDF export's
+   headless Chromium) actually got Segoe UI, Arial or a generic sans-serif. */
+@font-face{font-family:'Source Sans Pro';font-style:normal;font-weight:300;font-display:swap;src:url('/fonts/source-sans-pro-latin-300-normal.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Source Sans Pro';font-style:italic;font-weight:300;font-display:swap;src:url('/fonts/source-sans-pro-latin-300-italic.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Source Sans Pro';font-style:normal;font-weight:400;font-display:swap;src:url('/fonts/source-sans-pro-latin-400-normal.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Source Sans Pro';font-style:italic;font-weight:400;font-display:swap;src:url('/fonts/source-sans-pro-latin-400-italic.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Source Sans Pro';font-style:normal;font-weight:600;font-display:swap;src:url('/fonts/source-sans-pro-latin-600-normal.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Source Sans Pro';font-style:italic;font-weight:600;font-display:swap;src:url('/fonts/source-sans-pro-latin-600-italic.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Source Sans Pro';font-style:normal;font-weight:700;font-display:swap;src:url('/fonts/source-sans-pro-latin-700-normal.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Source Sans Pro';font-style:italic;font-weight:700;font-display:swap;src:url('/fonts/source-sans-pro-latin-700-italic.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--mb:#000E9C;--db:#00185E;--cobalt:#0050D5;--yellow:#FFD124;--dyellow:#FFBB22;--orange:#ED733D;--done:#4A7C1C;--blk:#D85639;--f:'Source Sans Pro','Segoe UI',Arial,sans-serif;--bd:#C8CAD4;--bd2:#E5E7ED;--gnd:#F3F4FA;--tx:#00185E;--tx2:#636369;--sgr:#BEC0C6;--r:3px}
+:root{--mb:#000E9C;--db:#00185E;--cobalt:#0050D5;--yellow:#FFD124;--dyellow:#FFBB22;--orange:#ED733D;--done:#4A7C1C;--blk:#D85639;--f:'Source Sans Pro','Segoe UI',Arial,sans-serif;--bd:#BEC0C6;--bd2:#E5E7ED;--gnd:#F3F4FA;--tx:#00185E;--tx2:#636369;--sgr:#BEC0C6;--r:3px}
 body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);background:var(--gnd);-webkit-font-smoothing:antialiased}
 
+/* Typography follows the OVHcloud rule: sentence case, emphasis by weight — capitals only on
+   table headers and on the Preview badge (a deliberate warning). */
 /* NAV */
 .app-nav{background:var(--mb);height:90px;display:flex;align-items:center;padding:0 24px;gap:24px;position:sticky;top:0;z-index:100;overflow:hidden}
 /* Prod and preview are the same app on the same host, told apart only by a port number in the
@@ -22,7 +33,7 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 .nav-brand svg,.nav-brand img{flex-shrink:0}
 .nav-brand-text{display:flex;flex-direction:column;line-height:1.15}
 .nav-brand-name{font-weight:700;font-size:17px}
-.nav-brand-tagline{font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:rgba(255,255,255,.55)}
+.nav-brand-tagline{font-size:13px;font-weight:600;color:rgba(255,255,255,.55)}
 .brand-divider{width:1px;align-self:stretch;flex-shrink:0}
 .nav-brand .brand-divider{background:rgba(255,255,255,.2)}
 .nav-user{display:flex;align-items:center;gap:10px;margin-left:auto}
@@ -54,7 +65,7 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 .ref-week{font-family:var(--f);font-size:18px;font-weight:700;color:var(--tx);line-height:1;text-align:center;min-width:70px}
 
 /* BUTTONS */
-.btn-primary{background:var(--yellow);color:var(--db);border:none;padding:9px 18px;border-radius:var(--r);font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;font-family:var(--f);text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:background .15s;white-space:nowrap}
+.btn-primary{background:var(--yellow);color:var(--db);border:none;padding:9px 18px;border-radius:var(--r);font-size:14px;font-weight:700;cursor:pointer;font-family:var(--f);text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:background .15s;white-space:nowrap}
 .btn-primary:hover{background:var(--dyellow)}
 .btn-primary:disabled{opacity:.5;cursor:default}
 .btn-ghost{background:transparent;color:var(--tx2);border:1px solid var(--bd);padding:8px 16px;border-radius:var(--r);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--f);text-decoration:none;display:inline-flex;align-items:center;transition:border-color .15s,color .15s;white-space:nowrap}
@@ -81,14 +92,14 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 .auth-brand .brand-divider{background:var(--bd)}
 .auth-brand-text{display:flex;flex-direction:column;gap:4px}
 .auth-title{font-size:28px;font-weight:700;color:var(--tx);letter-spacing:-.4px}
-.auth-tagline{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--cobalt)}
+.auth-tagline{font-size:13px;font-weight:700;color:var(--cobalt)}
 .auth-sub{font-size:15px;color:var(--tx2);margin-bottom:28px}
 .auth-error{background:#FEF0EE;color:var(--blk);border:1px solid #F4A17D;padding:11px 14px;border-radius:var(--r);font-size:13px;margin-bottom:16px}
 .auth-form{display:flex;flex-direction:column;gap:14px}
 
 /* FORMS */
 .field-group{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
-.field-label{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tx2)}
+.field-label{font-size:14px;font-weight:700;color:var(--tx2)}
 .field-step{display:block;font-size:15px;font-weight:700;color:var(--tx)}
 .field-step .step-num{color:var(--cobalt)}
 .field-input{width:100%;border:1px solid var(--bd);border-radius:var(--r);padding:9px 11px;font-size:15px;font-family:var(--f);color:var(--tx);outline:none;transition:border-color .15s;background:#fff}
@@ -96,9 +107,9 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 .field-hint{font-size:13px;color:var(--tx2);line-height:1.4}
 .field-hint a{color:var(--cobalt)}
 .milestone-fields{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:6px}
-.milestone-fields .field-hint{margin-bottom:4px;text-transform:uppercase;font-weight:700;letter-spacing:.06em;font-size:11px}
+.milestone-fields .field-hint{margin-bottom:4px;font-weight:700;font-size:13px}
 @media(max-width:480px){.milestone-fields{grid-template-columns:1fr}}
-.format-callout{background:#FFF6D6;border:1px solid #FFE16D;color:var(--db);border-radius:var(--r);padding:9px 12px;font-size:13px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.format-callout{background:var(--gnd);border:1px solid var(--bd2);color:var(--db);border-radius:var(--r);padding:9px 12px;font-size:13px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
 .format-callout a{color:var(--cobalt);font-weight:600;white-space:nowrap}
 .optional{font-weight:400;text-transform:none;letter-spacing:0}
 .form-card{background:#fff;border:1px solid var(--bd);border-radius:6px;padding:32px;max-width:560px}
@@ -144,21 +155,25 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 .form-info{background:var(--gnd);border:1px solid var(--bd2);border-radius:var(--r);padding:14px 18px;font-size:13px;color:var(--tx2);margin-top:24px;line-height:1.5}
 
 /* CARDS */
-.section-card{background:#fff;border:1px solid var(--bd);border-top:3px solid var(--mb);border-radius:var(--r);margin-bottom:18px;overflow:hidden}
-.section-card-header{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mb);padding:11px 20px 10px;border-bottom:1px solid var(--bd2)}
+/* OVHcloud's recurring motif is the triangle, and its identity has no coloured bar/stripe accents:
+   cards and sections get a small Masterbrand corner triangle instead of the 3px top stripe they had. */
+.section-card,.project-card{position:relative}
+.section-card::before,.project-card::before{content:'';position:absolute;top:0;left:0;width:14px;height:14px;background:var(--mb);clip-path:polygon(0 0,100% 0,0 100%);pointer-events:none}
+.section-card{background:#fff;border:1px solid var(--bd);border-radius:var(--r);margin-bottom:18px;overflow:hidden}
+.section-card-header{font-size:15px;font-weight:700;color:var(--mb);padding:11px 20px 10px;border-bottom:1px solid var(--bd2)}
 .empty-state-inline{padding:20px 20px;font-size:15px;color:var(--tx2)}
 .empty-state-inline a{color:var(--cobalt)}
 
 /* DASHBOARD */
 .project-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
-.project-card{background:#fff;border:1px solid var(--bd);border-top:3px solid var(--mb);border-radius:var(--r);padding:20px;display:flex;flex-direction:column;gap:10px}
+.project-card{background:#fff;border:1px solid var(--bd);border-radius:var(--r);padding:20px;display:flex;flex-direction:column;gap:10px}
 .project-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
 .project-card-name{font-size:17px;font-weight:700;color:var(--tx)}
-.project-epic{font-family:monospace;font-size:11px;color:var(--cobalt);background:#E8EFFF;padding:2px 7px;border-radius:2px;white-space:nowrap;flex-shrink:0}
+.project-epic{font-family:var(--f);font-variant-numeric:tabular-nums;font-size:11px;color:var(--cobalt);background:#E8EFFF;padding:2px 7px;border-radius:2px;white-space:nowrap;flex-shrink:0}
 .project-card-meta{font-size:14px;color:var(--tx2)}
 .project-card-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
 .empty-state{text-align:center;padding:60px 20px}
-.empty-icon{font-size:44px;margin-bottom:16px}
+.empty-icon{width:56px;height:56px;margin:0 auto 16px;background:linear-gradient(135deg,var(--mb),var(--royal));clip-path:polygon(0 0,100% 50%,0 100%);opacity:.85}
 .empty-state h2{font-size:22px;font-weight:700;color:var(--tx);margin-bottom:8px}
 .empty-state p{font-size:15px;color:var(--tx2);margin-bottom:20px}
 
@@ -220,8 +235,12 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 .wn-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 16px}
 .wn-title{font-size:18px;font-weight:700;color:var(--db);margin:0}
 .wn-meta{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--tx2)}
-.wn-new{background:var(--yellow);color:var(--db);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border-radius:var(--r)}
+.wn-new{background:var(--yellow);color:var(--db);font-size:12px;font-weight:700;padding:2px 7px;border-radius:var(--r)}
 .wn-body{font-size:15px;line-height:1.55;color:var(--tx);margin:10px 0 14px}
 .wn-shot{display:block;max-width:100%;height:auto;border:1px solid var(--bd2);border-radius:var(--r);box-shadow:0 1px 4px rgba(0,24,94,.08)}
 .wn-link{display:inline-block;margin-top:12px;font-size:14px;font-weight:600;color:var(--cobalt);text-decoration:none}
 .wn-link:hover{text-decoration:underline}
+/* Triangle markers in front of a heading — replaces emoji cues (🔴 📅 🟡: third-party glyphs, which
+   OVHcloud's identity rules out, and which render as empty boxes without an emoji font, e.g. in PDF). */
+.tri{display:inline-block;width:10px;height:10px;margin-right:8px;vertical-align:baseline;clip-path:polygon(0 0,100% 50%,0 100%);background:var(--mb)}
+.tri.high{background:var(--blk)}.tri.upcoming{background:var(--cobalt)}.tri.remaining{background:var(--yellow)}

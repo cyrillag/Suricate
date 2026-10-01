@@ -53,7 +53,7 @@
 
   <% if (result.high.length) { %>
   <div class="section-card" style="border-top-color:var(--blk)">
-    <div class="section-card-header" style="color:var(--blk)">🔴 <%= t('cleanup.high_priority') %> (<%= result.high.length %>)</div>
+    <div class="section-card-header" style="color:var(--blk)"><span class="tri high" aria-hidden="true"></span><%= t('cleanup.high_priority') %> (<%= result.high.length %>)</div>
     <table class="simple-table">
       <tbody>
       <% result.high.forEach(item => { %>
@@ -70,7 +70,7 @@
 
   <% if (result.upcoming.length) { %>
   <div class="section-card">
-    <div class="section-card-header">📅 <%= t('cleanup.upcoming') %> (<%= result.upcoming.length %>) — <span style="text-transform:none;font-weight:400;color:var(--tx2)"><%= t('cleanup.upcoming_hint') %></span></div>
+    <div class="section-card-header"><span class="tri upcoming" aria-hidden="true"></span><%= t('cleanup.upcoming') %> (<%= result.upcoming.length %>) — <span style="text-transform:none;font-weight:400;color:var(--tx2)"><%= t('cleanup.upcoming_hint') %></span></div>
     <table class="simple-table">
       <tbody>
       <% result.upcoming.forEach(item => { %>
@@ -87,7 +87,7 @@
 
   <% if (result.mediumByTeam.size) { %>
   <div class="section-card">
-    <div class="section-card-header">🟡 <%= t('cleanup.remaining') %></div>
+    <div class="section-card-header"><span class="tri remaining" aria-hidden="true"></span><%= t('cleanup.remaining') %></div>
     <table class="simple-table">
       <thead><tr><th>Team</th><th></th><th></th></tr></thead>
       <tbody>

@@ -32,7 +32,7 @@
       <div class="field-group">
         <label class="field-label" for="confluence_url"><%= t('editProject.confluence_label') %></label>
         <div class="format-callout">
-          <%- t('editProject.callout') %>
+          <span><span class="tri high" aria-hidden="true"></span><%- t('editProject.callout') %></span>
           <a href="https://confluence.ovhcloud.tools/pages/viewpage.action?pageId=994384126" target="_blank" rel="noopener"><%= t('editProject.callout_link') %></a>
         </div>
         <input class="field-input" type="url" id="confluence_url" name="confluence_url" value="<%= confluenceUrl %>" required>
