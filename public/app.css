@@ -199,11 +199,6 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
   .app-nav{height:64px;padding:0 14px;gap:10px}
   .nav-brand{gap:10px}
   .nav-brand-tagline,.nav-username{display:none}
-  /* Room for the logout button on a phone: the What's new link (also reachable from the dashboard on
-     a wider screen) and the language switch's separator go; the Preview badge shrinks. */
-  .nav-whatsnew{display:none}
-  .lang-sep{display:none}
-  .env-badge{margin-left:6px;padding:2px 6px;font-size:10px}
   .auth-page{padding:16px}
   .auth-card{padding:28px 24px}
 }
@@ -249,3 +244,7 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
    OVHcloud's identity rules out, and which render as empty boxes without an emoji font, e.g. in PDF). */
 .tri{display:inline-block;width:10px;height:10px;margin-right:8px;vertical-align:baseline;clip-path:polygon(0 0,100% 50%,0 100%);background:var(--mb)}
 .tri.high{background:var(--blk)}.tri.upcoming{background:var(--cobalt)}.tri.remaining{background:var(--yellow)}
+/* Phone nav: room for the logout button — the What's new link (reachable from a wider screen) and the
+   language separator go, the Preview badge shrinks. At the end of the file on purpose: these rules
+   must come after the base .nav-whatsnew/.env-badge rules to win. */
+@media(max-width:700px){.nav-whatsnew{display:none}.lang-sep{display:none}.env-badge{margin-left:6px;padding:2px 6px;font-size:10px}}
