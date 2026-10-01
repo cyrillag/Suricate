@@ -490,6 +490,39 @@ path (`refreshFullEpicTree`).
   (`DIGEST_WEBEX_BOT_TOKEN`, `DIGEST_WEBEX_ROOM_ID` — the API id, or the UUID of a
   `webexteams://im?space=…` link), not the app's other Webex bot, which serves another purpose.
 
+## Highlights formatting
+
+- **The Risk register follows the same rule** (since 2026-10-01): each risk's description and
+  mitigation keep the PM's formatting through the same allowlist (`desc_html` / `mitigation_html`
+  next to the plain `desc` / `mitigation`), mitigation bullets one per line instead of joined with
+  "; ". Risks frozen in an older report render as plain text, as before.
+
+- **The Highlights (Achievements / Blockers / Clarify) keep the PM's Confluence formatting** — bold,
+  italics, underline, strikethrough, superscript/subscript, text and highlight colours, links,
+  links to other Confluence pages, Jira issue macros (rendered as a link to the issue), status
+  lozenges (their title), dates. They used to be reduced to plain text, losing e.g. a bullet a PM
+  had put in bold to make it stand out, or the grey a PM uses to dim an older item.
+- **Strict allowlist, not a blocklist** (`confluence-format.js`, `toSafeInlineHtml`), since the
+  result goes into the report as HTML: the fragment is tokenised; any tag outside
+  strong/em/u/s/sup/sub/code/span/a/br is dropped with its text kept; attributes are rebuilt from
+  scratch, never copied; links must be http(s) or mailto (anything else becomes plain text) and open
+  in a new tab; styles keep only explicit colour values (`#hex`/`rgb()`), bold, italic and
+  underline/line-through — no `url()`, no expressions, no other property. Text stays as Confluence
+  escaped it, with stray `<`/`>` re-escaped. Tested against script tags, `javascript:` links,
+  event-handler attributes, CSS `url()`/`expression()` and attribute break-out attempts.
+- Atlassian writes colours as design tokens with a fallback (`var(--ds-text-subtle,#626f86)`): the
+  explicit fallback is kept. Its **default body text colour (`#172b4d`) is dropped**, so plain text
+  inherits the report's own text colour instead of a slightly different navy. A style set on the
+  bullet itself (`<li style="color:…;font-weight:bold">`) is applied to the whole item; bold
+  inherits the surrounding colour (a grey-and-bold bullet stays grey).
+- Bullets are split nesting-aware (`topLevelItems`): a bullet with sub-bullets stays one item, its
+  sub-bullets on their own lines, instead of being cut at the first `</li>`.
+- Each item stores both `text` (plain — counts in the health history, anything non-HTML) and `html`
+  in the frozen `highlights_json`. A report generated before this has no `html` and renders its text
+  exactly as before — past weeks don't change.
+- Colours are the PM's choice and shown as-is, even when low-contrast (Confluence's grey is ~3.2:1
+  on white): respecting their emphasis was the point. The Jira key chip after an item is unchanged.
+
 ## Report generation
 
 - The root epic's End date (`projects.eta`) is re-read from Jira on every generate/regenerate, not

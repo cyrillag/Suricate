@@ -673,8 +673,8 @@ async function generateReportRow(proj, year, week) {
       throw new AppError('confluence_no_week_summary_table', 'No "Week summary" table could be found on the Confluence page.');
     }
     execSummary = confluence.parseExecSummary(page.html);
-    highlights = confluence.parseWeekSummary(page.html, week) || highlights;
-    risks = confluence.parseRisks(page.html);
+    highlights = confluence.parseWeekSummary(page.html, week, proj.confluence_space) || highlights;
+    risks = confluence.parseRisks(page.html, proj.confluence_space);
   }
   // Freeze the matrix/Planning state now — this is the one moment a report is allowed to reflect
   // "current" data. From here on, viewing this week must never depend on what workstreams/

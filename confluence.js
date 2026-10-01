@@ -1,6 +1,7 @@
 const fetch = require('node-fetch');
 const { AppError, httpErrorCode, networkErrorCode } = require('./errors');
 const BASE = process.env.CONFLUENCE_BASE || 'https://confluence.ovhcloud.tools';
+const { toSafeInlineHtml, topLevelItems } = require('./confluence-format');
 
 async function rawFetch(url, token) {
   try {
@@ -189,24 +190,25 @@ function jiraKeysFromCell(html) {
   return keys;
 }
 
-function liItems(html) {
-  const items = [];
-  const re = /<li[^>]*>([\s\S]*?)<\/li>/gi;
-  let m;
-  while ((m = re.exec(html))) {
-    const text = stripTags(m[1]);
-    const jira = jiraKeyFromCell(m[1]);
-    if (text) items.push({ text, jira_key: jira });
-  }
-  return items;
+// A highlight keeps both a plain `text` (counts, digests, anything that isn't HTML) and an `html`
+// version carrying the PM's own formatting — bold, italics, underline, strikethrough, colours,
+// links — through a strict allowlist (confluence-format.js), so it can be rendered as-is.
+// Bullets are split nesting-aware, so sub-bullets stay inside their parent instead of being cut.
+function liItems(html, space) {
+  return topLevelItems(html).map(({ attrs, html: inner }) => {
+    const text = stripTags(inner);
+    if (!text) return null;
+    const liStyle = (attrs.match(/\sstyle\s*=\s*"([^"]*)"/i) || [])[1] || null;
+    return { text, html: toSafeInlineHtml(inner, { space, wrapStyle: liStyle }), jira_key: jiraKeyFromCell(inner) };
+  }).filter(Boolean);
 }
 
-function categoryItems(cellHtml) {
-  const items = liItems(cellHtml);
+function categoryItems(cellHtml, space) {
+  const items = liItems(cellHtml, space);
   if (items.length) return items;
   const text = stripTags(cellHtml);
   if (!text || /^nothing to report$/i.test(text)) return [];
-  return [{ text, jira_key: jiraKeyFromCell(cellHtml) }];
+  return [{ text, html: toSafeInlineHtml(cellHtml, { space }), jira_key: jiraKeyFromCell(cellHtml) }];
 }
 
 // ── Executive summary ────────────────────────────────────────────────
@@ -217,7 +219,8 @@ function parseExecSummary(html) {
 }
 
 // ── Week summary (Achievements / Blockers / Clarify) ────────────────
-function parseWeekSummary(html, week) {
+// `space`: the page's own space, for links to other pages of that space.
+function parseWeekSummary(html, week, space = null) {
   const section = extractSection(html, 'Week summary');
   const tables = extractTables(section);
   if (!tables.length) return null;
@@ -230,9 +233,9 @@ function parseWeekSummary(html, week) {
     if (!wm || parseInt(wm[1]) !== week) continue;
     const [, achCell, blkCell, clrCell] = cells;
     return {
-      achievements: achCell ? categoryItems(achCell.html) : [],
-      blockers:     blkCell ? categoryItems(blkCell.html) : [],
-      clarify:      clrCell ? categoryItems(clrCell.html) : []
+      achievements: achCell ? categoryItems(achCell.html, space) : [],
+      blockers:     blkCell ? categoryItems(blkCell.html, space) : [],
+      clarify:      clrCell ? categoryItems(clrCell.html, space) : []
     };
   }
   return null;
@@ -288,7 +291,8 @@ function parseDeliverables(html) {
 }
 
 // ── Risk matrix ──────────────────────────────────────────────────────
-function parseRisks(html) {
+// `space`: the page's own space, for links to other pages of that space (see parseWeekSummary).
+function parseRisks(html, space = null) {
   const section = extractSection(html, 'Risk matrix');
   const tables = extractTables(section);
   // The legend table is nested first; the actual risk register is the table with a "Référence" header.
@@ -313,8 +317,12 @@ function parseRisks(html) {
     if (/extreme/.test(scoreText)) level = 'extreme';
     else if (/high/.test(scoreText)) level = 'high';
     else if (/very low|^low/.test(scoreText)) level = 'low';
-    const mitigation = liItems(cells[4].html).map(i => i.text).join('; ') || stripTags(cells[4].html);
-    if (desc) risks.push({ ref, level, desc, mitigation });
+    // Same formatting rule as the Highlights (see FUNCTIONAL_RULES.md "Highlights formatting"):
+    // plain text kept alongside an allowlisted `_html` version; mitigation bullets one per line.
+    const mitItems = liItems(cells[4].html, space);
+    const mitigation = mitItems.map(i => i.text).join('; ') || stripTags(cells[4].html);
+    const mitigation_html = mitItems.length ? mitItems.map(i => i.html).join('<br>') : toSafeInlineHtml(cells[4].html, { space });
+    if (desc) risks.push({ ref, level, desc, mitigation, desc_html: toSafeInlineHtml(cells[1].html, { space }), mitigation_html });
   }
   return risks;
 }
@@ -324,8 +332,8 @@ async function syncProjectFromConfluence(token, spaceKey, title, week) {
   return {
     version: page.version,
     workstreams: parseDeliverables(page.html),
-    weekSummary: week != null ? parseWeekSummary(page.html, week) : null,
-    risks: parseRisks(page.html)
+    weekSummary: week != null ? parseWeekSummary(page.html, week, spaceKey) : null,
+    risks: parseRisks(page.html, spaceKey)
   };
 }
 
