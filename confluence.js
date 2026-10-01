@@ -291,7 +291,8 @@ function parseDeliverables(html) {
 }
 
 // ── Risk matrix ──────────────────────────────────────────────────────
-function parseRisks(html) {
+// `space`: the page's own space, for links to other pages of that space (see parseWeekSummary).
+function parseRisks(html, space = null) {
   const section = extractSection(html, 'Risk matrix');
   const tables = extractTables(section);
   // The legend table is nested first; the actual risk register is the table with a "Référence" header.
@@ -316,8 +317,12 @@ function parseRisks(html) {
     if (/extreme/.test(scoreText)) level = 'extreme';
     else if (/high/.test(scoreText)) level = 'high';
     else if (/very low|^low/.test(scoreText)) level = 'low';
-    const mitigation = liItems(cells[4].html).map(i => i.text).join('; ') || stripTags(cells[4].html);
-    if (desc) risks.push({ ref, level, desc, mitigation });
+    // Same formatting rule as the Highlights (see FUNCTIONAL_RULES.md "Highlights formatting"):
+    // plain text kept alongside an allowlisted `_html` version; mitigation bullets one per line.
+    const mitItems = liItems(cells[4].html, space);
+    const mitigation = mitItems.map(i => i.text).join('; ') || stripTags(cells[4].html);
+    const mitigation_html = mitItems.length ? mitItems.map(i => i.html).join('<br>') : toSafeInlineHtml(cells[4].html, { space });
+    if (desc) risks.push({ ref, level, desc, mitigation, desc_html: toSafeInlineHtml(cells[1].html, { space }), mitigation_html });
   }
   return risks;
 }
@@ -327,8 +332,8 @@ async function syncProjectFromConfluence(token, spaceKey, title, week) {
   return {
     version: page.version,
     workstreams: parseDeliverables(page.html),
-    weekSummary: week != null ? parseWeekSummary(page.html, week) : null,
-    risks: parseRisks(page.html)
+    weekSummary: week != null ? parseWeekSummary(page.html, week, spaceKey) : null,
+    risks: parseRisks(page.html, spaceKey)
   };
 }
 

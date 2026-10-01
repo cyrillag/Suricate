@@ -492,6 +492,11 @@ path (`refreshFullEpicTree`).
 
 ## Highlights formatting
 
+- **The Risk register follows the same rule** (since 2026-10-01): each risk's description and
+  mitigation keep the PM's formatting through the same allowlist (`desc_html` / `mitigation_html`
+  next to the plain `desc` / `mitigation`), mitigation bullets one per line instead of joined with
+  "; ". Risks frozen in an older report render as plain text, as before.
+
 - **The Highlights (Achievements / Blockers / Clarify) keep the PM's Confluence formatting** — bold,
   italics, underline, strikethrough, superscript/subscript, text and highlight colours, links,
   links to other Confluence pages, Jira issue macros (rendered as a link to the issue), status

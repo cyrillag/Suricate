@@ -74,8 +74,8 @@ function generateReport({ project, year, week, pmName, execSummary, highlights, 
           <div class="risk-badge ${r.level || 'high'}">${cap(r.level || 'High')}</div>
         </div>
         <div>
-          <div class="risk-desc">${esc(r.desc)}</div>
-          <div class="risk-mit">${esc(r.mitigation || '')}</div>
+          <div class="risk-desc">${r.desc_html || esc(r.desc)}</div>
+          <div class="risk-mit">${r.mitigation_html || esc(r.mitigation || '')}</div>
         </div>
       </div>`).join('')
     : '<div style="padding:14px 20px;font-size:13px;color:#636369">No risks recorded this week.</div>';
@@ -720,7 +720,7 @@ const CSS = `
   /* PM formatting carried over from Confluence (confluence-format.js): links get the app's link colour;
      colours, bold, italics, underline and strikethrough come inline from the page — bold inherits
      the surrounding colour, so a PM's grey-and-bold bullet stays grey. */
-  .abc-items li a:not(.ji){color:var(--cobalt);text-decoration:underline}
+  .abc-items li a:not(.ji),.risk-desc a,.risk-mit a{color:var(--cobalt);text-decoration:underline}
   .abc-items li::before{content:'–';position:absolute;left:0;color:var(--tx3);font-size:12.5px;top:0}
   .ji{font-family:var(--fm);font-size:12.5px;color:var(--cobalt);background:var(--prog-bg);padding:1px 5px;border-radius:2px;text-decoration:none;margin-left:4px}
   .ji:hover{text-decoration:underline}
