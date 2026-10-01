@@ -1,5 +1,22 @@
 [
   {
+    "id": "2026-10-confluence-formatting",
+    "date": "2026-10-01",
+    "audience": "all",
+    "title": {
+      "fr": "Highlights et risques : la mise en forme Confluence est conservée",
+      "en": "Highlights and risks keep their Confluence formatting"
+    },
+    "short": {
+      "fr": "Gras, italique, souligné, barré, couleurs et liens saisis dans Confluence apparaissent tels quels dans le rapport.",
+      "en": "Bold, italics, underline, strikethrough, colours and links set in Confluence now show as-is in the report."
+    },
+    "body": {
+      "fr": "Les Highlights (Achievements, Blockers, Clarify) et la matrice de risques (description et mitigation) reprennent la mise en forme de la page Confluence : gras, italique, souligné, barré, couleurs, liens vers une URL ou une autre page Confluence, tickets Jira insérés avec la macro Jira. Les actions de mitigation s’affichent une par ligne. Visible à la prochaine génération du rapport (↻ Refresh).",
+      "en": "Highlights (Achievements, Blockers, Clarify) and the risk register (description and mitigation) keep the Confluence page’s formatting: bold, italics, underline, strikethrough, colours, links to a URL or another Confluence page, Jira tickets inserted with the Jira macro. Mitigation actions show one per line. Visible from the next report generation (↻ Refresh)."
+    }
+  },
+  {
     "id": "2026-09-planning-phases",
     "date": "2026-09-29",
     "audience": "all",
