@@ -634,38 +634,34 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   to a user. Every caught error is classified (`AppError` + a stable code) and translated into an
   actionable sentence in the user's language; anything unclassified falls back to a generic
   apologetic message. The raw error is still logged server-side.
-- **One message per cause we can tell apart, each saying what happened, where, and what to do**
-  — not just which service failed. Renewing a token, fixing a page URL, granting access and simply
-  waiting are different fixes, and "retry" only helps for the last one; every message now states
-  its own next step, and the banner no longer appends a blanket "retry by clicking Generate". The
-  codes (`errors.js` + each service module, translations in `i18n.js` under `detail.err_*`):
-  - **token expired/revoked** (`*_token_invalid`, naming the exact `.env` variable to renew:
-    `JIRA_SERVICE_TOKEN`, `CONFLUENCE_SERVICE_TOKEN`, `BIGPICTURE_API_TOKEN`) — and says
-    retrying won't help. Detected even when the service doesn't answer 401: an expired Jira token
-    makes Jira run the call as anonymous, so a JQL search fails with a 400 "...cannot be viewed by
-    anonymous users"; an expired Confluence token gets a 404 `"authorized":false`. Both happened
-    for real on 2026-09-28/29, when all service tokens expired within two days.
-  - **token fine, rights missing**: `jira_forbidden`, `confluence_space_forbidden` (names the
-    space), `confluence_forbidden` (read restriction on the page itself);
-  - **Jira CAPTCHA lock** (`jira_captcha`, 403 + `X-Authentication-Denied-Reason`): someone must
-    log in once in a browser with the service account;
-  - **not found**, with the precise object: `jira_issue_not_found` ({{key}}),
-    `confluence_page_not_found` ({{space}}/{{title}}), `bigpicture_box_not_found` ({{box}});
-  - **bad JQL** (`jira_bad_query`): Jira's own `errorMessages` are passed through (they're
-    human-readable and say which part is wrong) — typically a BigPicture box's scope query;
-  - **transient**: `*_rate_limited` (429), `*_timeout` (no answer within 15 s),
-    `*_unreachable` (DNS/network — "if it works in your browser, it's the server's network"),
-    `*_unavailable` (5xx, service-side incident). BigPicture's 5xx message also hints at an invalid
-    token, since a bad token has been seen to come back as a 500 there;
-  - `bigpicture_token_missing`: a box is configured but the server has no BigPicture token.
-- **Confluence's `"authorized":false` 404 is diagnosed, not guessed.** It covers both "token
-  expired" and "no access to this space". The request is first retried once after 2 s — a genuinely
-  transient burst did happen once (Managed Backup for VMware, 2026-08-31, ~90 s, resolved on its
-  own) — then `/rest/api/user/current` tells the two apart: served as anonymous means the token is
-  dead (`confluence_token_invalid`), a real user means the account lacks access to that space
-  (`confluence_space_forbidden`). The former `confluence_auth_blip` message ("temporary, retry
-  later") is retired: on 2026-09-29 it was shown for an expired token, which never resolves by
-  itself.
+- **Precise codes in the logs, ~10 message templates on screen.** Each failure keeps a precise code
+  (`errors.js` + each service module: `jira_issue_not_found`, `confluence_timeout`…) for diagnosis,
+  but what a PM reads is one of a handful of templates filled with the service and the object
+  involved (`userMessage` in server.js, `detail.msg_*` in i18n.js). There used to be 41 near-duplicate
+  messages, the same sentence repeated per service (rationalised 2026-10-02). Every template still
+  says what happened, where, and what to do — retrying only helps for the temporary one:
+  - **token not recognised** — `{service}`, naming the exact `.env` variable (`JIRA_SERVICE_TOKEN`,
+    `CONFLUENCE_SERVICE_TOKEN`, `BIGPICTURE_API_TOKEN`); **token missing** (BigPicture box set, no token);
+    detected even without a 401 (Jira runs an expired token as anonymous → 400 "…anonymous users";
+    Confluence → 404 `"authorized":false`) — both seen for real on 2026-09-28/29;
+  - **CAPTCHA lock** (Jira 403 + `X-Authentication-Denied-Reason`);
+  - **no access to {object}** — some Jira tickets, a Confluence space, a page with a read restriction;
+  - **{object} not found** — root epic, Jira ticket, Confluence page, BigPicture box;
+  - **search query rejected** — Jira's own `errorMessages` passed through (typically a box's JQL);
+  - **{service} temporarily unavailable** — rate limit, timeout, network, 5xx, and Confluence's
+    temporary denial (below); "retry in a few minutes";
+  - **unexpected error from {service}**; **Confluence page off-format** (table missing / empty);
+  - a BigPicture failure also says the report's Planning section couldn't be built from it.
+  App-level messages (invalid / future / locked week, login, forms, PDF) keep their own wording.
+- **Confluence's `"authorized":false` 404 is diagnosed in steps, not guessed.** It's retried once
+  after 2 s (a transient burst happened on 2026-08-31). Then: token served as anonymous
+  (`/rest/api/user/current`) → **token not recognised**; token fine and the space itself visible
+  (`/rest/api/space/{key}`) → **no access to the page** (read restriction); token fine but the space
+  unreachable → **temporarily unavailable**, "if it persists, check the service account still has
+  access to space X". That last case used to say "no access to the space" outright — wrong on
+  2026-10-02, when Confluence answered "No space with key: CPO" for ~7 minutes on a space the account
+  has always read (every other CPO page worked before and after), and sent the PM chasing rights
+  they already had. A genuine loss of access looks the same from the API, hence the two-step wording.
 - **The banner is labelled with the service that actually failed** (`AppError.source`, derived
   from the code's prefix) — it used to say "Confluence sync failed" for every error, Jira ones
   included. Non-service notices (past week locked, future week...) carry no service label.
