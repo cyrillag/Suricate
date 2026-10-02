@@ -94,11 +94,44 @@ function warningQuery({ source, message }) {
 // (a bug, an unclassified exception) falls back to a generic apologetic message instead
 // of leaking a stack trace or API payload into the UI. The raw error is always logged
 // server-side so it stays debuggable.
+// The precise code (errors.js) stays in the logs; what a PM reads is one of ~10 templates, filled
+// with the service and the object involved (see FUNCTIONAL_RULES.md "Error handling").
+const SERVICE_LABEL = { jira: 'Jira', confluence: 'Confluence', bigpicture: 'BigPicture' };
+const TOKEN_ENV = { jira: 'JIRA_SERVICE_TOKEN', confluence: 'CONFLUENCE_SERVICE_TOKEN', bigpicture: 'BIGPICTURE_API_TOKEN' };
+function userMessage(t, code, v = {}) {
+  const [svc, ...rest] = code.split('_');
+  const cause = rest.join('_');
+  const service = SERVICE_LABEL[svc];
+  const what = (key, vars) => t(`detail.what_${key}`, vars);
+  const where = key => t(`detail.where_${key}`);
+  if (code === 'confluence_no_deliverables_table') return t('detail.msg_page_format', { table: 'Deliverables status', problem: t('detail.problem_missing') });
+  if (code === 'confluence_empty_deliverables') return t('detail.msg_page_format', { table: 'Deliverables status', problem: t('detail.problem_empty') });
+  if (code === 'confluence_no_week_summary_table') return t('detail.msg_page_format', { table: 'Week summary', problem: t('detail.problem_missing') });
+  if (!service) return null;
+  switch (cause) {
+    case 'token_invalid': return t('detail.msg_token_invalid', { service, envVar: TOKEN_ENV[svc] });
+    case 'token_missing': return t('detail.msg_token_missing', v);
+    case 'captcha': return t('detail.msg_captcha');
+    case 'forbidden': return t('detail.msg_forbidden', { what: svc === 'jira' ? what('jira_tickets') : what('confluence_page', v) });
+    case 'space_forbidden': return t('detail.msg_forbidden', { what: what('confluence_space', v) });
+    case 'not_found': return t('detail.msg_not_found', { what: what('root_epic'), where: where('root_epic') });
+    case 'issue_not_found': return t('detail.msg_not_found', { what: what('issue', v), where: where('issue') });
+    case 'page_not_found': return t('detail.msg_not_found', { what: what('page', v), where: where('page') });
+    case 'box_not_found': return t('detail.msg_not_found', { what: what('box', v), where: where('box') });
+    case 'bad_query': return t('detail.msg_bad_query', v);
+    case 'temporarily_denied': return t('detail.msg_temporary', { service, hint: t('detail.msg_temporary_hint_space', v) });
+    case 'rate_limited': case 'timeout': case 'unreachable': case 'unavailable':
+      return t('detail.msg_temporary', { service, hint: t('detail.msg_temporary_hint_logs') });
+    default: return t('detail.msg_unexpected', { service });
+  }
+}
 function friendlyError(t, err) {
   console.error(err);
-  const code = err instanceof AppError ? err.code : 'generic';
-  const translated = t(`detail.err_${code}`, err.vars);
-  return translated === `detail.err_${code}` ? t('detail.err_generic') : translated;
+  if (!(err instanceof AppError)) return t('detail.err_generic');
+  const msg = userMessage(t, err.code, err.vars);
+  if (msg) return err.source === 'bigpicture' ? msg + t('detail.msg_planning_suffix') : msg;
+  const own = t(`detail.err_${err.code}`, err.vars); // app-level codes keep their own message
+  return own === `detail.err_${err.code}` ? t('detail.err_generic') : own;
 }
 
 // The warning banner's {source, message}: the source comes from the error's own code, so a Jira

@@ -13,6 +13,15 @@ async function rawFetch(url, token) {
 
 // Whether Confluence still recognizes the service token at all — an expired token doesn't fail
 // outright, Confluence just serves the call as the anonymous user.
+async function spaceIsVisible(token, spaceKey) {
+  try {
+    const res = await rawFetch(`${BASE}/rest/api/space/${encodeURIComponent(spaceKey)}`, token);
+    return res.ok;
+  } catch (e) {
+    return false;
+  }
+}
+
 async function tokenIsRecognized(token) {
   try {
     const res = await rawFetch(`${BASE}/rest/api/user/current`, token);
@@ -46,7 +55,14 @@ async function confluenceFetch(url, token, context = {}) {
     // account has no access to that particular space.
     if (res.status === 404 && /"authorized"\s*:\s*false/.test(body)) {
       if (!(await tokenIsRecognized(token))) throw new AppError('confluence_token_invalid', log);
-      throw new AppError('confluence_space_forbidden', log, context);
+      // Token fine: is the space itself visible to us? Yes → the page carries a read restriction.
+      // No → either the account really lost access to the space, or Confluence is denying it for a
+      // while: on 2026-10-02 it answered "No space with key: CPO" for ~7 minutes on a space the
+      // account has always read (every other CPO page worked before and after), and the former
+      // "no access to the space" message sent the PM chasing rights they already had. Both cases
+      // get the same honest message: retry first, then check the space access if it persists.
+      if (context.space && await spaceIsVisible(token, context.space)) throw new AppError('confluence_forbidden', log, context);
+      throw new AppError('confluence_temporarily_denied', log, context);
     }
     if (res.status === 401) throw new AppError('confluence_token_invalid', log);
     if (res.status === 404) throw new AppError('confluence_page_not_found', log, context);
