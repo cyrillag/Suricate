@@ -7,15 +7,16 @@
 # GitHub (commit status) or at http://<host>:<port>/version.
 #
 # Install (once, from master):  install -m 755 ops/autodeploy.sh ~/bin/suricate-autodeploy
-# Cron:                          * * * * * $HOME/bin/suricate-autodeploy contrib 31625 >/dev/null 2>&1
+# Cron (one line per preview, added by ops/new-preview.sh):
+#   * * * * * $HOME/bin/suricate-autodeploy <slug> <port> >/dev/null 2>&1
 #
 # Isolation: the compose file and the env file live in the slot directory, outside the git checkout,
 # so a branch can change the app's code and Dockerfile but not the ports, mounts or secrets. The
 # host's ~/.git-credentials is only read here, never exposed to the build context or the container.
 set -uo pipefail
 
-SLOT="${1:-contrib}"
-PORT="${2:-31625}"
+SLOT="${1:?usage: suricate-autodeploy <slug> <port>}"
+PORT="${2:?usage: suricate-autodeploy <slug> <port>}"
 BRANCH="preview/${SLOT}"
 BASE="$HOME/suricate-${SLOT}"
 SRC="$BASE/src"
@@ -66,8 +67,8 @@ log "deploying ${SHORT} — ${MSG}"
 gh_status pending "Déploiement de la preview ${SLOT} en cours…"
 write_status deploying
 git checkout -q --force --detach "$SHA"
-PREV_SHORT="$(sed -n 's/^APP_VERSION=//p' "$BASE/${SLOT}.env" | tail -1)"
-set_version() { sed -i '/^APP_VERSION=/d' "$BASE/${SLOT}.env"; echo "APP_VERSION=$1" >> "$BASE/${SLOT}.env"; }
+PREV_SHORT="$(sed -n 's/^APP_VERSION=//p' "$BASE/preview.env" | tail -1)"
+set_version() { sed -i '/^APP_VERSION=/d' "$BASE/preview.env"; echo "APP_VERSION=$1" >> "$BASE/preview.env"; }
 set_version "$SHORT"
 
 # A commit that doesn't start must not leave the preview dead: the contributor would then see
@@ -90,7 +91,9 @@ if docker compose -p "$PROJECT" -f "$BASE/compose.yml" up -d --build > "$BASE/la
   done
   if [ -n "$ok" ]; then
     docker tag "suricate-${SLOT}:latest" "${PROJECT}:last-good"
-    log "ok"; write_status success; gh_status success "Preview ${SLOT} à jour (${SHORT})"
+    write_status success
+    cp "$STATUS_DIR/deploy.json" "$STATUS_DIR/last-success.json"   # what the Preview badge shows
+    log "ok"; gh_status success "Preview ${SLOT} à jour (${SHORT})"
   else
     docker compose -p "$PROJECT" -f "$BASE/compose.yml" logs --tail 40 app >> "$BASE/last-build.log" 2>&1
     rollback

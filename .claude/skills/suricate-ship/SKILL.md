@@ -16,8 +16,9 @@ description: Prepare and open a pull request for a Suricate change — conventio
    - No raw error reaching the UI; Confluence/Jira content escaped or filtered (`confluence-format.js`).
    - Every changed `.js` passes `node --check`.
    - Optional for UI changes: run the `ui-reviewer` agent on the changed views.
-3. **Preview**: `curl -s http://gw.lab.core.ovh.net:31625/version` must show the branch's latest commit with
-   `deploy.state` = `success`. If not, run the `suricate-preview` skill first and let the user test.
+3. **Preview**: the user's preview (`git config suricate.preview` → port in `ops/previews.json`) must show the
+   branch's latest commit on `/version` with `deploy.state` = `success`. If not, run the `suricate-preview`
+   skill first and let the user test.
 4. **Push and open the PR**: `git push -u origin HEAD`. Write the PR description from
    `.github/pull_request_template.md` into a temp file, filled in (what/why, what was tested on the preview,
    the checklist ticked honestly), then `gh pr create --base master --title "<short title>" --body-file <tmp>`.

@@ -2,7 +2,7 @@
 <!-- Le besoin côté PM, en 2-3 phrases. -->
 
 ## Testé sur la preview
-- [ ] Déployé sur la preview contributeur (`/version` affiche le dernier commit, état `success`)
+- [ ] Déployé sur ma preview (badge « màj » à l'heure de mon dernier push, `/version` en `success`)
 - [ ] Parcours testé à la main : <!-- quelles pages, quels projets -->
 
 ## Conventions

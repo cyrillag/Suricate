@@ -11,7 +11,7 @@
       <span class="nav-brand-name"><%= t('nav.brand') %></span>
       <span class="nav-brand-tagline"><%= t('nav.tagline') %></span>
     </span>
-    <% if (isPreview) { %><span class="env-badge"><%= previewLabel || 'Preview' %></span><% } %>
+    <% if (isPreview) { %><span class="env-badge"<% if (typeof previewTitle !== 'undefined' && previewTitle) { %> title="<%= previewTitle %>"<% } %>><%= previewLabel || 'Preview' %></span><% } %>
   </a>
   <div class="nav-user">
     <div class="lang-switch">

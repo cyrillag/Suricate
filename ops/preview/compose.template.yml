@@ -1,0 +1,24 @@
+# Per-person preview stack — rendered by ops/new-preview.sh into ~/suricate-<slug>/compose.yml on the
+# host (__SLUG__, __NAME__, __PORT__ replaced). Deliberately NOT the repo's docker-compose.yml: ports,
+# volumes and secrets are fixed here, outside the person's branch, so their code can't change what the
+# container can reach. Only the image is built from the branch (./src = the git checkout).
+services:
+  app:
+    build: ./src
+    image: suricate-__SLUG__:latest
+    restart: unless-stopped
+    ports:
+      - "__PORT__:3000"
+    volumes:
+      - data:/data
+      - ./status:/status:ro
+    env_file:
+      - ./preview.env
+    environment:
+      - NODE_ENV=production
+      - DATA_DIR=/data
+      - APP_ENV=preview
+      - PREVIEW_NAME=__NAME__
+      - DEPLOY_STATUS_FILE=/status/deploy.json
+volumes:
+  data:

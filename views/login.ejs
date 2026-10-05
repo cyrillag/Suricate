@@ -25,7 +25,7 @@
       <h1 class="auth-title"><%= t('nav.brand') %></h1>
       <p class="auth-tagline"><%= t('nav.tagline') %></p>
     </div>
-    <% if (isPreview) { %><span class="env-badge"><%= previewLabel || 'Preview' %></span><% } %>
+    <% if (isPreview) { %><span class="env-badge"<% if (typeof previewTitle !== 'undefined' && previewTitle) { %> title="<%= previewTitle %>"<% } %>><%= previewLabel || 'Preview' %></span><% } %>
   </div>
   <p class="auth-sub"><%= t('login.subtitle') %></p>
   <% if (error) { %><div class="auth-error"><%= error %></div><% } %>

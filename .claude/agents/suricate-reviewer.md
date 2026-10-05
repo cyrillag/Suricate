@@ -26,8 +26,8 @@ the files they call into when logic crosses (server.js ↔ report-gen.js ↔ jir
    (`mapStatus`, `rollupStatus`, own Jira dates first).
 5. **Conventions** — i18n FR+EN, What's new entry when visible to PMs, comments explaining *why*, no unrelated
    changes, `node --check` passes on every changed `.js`.
-6. **Preview** — `curl -s http://gw.lab.core.ovh.net:31625/version`: was this branch's head deployed with
-   `deploy.state` = `success`? If the maintainer's own session is running this, a spot check on the preview
+6. **Preview** — on the author's preview (port in `ops/previews.json`, `/version`): was this branch's head
+   deployed with `deploy.state` = `success`? If the maintainer's own session is running this, a spot check on the preview
    (the page the change touches) is worth it.
 
 ## Output

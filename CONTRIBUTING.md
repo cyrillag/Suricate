@@ -1,68 +1,58 @@
-# Contribuer à Suricate
+# Contribuer à Suricate — référence
 
-Bienvenue ! Ce guide explique comment proposer une évolution, la tester sur ta propre preview, puis la
-soumettre au mainteneur (Cyril), qui la relit, la merge et la déploie en prod.
+> Pour démarrer, lis d'abord le **guide d'onboarding** (lien envoyé par le mainteneur). Ce fichier en est la
+> version de référence, dans le repo.
 
-## En bref
+## Le circuit
 
 ```
-master ──► feature/ma-modif ──► preview/contrib (test) ──► Pull Request ──► review + merge + prod
-           (ta branche)          ta preview :31625            (toi)          (le mainteneur)
+master ──► feature/ma-modif ──► preview/<moi> ──► Pull Request ──► review + merge + prod
+           ma branche           ma preview         moi              le mainteneur
 ```
 
-- Tu travailles sur une branche `feature/…`, jamais sur `master`.
-- Pour tester, tu pousses ta branche sur `preview/contrib` : **ta preview se met à jour toute seule en une
-  minute** sur http://gw.lab.core.ovh.net:31625.
-- Quand c'est bon, tu ouvres une Pull Request. Le mainteneur relit, merge et met en prod.
+- On travaille sur une branche `feature/…` ou `fix/…`, jamais sur `master`.
+- Chacun a **sa preview** (`ops/previews.json`). Pousser sa branche sur `preview/<moi>` la met à jour toute
+  seule, en une minute environ. Le badge affiche `Preview · <Prénom> · màj <heure>` : si l'heure suit ton
+  dernier push, c'est ta version.
+- Quand c'est bon, Pull Request. Le mainteneur relit, merge et met en prod. Personne d'autre ne touche à la prod.
 
-Tu n'as besoin d'**aucun accès** à la machine qui héberge Suricate.
+Aucun accès à la machine qui héberge Suricate n'est nécessaire.
 
 ## Mise en place (une fois)
 
-1. Accepte l'invitation GitHub au repo `cyrillag/Suricate` (privé).
-2. Clone et active le garde-fou :
-   ```sh
-   git clone https://github.com/cyrillag/Suricate.git && cd Suricate
-   git config core.hooksPath .githooks      # empêche un push direct sur master
-   ```
-3. Ouvre Claude Code dans le dossier : il charge automatiquement `CLAUDE.md` (les règles du projet), les
-   skills `suricate-preview` / `suricate-ship` et les agents de QA du repo.
-4. (Conseillé) installe la CLI GitHub `gh` et fais `gh auth login` : Claude Code pourra ouvrir les PR pour toi.
+```sh
+git clone https://github.com/cyrillag/Suricate.git && cd Suricate
+git config core.hooksPath .githooks       # garde-fou : refuse un push direct sur master
+git config suricate.preview <mon-slug>    # mon nom dans ops/previews.json, ex. aurelien
+```
 
-## Proposer une évolution
+Puis ouvrir Claude Code dans ce dossier : il charge `CLAUDE.md` (les règles du projet), les skills
+`suricate-preview` et `suricate-ship`, et les agents de QA. Conseillé : CLI GitHub `gh` + `gh auth login`.
 
-1. **Pars de master à jour** : `git checkout master && git pull && git checkout -b feature/ma-modif`
-2. **Décris ton besoin à Claude Code.** Il lit d'abord `FUNCTIONAL_RULES.md` (les règles métier, avec leur
-   raison d'être) — si ta demande en contredit une, il te le dira : c'est voulu, on en discute.
-3. **Teste** : demande « déploie sur la preview » (skill `suricate-preview`). Il pousse ta branche sur
-   `preview/contrib`, attend le déploiement et te donne l'URL. Le badge de la preview affiche
-   `Preview · contrib · <commit>`. Si le build échoue, il récupère le log et corrige.
-   Ta preview a **sa propre base de données** (copie de la prod faite à l'installation) : tu peux y générer
-   ou supprimer des rapports sans risque.
-4. **Soumets** : « ouvre la PR » (skill `suricate-ship`). Il vérifie les conventions, pousse ta branche et
-   ouvre la Pull Request avec le modèle du repo.
-5. **Review** : le mainteneur relit (avec l'agent `suricate-reviewer`), te demande des ajustements si besoin,
-   puis merge et déploie en prod.
+## Avec Claude Code
 
-## Les conventions du projet
+| Tu dis | Il fait |
+|---|---|
+| « Je voudrais que… » | crée une branche, lit `FUNCTIONAL_RULES.md`, propose et code — et te signale si ta demande contredit une règle existante |
+| « Mets ça sur ma preview » | skill `suricate-preview` : pousse sur `preview/<toi>`, attend le déploiement, te donne l'URL ; si le build échoue, lit le log et corrige |
+| « Ouvre la PR » | skill `suricate-ship` : vérifie les conventions, pousse la branche, ouvre la Pull Request |
+
+## Les conventions
 
 Dans la même PR que le code :
-- **`FUNCTIONAL_RULES.md`** mis à jour si une règle métier change ou apparaît — avec le *pourquoi*.
-- **`whats-new/entries.json`** : une entrée si les PM verront la différence (elle alimente la page Nouveautés
-  et le digest Webex). Pas d'entrée pour une correction invisible.
-- **Textes d'interface en FR et EN** (`i18n.js`).
-- **Jamais de message d'erreur brut** à l'écran, **jamais de contenu Confluence/Jira inséré en HTML sans
-  filtrage**.
+- `FUNCTIONAL_RULES.md` mis à jour si une règle métier change ou apparaît, avec le *pourquoi* ;
+- une entrée dans `whats-new/entries.json` si les PM verront la différence (page Nouveautés + digest Webex) ;
+- les textes d'interface en FR et EN (`i18n.js`) ;
+- jamais de message d'erreur brut à l'écran, jamais de contenu Confluence/Jira inséré en HTML sans filtrage.
 
-Le détail est dans `CLAUDE.md` ; Claude Code les applique de lui-même.
+Détails dans `CLAUDE.md` — Claude Code les applique de lui-même.
 
 ## Bon à savoir
 
-- **Une seule preview contributeur** : pousser une autre branche sur `preview/contrib` remplace la précédente.
-- Un commit qui échoue au build n'est pas retenté : pousse un correctif.
-- État de ta preview à tout moment : http://gw.lab.core.ovh.net:31625/version (commit déployé, état,
-  et fin du log en cas d'échec).
-- La preview utilise les vrais accès Jira / Confluence / BigPicture de l'app (en lecture). Elle ne peut pas
-  envoyer le digest Webex.
-- Tu ne peux pas déployer en prod, ni pousser sur `master` : c'est volontaire.
-- Une question, un blocage : demande au mainteneur.
+- État de ta preview à tout moment : `http://gw.lab.core.ovh.net:<ton port>/version`.
+- Si un déploiement échoue, ta preview revient automatiquement à la version précédente ; le log de l'échec
+  est sur `/version`. Pousse un correctif, le même commit n'est pas retenté.
+- Ta preview a sa propre base : tu peux y générer ou supprimer des rapports sans risque pour la prod.
+- Elle lit Jira / Confluence / BigPicture avec les vrais accès de l'app, et ne peut pas envoyer le digest Webex.
+- Tu ne peux pas pousser sur `master` ni déployer en prod : c'est voulu.
+- Côté machine (ajouter une personne, diagnostiquer un déploiement) : `ops/README.md`, réservé au mainteneur.

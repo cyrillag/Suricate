@@ -42,6 +42,31 @@ const IS_PREVIEW = process.env.APP_ENV === 'preview';
 const PREVIEW_NAME = process.env.PREVIEW_NAME || '';
 const APP_VERSION = process.env.APP_VERSION || '';
 
+// What the Preview badge shows: whose preview, and when it was last updated ("màj 05/10 10:42") —
+// a time a person can match against when they pushed, unlike a commit hash. The hash and the change's
+// message go in the tooltip. Read from the deploy agent's last-success file (ops/autodeploy.sh), with a
+// short cache: the file is written right after the new container starts, so it can't be read once at boot.
+let lastSuccessCache = { at: 0, value: null };
+function lastSuccessfulDeploy() {
+  const file = process.env.DEPLOY_STATUS_FILE && path.join(path.dirname(process.env.DEPLOY_STATUS_FILE), 'last-success.json');
+  if (!file) return null;
+  if (Date.now() - lastSuccessCache.at > 15000) {
+    let value = null;
+    try { value = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { /* not deployed by the agent yet */ }
+    lastSuccessCache = { at: Date.now(), value };
+  }
+  return lastSuccessCache.value;
+}
+function previewBadge() {
+  if (!IS_PREVIEW) return { label: '', title: '' };
+  const d = lastSuccessfulDeploy();
+  const when = d && d.at ? `màj ${d.at.slice(8, 10)}/${d.at.slice(5, 7)} ${d.at.slice(11, 16)}` : '';
+  return {
+    label: ['Preview', PREVIEW_NAME, when].filter(Boolean).join(' · '),
+    title: d ? `« ${d.message || ''} » (${d.commit || APP_VERSION})` : (APP_VERSION ? `(${APP_VERSION})` : '')
+  };
+}
+
 // No fallback: a hardcoded default here would let anyone who reads this (public) source forge
 // session cookies for any deployment that forgot to set the real secret.
 const SESSION_SECRET = process.env.SESSION_SECRET;
@@ -457,7 +482,9 @@ app.use((req, res, next) => {
   res.locals.isCreator = !!(req.session && req.session.userId && whatsNew.isCreator(req.session.userId));
   if (res.locals.isCreator) res.locals.whatsNewCount = whatsNew.unseenCount(req.session.userId);
   res.locals.isPreview = IS_PREVIEW;
-  res.locals.previewLabel = IS_PREVIEW ? ['Preview', PREVIEW_NAME, APP_VERSION].filter(Boolean).join(' · ') : '';
+  const badge = previewBadge();
+  res.locals.previewLabel = badge.label;
+  res.locals.previewTitle = badge.title;
   next();
 });
 // Unauthenticated, no data: what this instance runs — polled by the contributor tooling
@@ -1038,7 +1065,7 @@ function buildReportHtml(proj, report, year, week, isOwner, lang, userName, noti
     backfilled: !!report.backfilled,
     generatedAt: formatDate(new Date(report.created_at * 1000).toISOString()),
     lang, userName, confluenceUrl, notice, isPreview: IS_PREVIEW,
-    previewLabel: IS_PREVIEW ? ['Preview', PREVIEW_NAME, APP_VERSION].filter(Boolean).join(' · ') : ''
+    previewLabel: previewBadge().label, previewTitle: previewBadge().title
   });
 }
 

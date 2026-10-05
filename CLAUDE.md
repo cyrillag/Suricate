@@ -18,8 +18,9 @@ if a change contradicts one, say so and ask.
 2. **Same change, same PR**: code + `FUNCTIONAL_RULES.md` (new/changed rule, with the why) + an entry in
    `whats-new/entries.json` when PMs will notice it (id, date, audience `all`/`creators`, FR/EN `title`,
    one-line `short`, longer `body`, optional `screenshot`). Bug fixes without visible change: no entry.
-3. **Test on a preview, not on prod.** Contributors: skill `suricate-preview` (pushes your branch to
-   `preview/contrib`, waits for the deploy, gives you the URL). The maintainer uses his own preview (31622).
+3. **Test on your own preview, not on prod.** One preview per person (`ops/previews.json`; yours is
+   `git config suricate.preview`): skill `suricate-preview` pushes your branch to `preview/<you>`, waits for the
+   automatic deploy and gives you the URL. Same for the maintainer.
 4. **Open the PR**: skill `suricate-ship` (checklist + push + PR). The maintainer reviews (agent
    `suricate-reviewer`), merges and deploys prod. A contributor never deploys prod.
 
