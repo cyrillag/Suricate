@@ -17,9 +17,11 @@ function daysBetween(a, b) {
 // important, which isn't the point):
 //
 // - ANOMALIES: something is actually wrong — overdue, not started despite a past start
-//   date, inconsistent dates, or missing assignee/start/end date. All six rules are listed
-//   individually, with equal weight, in one table (no_assignee was dropped then reinstated
-//   in the same week, 2026-10 — the user reconsidered after using the redesigned page).
+//   date, inconsistent dates, or a missing start/end date. All five rules are listed
+//   individually, with equal weight, in one table. Missing assignee was tried as a sixth
+//   rule, dropped, reinstated, then dropped again for good (all in 2026-10) — a missing
+//   assignee isn't itself a tracking problem; back in sync with the sibling Webex bot
+//   (jira-hygiene-report), which never had this rule.
 // - Due-soon ("this week" / "next 2 weeks"): not an anomaly at all — a perfectly healthy
 //   epic lands here purely because its end date is close. Kept in its own section, for
 //   planning vigilance, not tracking hygiene.
@@ -44,7 +46,6 @@ function checkEpic(epic, today) {
   const { start_date: start, end_date: end } = epic;
 
   if (!isDone) {
-    if (!epic.assignee) findings.push({ rule: 'no_assignee' });
     if (!start) findings.push({ rule: 'no_start' });
     if (!end) findings.push({ rule: 'no_end' });
   }
@@ -80,7 +81,7 @@ function contact(epic) {
   return null;
 }
 
-const ANOMALY_RULES = ['overdue', 'not_started', 'date_inconsistent', 'no_assignee', 'no_start', 'no_end'];
+const ANOMALY_RULES = ['overdue', 'not_started', 'date_inconsistent', 'no_start', 'no_end'];
 const ANOMALY_RULE_SET = new Set(ANOMALY_RULES);
 const RULE_RANK = new Map(ANOMALY_RULES.map((r, i) => [r, i]));
 

@@ -35,7 +35,6 @@
       overdue:            { cls: 'tag-alert', key: 'cleanup.rule_overdue' },
       not_started:        { cls: 'tag-alert', key: 'cleanup.rule_not_started' },
       date_inconsistent:  { cls: 'tag-alert', key: 'cleanup.rule_date_inconsistent' },
-      no_assignee:        { cls: 'tag-info',  key: 'cleanup.rule_no_assignee' },
       no_start:           { cls: 'tag-info',  key: 'cleanup.rule_no_start' },
       no_end:             { cls: 'tag-info',  key: 'cleanup.rule_no_end' },
     };
@@ -55,11 +54,10 @@
     function dueText(item) {
       return t('cleanup.detail_due_soon', { days: item.days, date: item.date });
     }
-    // No reporter-fallback name here: a "Sans assignee" row already carries that badge in
-    // the Problem column on the Incohérences table, so repeating "Name (reporter, pas
-    // d'assignee)" here was pure redundancy — just say "Sans assignee" and save the width
-    // (2026-10, direct user feedback). Applies uniformly on the Vigilance table too, for
-    // the same reason there's nothing more useful to say when there's no real assignee.
+    // No reporter-fallback name here: "Name (reporter, pas d'assignee)" was pure padding for
+    // no benefit — just say "Sans assignee" and save the width (2026-10, direct user
+    // feedback). A missing assignee is display info here, not a Problem-column anomaly
+    // (that check was tried, then dropped for good — see quality-check.js).
     function contactText(c) {
       if (c && !c.isReporter) return c.name;
       return t('cleanup.rule_no_assignee');

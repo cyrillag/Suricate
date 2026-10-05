@@ -706,14 +706,14 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   is just as much a planning problem).
   - **⚠️ Incohérences de suivi / Tracking inconsistencies**: overdue (end date passed, status
     still active); not started despite a past start date; inconsistent dates (start after
-    end); missing assignee; missing start date; missing end date. All six listed
-    individually, with equal visual weight — no rule is demoted to a count.
+    end); missing start date; missing end date. All five listed individually, with equal
+    visual weight — no rule is demoted to a count.
     Each row leads with a short, coloured badge naming the rule itself (e.g. "En retard",
     "Sans start date") before any detail sentence — added 2026-10, direct feedback that a
     full sentence per row wasn't something you could scan, you had to read it. Two badge
     colours, not a severity scale: red (`tag-alert`) for a status/date contradiction
     (overdue, not started, inconsistent dates), neutral (`tag-info`) for a missing field
-    (assignee, start, end) — same size/weight for both, since neither cluster is "worse".
+    (start, end) — same size/weight for both, since neither cluster is "worse".
     A missing-field row has no further detail sentence (the badge already says everything);
     a contradiction row keeps its sentence underneath, since that one carries information
     the badge can't (the actual day count, date and current status).
@@ -745,8 +745,8 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   assignee at all" is its own selectable value** (`data-assignee=""`, a dedicated "(vide —
   sans assignee)" option) — not just a list of real names, so a PM can isolate exactly the
   unassigned epics in one click.
-- **Missing-assignee/start/end-date checks are skipped once an epic's `mapStatus` bucket is
-  `done`** — closed work doesn't need its ownership or dates backfilled. This reuses
+- **Missing-start/end-date checks are skipped once an epic's `mapStatus` bucket is
+  `done`** — closed work doesn't need its dates backfilled. This reuses
   `jira.mapStatus`'s own done/in-progress/paused/blocked/to-start buckets (the same ones
   driving the Deliverable matrix and health badge) rather than Jira's raw status, so
   paused/on-hold epics keep this app's already-agreed semantics instead of a generically
@@ -759,11 +759,12 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   exclusion Planning already applies, extended here to also cover Rejected. Without this, a
   cancelled epic with a stale past end date read as an active, overdue tracking problem (seen
   in production: NCC-2865 and CLDAPI-2009, both Cancelled, both flagged as overdue/not-started).
-- **Missing-assignee is back as an anomaly** (reinstated 2026-10, the same week it was
-  dropped — direct user feedback after trying the redesigned page: a missing assignee *is*
-  worth flagging). The sibling Webex bot (jira-hygiene-report) does **not** have this rule —
-  the two tools previously stayed in sync on this exact point and now diverge; revisit there
-  too if this sticks.
+- **Missing assignee is not an anomaly.** Tried as a sixth rule, dropped, reinstated, then
+  dropped again for good (all 2026-10 — direct user feedback each time: "sans assignee ne
+  doit pas être un problème"). It's still shown — the Contact column reads "Sans assignee"
+  and the Assignee filter still has its own "(vide)" option (see above) — just never flagged
+  as something to fix. Back in sync with the sibling Webex bot (jira-hygiene-report), which
+  never had this rule.
 - **The Contact column shows only the real assignee, or "Sans assignee"** — a reporter
   fallback name used to be displayed there ("{{name}} (reporter, pas d'assignee)"); dropped
   2026-10, direct feedback that it was redundant once the row's own badge already says "Sans

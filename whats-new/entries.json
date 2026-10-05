@@ -12,8 +12,8 @@
       "en": "A per-project page naming your epics’ status/date/assignee inconsistencies, kept apart from deadlines that are just worth watching."
     },
     "body": {
-      "fr": "Le lien « 🩺 Cleanup » de chaque projet vérifie 6 points sur vos epics : en retard, non démarrée, dates incohérentes, sans assignee, sans start date, sans end date. Filtrable par équipe, assignee et problème. Une section à part, Vigilance planning, signale ce qui arrive bientôt à échéance — pas une anomalie, juste à surveiller. Mêmes données que Planning ; se rafraîchit avec le ↻ Refresh du projet.",
-      "en": "The “🩺 Cleanup” link on every project runs 6 checks on your epics: overdue, not started, inconsistent dates, no assignee, no start date, no end date. Filterable by team, assignee and problem. A separate Planning watch section flags what’s coming due soon — not an anomaly, just worth watching. Same data as Planning; refreshes with the project’s ↻ Refresh."
+      "fr": "Le lien « 🩺 Cleanup » de chaque projet vérifie 5 points sur vos epics : en retard, non démarrée, dates incohérentes, sans start date, sans end date. Filtrable par équipe, assignee et problème. Une section à part, Vigilance planning, signale ce qui arrive bientôt à échéance — pas une anomalie, juste à surveiller. Mêmes données que Planning ; se rafraîchit avec le ↻ Refresh du projet.",
+      "en": "The “🩺 Cleanup” link on every project runs 5 checks on your epics: overdue, not started, inconsistent dates, no start date, no end date. Filterable by team, assignee and problem. A separate Planning watch section flags what’s coming due soon — not an anomaly, just worth watching. Same data as Planning; refreshes with the project’s ↻ Refresh."
     },
     "link": "/projects/bgp-as-a-service/cleanup",
     "screenshot": {
