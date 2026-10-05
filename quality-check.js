@@ -97,6 +97,7 @@ function runQualityCheck(epics, today = new Date()) {
   const upcoming = [];
   const teams = new Set();
   const assignees = new Set(); // real names only; "unassigned" is a separate flag, not a name
+  const rulesSeen = new Set();
   let hasUnassigned = false;
 
   for (const epic of epics) {
@@ -106,7 +107,10 @@ function runQualityCheck(epics, today = new Date()) {
     if (epic.assignee) assignees.add(epic.assignee); else hasUnassigned = true;
     for (const f of findings) {
       const item = { epic, contact: contact(epic), ...f };
-      if (ANOMALY_RULES.has(f.rule)) anomalies.push(item);
+      if (ANOMALY_RULES.has(f.rule)) {
+        anomalies.push(item);
+        rulesSeen.add(f.rule);
+      }
       else if (f.rule === 'due_this_week') thisWeek.push(item);
       else if (f.rule === 'due_soon') upcoming.push(item);
     }
@@ -123,6 +127,9 @@ function runQualityCheck(epics, today = new Date()) {
     teams: [...teams].sort((a, b) => a.localeCompare(b)),
     assignees: [...assignees].sort((a, b) => a.localeCompare(b)),
     hasUnassigned,
+    // Fixed, meaningful order (contradiction rules first, then missing-field ones) rather
+    // than alphabetical — ANOMALY_RULES is already declared in that order.
+    rules: [...ANOMALY_RULES].filter(r => rulesSeen.has(r)),
     totalEpics: epics.length,
   };
 }

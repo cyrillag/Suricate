@@ -756,11 +756,32 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   worth flagging). The sibling Webex bot (jira-hygiene-report) does **not** have this rule —
   the two tools previously stayed in sync on this exact point and now diverge; revisit there
   too if this sticks.
-- **The "responsible" contact shown on every row is the assignee, falling back to the
-  reporter** when the assignee is empty. Display-only and independent of the Assignee
-  filter above, which reads the real `epic.assignee` field, not this fallback — filtering to
-  "(vide)" can still show a row whose Contact column displays a reporter's name; that's
-  intentional (the empty assignee is still true, the reporter is just who to chase about it).
+- **The Contact column shows only the real assignee, or "Sans assignee"** — a reporter
+  fallback name used to be displayed there ("{{name}} (reporter, pas d'assignee)"); dropped
+  2026-10, direct feedback that it was redundant once the row's own badge already says "Sans
+  assignee" and cost horizontal width for no benefit. Display-only and independent of the
+  Assignee filter above, which still reads the real `epic.assignee` field — filtering to
+  "(vide)" shows exactly the rows whose Contact column reads "Sans assignee", no reporter name
+  ever appears there anymore (on either the Incohérences or the Vigilance planning table).
+- **A third filter, by problem/rule type, combines with Team and Assignee** (added 2026-10,
+  direct feedback) — populated from whichever rules are actually present (`result.rules`,
+  already in the fixed contradiction-then-missing-field order), reusing the same `rule_*`
+  labels as the badges so the filter's wording matches what's on screen. It only ever applies
+  to the Incohérences table (`data-rule` is only set on anomaly rows) — Vigilance planning
+  rows have no rule to filter by and are deliberately left untouched by it, consistent with
+  that section always being visible regardless of filter state (see below).
+- **The Epic column is widened (420px) and its summary clamped to 2 lines**
+  (`-webkit-line-clamp`), not cropped to a hard character count — short summaries don't pad
+  the row, long ones never overflow into the next column. The full summary is always
+  reachable via a native `title=""` tooltip on hover, HTML-escaped, so a truncated row never
+  loses information (2026-10, direct feedback after widening the column alone still left it
+  cramped for the longest real summaries).
+- **📅 Vigilance planning always renders, even at 0/0** — it used to disappear entirely when
+  nothing was due soon, which read as "the page is broken" rather than "nothing to watch this
+  time" (2026-10, direct user feedback: "laisse toujours les vigilances planning quitte à ce
+  que le compteur soit à 0"). Each of "this week" / "next 2 weeks" shows its own small
+  "Nothing this week"/"Nothing in the next 2 weeks" message in place of an empty table when
+  its count is 0, rather than hiding the subsection.
 - **Visible to every authenticated user, no ownership check** — same rule as the
   project-detail and report-view pages (see Visibility & permissions): it's read-only, and a
   weekly report is routinely shared with people who don't own the project.

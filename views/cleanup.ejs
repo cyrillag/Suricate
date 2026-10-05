@@ -55,10 +55,17 @@
     function dueText(item) {
       return t('cleanup.detail_due_soon', { days: item.days, date: item.date });
     }
+    // No reporter-fallback name here: a "Sans assignee" row already carries that badge in
+    // the Problem column on the Incohérences table, so repeating "Name (reporter, pas
+    // d'assignee)" here was pure redundancy — just say "Sans assignee" and save the width
+    // (2026-10, direct user feedback). Applies uniformly on the Vigilance table too, for
+    // the same reason there's nothing more useful to say when there's no real assignee.
     function contactText(c) {
-      if (!c) return t('cleanup.contact_none');
-      if (c.isReporter) return t('cleanup.contact_reporter_fallback', { name: c.name });
-      return c.name;
+      if (c && !c.isReporter) return c.name;
+      return t('cleanup.rule_no_assignee');
+    }
+    function esc(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
     }
     // One row, shared by every table on this page. Team and Assignee are both real,
     // filterable columns/attributes (2026-10: replaced an earlier per-team sub-header
@@ -66,27 +73,36 @@
     // from someone not reading top-to-bottom). Assignee filtering must cover "no assignee
     // at all" as its own selectable value, not just real names — data-assignee is the
     // empty string in that case, matched by the filter's own "(empty)" option.
-    function row(item, middleHtml) {
+    // The Epic cell clamps its summary to 2 lines (full text on hover via the native
+    // `title` tooltip — no JS component needed) rather than a hard character cutoff, so a
+    // short summary never grows the row for nothing and a long one never pushes into the
+    // next column (2026-10: fixed a real overflow bug, then widened+clamped further on
+    // direct feedback once the overflow fix alone still left the column cramped).
+    function row(item, middleHtml, rule) {
       const team = item.epic.team || '—';
       const assignee = item.epic.assignee || '';
+      const ruleAttr = rule ? ` data-rule="${rule}"` : '';
       return `
-      <tr data-team="${team}" data-assignee="${assignee}">
+      <tr data-team="${team}" data-assignee="${assignee}"${ruleAttr}>
         <td><strong>${team}</strong></td>
-        <td style="max-width:320px"><span style="white-space:nowrap"><a href="${issueUrl(item.epic.jira_key)}" target="_blank" rel="noopener"><strong>${item.epic.jira_key}</strong></a></span><br><span class="page-sub" style="margin:0;word-break:break-word">${item.epic.summary}</span></td>
+        <td style="max-width:420px">
+          <span style="white-space:nowrap"><a href="${issueUrl(item.epic.jira_key)}" target="_blank" rel="noopener"><strong>${item.epic.jira_key}</strong></a></span><br>
+          <span class="page-sub cleanup-clamp-2" style="margin:0" title="${esc(item.epic.summary)}">${item.epic.summary}</span>
+        </td>
         <td>${middleHtml}</td>
         <td style="white-space:nowrap;text-align:right">${contactText(item.contact)}</td>
       </tr>`;
     }
     function anomalyRow(item) {
       const detail = detailText(item);
-      return row(item, `${badge(item)}${detail ? `<br><span class="page-sub" style="margin:0">${detail}</span>` : ''}`);
+      return row(item, `${badge(item)}${detail ? `<br><span class="page-sub" style="margin:0">${detail}</span>` : ''}`, item.rule);
     }
     function dueRow(item) {
       return row(item, dueText(item));
     }
   %>
 
-  <% if (result.teams.length > 1 || result.assignees.length > 1 || result.hasUnassigned) { %>
+  <% if (result.teams.length > 1 || result.assignees.length > 1 || result.hasUnassigned || result.rules.length > 1) { %>
   <div class="section-card" style="padding:14px 20px;display:flex;flex-wrap:wrap;gap:18px;align-items:center">
     <% if (result.teams.length > 1) { %>
     <div>
@@ -113,6 +129,17 @@
       </select>
     </div>
     <% } %>
+    <% if (result.rules.length > 1) { %>
+    <div>
+      <label for="problem-filter" style="font-size:13px;font-weight:600;color:var(--tx2);margin-right:6px"><%= t('cleanup.filter_problem_label') %></label>
+      <select id="problem-filter" class="field-input" style="display:inline-block;width:auto;padding:6px 10px">
+        <option value=""><%= t('cleanup.filter_all') %></option>
+        <% result.rules.forEach(rule => { %>
+        <option value="<%= rule %>"><%= t(BADGE[rule].key) %></option>
+        <% }) %>
+      </select>
+    </div>
+    <% } %>
   </div>
   <% } %>
 
@@ -123,7 +150,7 @@
   <% } %>
 
   <% if (result.anomalies.length) { %>
-  <div class="section-card" style="border-top-color:var(--blk)">
+  <div class="section-card" style="border-top-color:var(--blk)" id="anomalies-section">
     <div class="section-card-header" style="color:var(--blk)">⚠️ <%= t('cleanup.anomalies') %> (<%= result.anomalies.length %>)</div>
     <p class="page-sub" style="margin:10px 20px"><%= t('cleanup.anomalies_hint') %></p>
     <table class="simple-table">
@@ -133,47 +160,64 @@
   </div>
   <% } %>
 
-  <% if (result.thisWeek.length || result.upcoming.length) { %>
+  <%
+    // Always rendered, even at 0/0 — this used to disappear entirely when nothing was due
+    // soon, which read as "the page is broken/incomplete" rather than "nothing to watch
+    // this time" (2026-10, direct user feedback). The Problem filter above deliberately
+    // does NOT touch this section (see the script below) — it isn't an anomaly list, so
+    // filtering by anomaly type has nothing to say about it.
+  %>
   <div class="section-card">
     <div class="section-card-header">📅 <%= t('cleanup.due_soon_section') %></div>
     <p class="page-sub" style="margin:10px 20px"><%= t('cleanup.due_soon_hint') %></p>
 
-    <% if (result.thisWeek.length) { %>
     <h4 style="margin:0;padding:10px 20px 0;font-size:13px;color:var(--orange)">🟠 <%= t('cleanup.this_week') %> (<%= result.thisWeek.length %>)</h4>
+    <% if (result.thisWeek.length) { %>
     <table class="simple-table">
       <thead><tr><th><%= t('cleanup.col_team') %></th><th><%= t('cleanup.col_epic') %></th><th><%= t('cleanup.col_due') %></th><th><%= t('cleanup.col_contact') %></th></tr></thead>
       <tbody><%- result.thisWeek.map(dueRow).join('') %></tbody>
     </table>
+    <% } else { %>
+    <div class="empty-state-inline"><%= t('cleanup.none_this_week') %></div>
     <% } %>
 
-    <% if (result.upcoming.length) { %>
     <h4 style="margin:0;padding:10px 20px 0;font-size:13px;color:var(--tx2)"><%= t('cleanup.next_weeks') %> (<%= result.upcoming.length %>)</h4>
+    <% if (result.upcoming.length) { %>
     <table class="simple-table">
       <thead><tr><th><%= t('cleanup.col_team') %></th><th><%= t('cleanup.col_epic') %></th><th><%= t('cleanup.col_due') %></th><th><%= t('cleanup.col_contact') %></th></tr></thead>
       <tbody><%- result.upcoming.map(dueRow).join('') %></tbody>
     </table>
+    <% } else { %>
+    <div class="empty-state-inline"><%= t('cleanup.none_upcoming') %></div>
     <% } %>
   </div>
-  <% } %>
 </div>
 
 <script>
 (function () {
   var teamSelect = document.getElementById('team-filter');
   var assigneeSelect = document.getElementById('assignee-filter');
-  if (!teamSelect && !assigneeSelect) return;
+  var problemSelect = document.getElementById('problem-filter');
+  if (!teamSelect && !assigneeSelect && !problemSelect) return;
+  var anomaliesSection = document.getElementById('anomalies-section');
   function applyFilters() {
     var team = teamSelect ? teamSelect.value : '';
     var assignee = assigneeSelect ? assigneeSelect.value : '';
+    var problem = problemSelect ? problemSelect.value : '';
     document.querySelectorAll('tr[data-team]').forEach(function (tr) {
       var teamOk = !team || tr.getAttribute('data-team') === team;
       var rowAssignee = tr.getAttribute('data-assignee') || '';
       var assigneeOk = !assignee || (assignee === '__empty__' ? rowAssignee === '' : rowAssignee === assignee);
-      tr.style.display = (teamOk && assigneeOk) ? '' : 'none';
+      // The Problem filter only ever applies inside the Incohérences table (rows there
+      // carry data-rule) — a row with no data-rule (Vigilance) is never affected by it.
+      var inAnomalies = anomaliesSection && anomaliesSection.contains(tr);
+      var problemOk = !problem || !inAnomalies || tr.getAttribute('data-rule') === problem;
+      tr.style.display = (teamOk && assigneeOk && problemOk) ? '' : 'none';
     });
   }
   if (teamSelect) teamSelect.addEventListener('change', applyFilters);
   if (assigneeSelect) assigneeSelect.addEventListener('change', applyFilters);
+  if (problemSelect) problemSelect.addEventListener('change', applyFilters);
 })();
 </script>
 </body>

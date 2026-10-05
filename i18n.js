@@ -184,6 +184,7 @@ const DICT = {
 
     filter_team_label: { fr: 'Équipe :',          en: 'Team:' },
     filter_assignee_label: { fr: 'Assignee :',    en: 'Assignee:' },
+    filter_problem_label: { fr: 'Problème :',     en: 'Problem:' },
     filter_all: { fr: 'Toutes',                   en: 'All' },
     filter_unassigned: { fr: '(vide — sans assignee)', en: '(empty — no assignee)' },
 
@@ -205,8 +206,8 @@ const DICT = {
     detail_not_started: { fr: 'Start date dépassée depuis {{days}} j ({{date}}) — statut toujours « {{status}} ».', en: 'Start date passed {{days}}d ago ({{date}}) — status still "{{status}}".' },
     detail_date_inconsistent: { fr: 'Start date ({{start}}) postérieure à la end date ({{end}}).', en: 'Start date ({{start}}) is after the end date ({{end}}).' },
 
-    contact_reporter_fallback: { fr: '{{name}} (reporter, pas d’assignee)', en: '{{name}} (reporter, no assignee)' },
-    contact_none: { fr: 'non identifié',          en: 'unidentified' }
+    none_this_week: { fr: 'Rien cette semaine.',  en: 'Nothing this week.' },
+    none_upcoming: { fr: 'Rien dans les 2 prochaines semaines.', en: 'Nothing in the next 2 weeks.' }
   }
 };
 

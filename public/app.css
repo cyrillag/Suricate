@@ -183,6 +183,11 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
    the app (ETA, counts), so this is its own class rather than bolding .tag globally. */
 .tag-info{font-size:12px;font-weight:700;background:var(--gnd);border:1px solid var(--bd2);padding:3px 9px;border-radius:2px;color:var(--tx2);margin-right:5px;display:inline-block;white-space:nowrap}
 
+/* Epic summary on the Cleanup page: clamp to 2 lines instead of a hard character cutoff, so a
+   short summary doesn't pad the row and a long one never overflows into the next column. The
+   full text is still reachable via the title="" tooltip set on the same element. */
+.cleanup-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
 @media(max-width:700px){
   .project-grid{grid-template-columns:1fr}
   .nav-brand .brand-divider,.auth-brand .brand-divider{display:none}
