@@ -1,0 +1,24 @@
+# Contributor preview stack — copied once to ~/suricate-<slot>/compose.yml on the host (see
+# ops/README.md). Deliberately NOT the repo's docker-compose.yml: ports, volumes and secrets are
+# fixed here, outside the contributor's branch, so their code can't change what the container can
+# reach. Only the image is built from the branch (./src = the git checkout).
+services:
+  app:
+    build: ./src
+    image: suricate-contrib:latest
+    restart: unless-stopped
+    ports:
+      - "31625:3000"
+    volumes:
+      - contrib-data:/data
+      - ./status:/status:ro
+    env_file:
+      - ./contrib.env
+    environment:
+      - NODE_ENV=production
+      - DATA_DIR=/data
+      - APP_ENV=preview
+      - PREVIEW_NAME=contrib
+      - DEPLOY_STATUS_FILE=/status/deploy.json
+volumes:
+  contrib-data:

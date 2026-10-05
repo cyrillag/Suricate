@@ -772,6 +772,28 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   control jump to a different spot depending on whether that particular week happens to have a
   report or not.
 
+## Contributors & environments
+
+- **Contributors propose, the maintainer merges and deploys.** A contributor works on a `feature/…`
+  branch, tests on their own preview, opens a PR; the maintainer reviews (agent `suricate-reviewer`),
+  merges and deploys prod as before. `master` never receives a direct push from a contributor: the
+  repo's pre-push hook refuses it (`.githooks/pre-push`, enabled with `git config core.hooksPath
+  .githooks`; the maintainer's clone opts out with `git config suricate.maintainer true`). The
+  personal GitHub plan has no server-side branch protection on a private repo — this hook plus the
+  fact that prod only ever changes when the maintainer deploys it are the safeguards.
+- **The contributor's preview deploys itself from `preview/contrib`** (port 31625): a cron job on
+  the host (`ops/autodeploy.sh`) polls GitHub every minute, rebuilds on a new commit and reports the
+  result as a GitHub commit status and on `/version` (state + build log tail). Pull-based on purpose:
+  the host has no sudo (no separate Unix account possible) and sharing the maintainer's SSH account
+  was ruled out, and GitHub can't reach the internal host to push webhooks. Ports, mounts and
+  secrets come from files outside the checkout, so a branch can't change them. Details, isolation
+  limits and how to add a second contributor: `ops/README.md`; contributor guide: `CONTRIBUTING.md`.
+- **Claude Code is the expected tool on both sides**: `CLAUDE.md` (loaded automatically) carries the
+  conventions; skills `suricate-preview` / `suricate-ship` drive testing and PRs; the existing QA
+  hooks and agents apply to contributors too.
+- `/version` (unauthenticated) returns the environment, preview name and deployed commit — no data.
+  The Preview badge shows `Preview · <name> · <commit>`.
+
 ## Environment badge
 
 Prod (`:31621`) and preview (`:31622`) run identical code on the same host, told apart on the

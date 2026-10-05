@@ -13,6 +13,8 @@ services:
     environment:
       - NODE_ENV=production
       - APP_ENV=${APP_ENV:-}
+      - PREVIEW_NAME=${PREVIEW_NAME:-}
+      - APP_VERSION=${APP_VERSION:-}
       - DATA_DIR=/data
       - SESSION_SECRET=${SESSION_SECRET}
       - JIRA_SERVICE_TOKEN=${JIRA_SERVICE_TOKEN}

@@ -1,6 +1,7 @@
 const express    = require('express');
 const session    = require('express-session');
 const path       = require('path');
+const fs         = require('fs');
 const puppeteer  = require('puppeteer-core');
 const db         = require('./db');
 const jira       = require('./jira');
@@ -35,6 +36,11 @@ if (!BIGPICTURE_TOKEN) console.warn('WARNING: BIGPICTURE_API_TOKEN not set — P
 // it appear on prod. The code itself is on master: when it only lived on its feature branch, the
 // badge vanished every time another branch was deployed to the preview.
 const IS_PREVIEW = process.env.APP_ENV === 'preview';
+// Which preview this is (e.g. "contrib" for a contributor's own preview) and which commit it runs —
+// shown in the Preview badge and served by /version, so a contributor (or their Claude Code
+// session) can tell when their push is live. Set by ops/autodeploy.sh; empty on prod.
+const PREVIEW_NAME = process.env.PREVIEW_NAME || '';
+const APP_VERSION = process.env.APP_VERSION || '';
 
 // No fallback: a hardcoded default here would let anyone who reads this (public) source forge
 // session cookies for any deployment that forgot to set the real secret.
@@ -451,8 +457,21 @@ app.use((req, res, next) => {
   res.locals.isCreator = !!(req.session && req.session.userId && whatsNew.isCreator(req.session.userId));
   if (res.locals.isCreator) res.locals.whatsNewCount = whatsNew.unseenCount(req.session.userId);
   res.locals.isPreview = IS_PREVIEW;
+  res.locals.previewLabel = IS_PREVIEW ? ['Preview', PREVIEW_NAME, APP_VERSION].filter(Boolean).join(' · ') : '';
   next();
 });
+// Unauthenticated, no data: what this instance runs — polled by the contributor tooling
+// (.claude/skills/suricate-preview) to know when a push is deployed. On a contributor preview it
+// also returns the last deploy's status and log tail (ops/autodeploy.sh writes it), since the
+// contributor has no access to the host to read a failed build's log.
+app.get('/version', (req, res) => {
+  let deploy = null;
+  if (process.env.DEPLOY_STATUS_FILE) {
+    try { deploy = JSON.parse(fs.readFileSync(process.env.DEPLOY_STATUS_FILE, 'utf8')); } catch (e) { /* none yet */ }
+  }
+  res.json({ env: IS_PREVIEW ? 'preview' : 'prod', name: PREVIEW_NAME || null, commit: APP_VERSION || null, deploy });
+});
+
 app.get('/lang/:code', (req, res) => {
   res.cookie('lang', req.params.code === 'en' ? 'en' : 'fr', { maxAge: 365 * 24 * 60 * 60 * 1000 });
   res.redirect(req.get('Referer') || '/');
@@ -1018,7 +1037,8 @@ function buildReportHtml(proj, report, year, week, isOwner, lang, userName, noti
     stats, health, isOwner,
     backfilled: !!report.backfilled,
     generatedAt: formatDate(new Date(report.created_at * 1000).toISOString()),
-    lang, userName, confluenceUrl, notice, isPreview: IS_PREVIEW
+    lang, userName, confluenceUrl, notice, isPreview: IS_PREVIEW,
+    previewLabel: IS_PREVIEW ? ['Preview', PREVIEW_NAME, APP_VERSION].filter(Boolean).join(' · ') : ''
   });
 }
 
