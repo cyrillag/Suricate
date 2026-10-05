@@ -12,10 +12,15 @@
       "en": "A per-project page naming your epics’ status/date/assignee inconsistencies, kept apart from deadlines that are just worth watching."
     },
     "body": {
-      "fr": "La page Cleanup (lien « 🩺 Cleanup » sur chaque projet) compare le statut Jira de chaque epic à ses dates et à son assignee : end date dépassée alors que le statut est toujours actif, start date dépassée sans que l’epic ait démarré, dates incohérentes, sans assignee, start/end date manquante — toutes listées au même niveau d’importance, avec un badge qui nomme le problème d’un coup d’œil et, pour les incohérences de statut/dates, le détail exact (ex. « statut toujours In Progress »). Trois filtres combinables, Équipe, Assignee et Problème — « (vide) » est une valeur sélectionnable pour isoler d’un clic les epics sans assignee. Une deuxième section, Vigilance planning, toujours affichée même sans rien à signaler, liste séparément ce qui n’est pas une anomalie mais arrive à échéance (cette semaine / dans les 2 semaines) — pour la maîtrise du planning, pas pour corriger quoi que ce soit. Mêmes données que la section Planning ; se rafraîchit avec le ↻ Refresh du projet.",
-      "en": "The Cleanup page (the “🩺 Cleanup” link on every project) compares each epic’s Jira status against its dates and its assignee: an end date that’s passed while the status is still active, a start date that’s passed without the epic starting, inconsistent dates, no assignee, a missing start or end date — all listed with equal weight, each with a badge naming the problem at a glance and, for status/date contradictions, the exact detail (e.g. “status still In Progress”). Three combinable filters, Team, Assignee and Problem — “(empty)” is a selectable value to isolate unassigned epics in one click. A second section, Planning watch, always shown even with nothing to report, separately lists what isn’t an anomaly but is simply coming due (this week / next 2 weeks) — for planning awareness, not for fixing anything. Same data as Planning; refreshes with the project’s ↻ Refresh."
+      "fr": "Le lien « 🩺 Cleanup » de chaque projet vérifie 6 points sur vos epics : en retard, non démarrée, dates incohérentes, sans assignee, sans start date, sans end date. Filtrable par équipe, assignee et problème. Une section à part, Vigilance planning, signale ce qui arrive bientôt à échéance — pas une anomalie, juste à surveiller. Mêmes données que Planning ; se rafraîchit avec le ↻ Refresh du projet.",
+      "en": "The “🩺 Cleanup” link on every project runs 6 checks on your epics: overdue, not started, inconsistent dates, no assignee, no start date, no end date. Filterable by team, assignee and problem. A separate Planning watch section flags what’s coming due soon — not an anomaly, just worth watching. Same data as Planning; refreshes with the project’s ↻ Refresh."
     },
-    "link": "/projects/bgp-as-a-service/cleanup"
+    "link": "/projects/bgp-as-a-service/cleanup",
+    "screenshot": {
+      "file": "cleanup.png",
+      "page": "/projects/bgp-as-a-service/cleanup",
+      "selector": "#anomalies-section"
+    }
   },
   {
     "id": "2026-10-confluence-formatting",
