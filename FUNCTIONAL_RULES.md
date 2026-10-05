@@ -688,41 +688,51 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   were removed project-wide (see Project onboarding & editing) — Cleanup reuses the existing
   Generate/Refresh form as-is (shown on the Cleanup page too when the viewer is the owner)
   instead of introducing its own refresh action.
-- **Four severity tiers**, based on the sibling "JIRA Cleanup" Webex bot (jira-hygiene-report)
-  with an extra tier of its own: 🔴 High priority (overdue; not started despite a past start
-  date; inconsistent dates — actual tracking problems, always listed individually) is distinct
-  from 🟠 Due this week (end date within 7 days) and 📅 Upcoming deadlines (end date 8–14
-  days out) — neither is a problem, a perfectly healthy epic can land in either purely because
-  it's closing soon, kept apart from 🔴 so neither ever reads as something broken — and from
-  🟡 Remaining (missing start/end date — real hygiene debt, but not urgent, so it's collapsed
-  to a per-team count + a live Jira JQL link rather than listed epic-by-epic). "This week" was
-  split out from the 14-day window (2026-10) specifically so a PM scanning before a status
-  check can see what needs acting on *now* without picking it out of everything closing in
-  the next two weeks.
-- **🔴/🟠/📅 are grouped by team, not one flat list** (2026-10) — a team sub-header row
-  (`.cleanup-team-row`) precedes that team's items within the tier's table, the same grouping
-  axis the Deliverable matrix and 🟡 Remaining already use. Added once these tiers grew long
-  enough that a flat enumeration stopped being scannable.
-- **No missing-assignee check.** A missing assignee doesn't stop a project moving forward, so
-  it's no longer flagged — only missing start/end date count as 🟡 hygiene debt now. The
-  sibling Webex bot (jira-hygiene-report) made the same call shortly after (both tools are
-  allowed to diverge, but didn't here — keep them in sync if one changes this again).
-- **Missing-metadata checks (🟡) are skipped once an epic's `mapStatus` bucket is `done`** —
+- **Two groups, not a severity ladder** (reworked 2026-10 from an earlier 4-tier
+  high/this-week/upcoming/medium split, after the user pushed back: collapsing missing
+  start/end dates into a lesser, count-only tier made them read as less important than an
+  overdue epic, which isn't true from a PM's point of view — a project you can't even date
+  is just as much a planning problem).
+  - **⚠️ Incohérences de suivi / Tracking inconsistencies**: overdue (end date passed, status
+    still active); not started despite a past start date; inconsistent dates (start after
+    end); missing start date; missing end date. All five listed individually, in one table,
+    with equal visual weight — no rule is demoted to a count.
+  - **📅 Vigilance planning / Planning watch**: 🟠 due this week (end date within 7 days) and
+    an unlabelled "next 2 weeks" group (end date 8–14 days out). Explicitly **not** an
+    anomaly — a perfectly healthy epic lands here purely because it's closing soon. Kept in
+    its own card, with its own hint text, so it never reads as something to fix. "This week"
+    was split out from the 14-day window specifically so a PM scanning before a status check
+    can see what needs acting on *now* without picking it out of everything closing in the
+    next two weeks.
+- **Findings are stated directly, naming the actual contradiction** — "End date dépassée
+  depuis {{days}}j, statut toujours « {{status}} »", not just the date delta with the status
+  left for the reader to cross-reference from elsewhere on the row (direct user feedback,
+  2026-10: the original wording wasn't explicit enough).
+- **Team is a real, filterable column — not a row-grouping scheme.** An earlier version
+  (2026-10, briefly) grouped rows under a per-team sub-header; replaced by a plain "Team"
+  column plus a `<select>` filter (vanilla JS, toggles `tr[data-team]` visibility) after
+  direct feedback — a column you can filter on serves the same scanning need without ever
+  hiding a row from someone who isn't reading top-to-bottom.
+- **Missing-start/end-date checks are skipped once an epic's `mapStatus` bucket is `done`** —
   closed work doesn't need its dates backfilled. This reuses `jira.mapStatus`'s own
   done/in-progress/paused/blocked/to-start buckets (the same ones driving the Deliverable matrix
   and health badge) rather than Jira's raw status, so paused/on-hold epics keep this app's
   already-agreed semantics instead of a generically re-derived one.
-- **A Cancelled or Rejected epic is skipped from every check, not just the 🟡 ones** — same
-  treatment as a Done epic (no overdue/not-started/inconsistent-dates/missing-metadata
-  findings). `mapStatus` has no bucket for "irrelevant, stop checking" (it falls through to
-  `ts`, the same bucket as a genuinely not-yet-started epic), so this is checked against
-  Jira's raw status text directly instead — same idea as the Cancelled exclusion Planning
-  already applies, extended here to also cover Rejected. Without this, a cancelled epic with
-  a stale past end date read as an active, overdue tracking problem (seen in production:
-  NCC-2865 and CLDAPI-2009, both Cancelled, both flagged 🔴 overdue/not-started).
-- **The "responsible" contact shown on 🔴/🟠/📅 rows is the assignee, falling back to the
-  reporter** when the assignee is empty — purely a display choice now that there's no
-  missing-assignee finding tied to it.
+- **A Cancelled or Rejected epic is skipped from every check, not just the missing-metadata
+  ones** — same treatment as a Done epic (no overdue/not-started/inconsistent-dates/
+  missing-metadata findings). `mapStatus` has no bucket for "irrelevant, stop checking" (it
+  falls through to `ts`, the same bucket as a genuinely not-yet-started epic), so this is
+  checked against Jira's raw status text directly instead — same idea as the Cancelled
+  exclusion Planning already applies, extended here to also cover Rejected. Without this, a
+  cancelled epic with a stale past end date read as an active, overdue tracking problem (seen
+  in production: NCC-2865 and CLDAPI-2009, both Cancelled, both flagged as overdue/not-started).
+- **No missing-assignee check.** A missing assignee doesn't stop a project moving forward, so
+  it's not flagged as an anomaly — only missing start/end date do. The sibling Webex bot
+  (jira-hygiene-report) made the same call shortly after (both tools are allowed to diverge,
+  but didn't here — keep them in sync if one changes this again).
+- **The "responsible" contact shown on every row is the assignee, falling back to the
+  reporter** when the assignee is empty — purely a display choice, never tied to whether a
+  row is flagged at all.
 - **Visible to every authenticated user, no ownership check** — same rule as the
   project-detail and report-view pages (see Visibility & permissions): it's read-only, and a
   weekly report is routinely shared with people who don't own the project.

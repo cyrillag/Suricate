@@ -1,5 +1,23 @@
 [
   {
+    "id": "2026-10-cleanup-redesign",
+    "date": "2026-10-05",
+    "audience": "all",
+    "title": {
+      "fr": "Cleanup : incohérences de suivi, filtrables par équipe",
+      "en": "Cleanup: tracking inconsistencies, filterable by team"
+    },
+    "short": {
+      "fr": "Une page par projet qui pointe les incohérences de statut/dates de vos epics, et sépare ça des échéances juste à surveiller.",
+      "en": "A per-project page naming your epics’ status/date inconsistencies, kept apart from deadlines that are just worth watching."
+    },
+    "body": {
+      "fr": "La page Cleanup (lien « 🩺 Cleanup » sur chaque projet) compare le statut Jira de chaque epic à ses dates : end date dépassée alors que le statut est toujours actif, start date dépassée sans que l’epic ait démarré, dates incohérentes, start/end date manquante — toutes listées au même niveau d’importance, avec le détail exact (ex. « statut toujours In Progress »). Une colonne Équipe filtrable permet de se concentrer sur son périmètre. Une deuxième section, Vigilance planning, liste séparément ce qui n’est pas une anomalie mais arrive à échéance (cette semaine / dans les 2 semaines) — pour la maîtrise du planning, pas pour corriger quoi que ce soit. Mêmes données que la section Planning ; se rafraîchit avec le ↻ Refresh du projet.",
+      "en": "The Cleanup page (the “🩺 Cleanup” link on every project) compares each epic’s Jira status against its dates: an end date that’s passed while the status is still active, a start date that’s passed without the epic starting, inconsistent dates, a missing start or end date — all listed with equal weight, each with its exact detail (e.g. “status still In Progress”). A filterable Team column lets you focus on your own scope. A second section, Planning watch, separately lists what isn’t an anomaly but is simply coming due (this week / next 2 weeks) — for planning awareness, not for fixing anything. Same data as Planning; refreshes with the project’s ↻ Refresh."
+    },
+    "link": "/projects/bgp-as-a-service/cleanup"
+  },
+  {
     "id": "2026-10-confluence-formatting",
     "date": "2026-10-01",
     "audience": "all",

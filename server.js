@@ -684,7 +684,7 @@ app.get('/projects/:slug/cleanup', requireAuth, (req, res) => {
   const result = qualityCheck.runQualityCheck(epics);
   res.render('cleanup', {
     proj, isOwner, result, lastSynced, formatDate,
-    issueUrl: qualityCheck.jiraIssueUrl, keysJqlUrl: qualityCheck.jiraKeysJqlUrl,
+    issueUrl: qualityCheck.jiraIssueUrl,
     userName: req.session.userName, currentWeek: currentWeekStr()
   });
 });

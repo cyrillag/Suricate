@@ -174,24 +174,31 @@ const DICT = {
     refresh_hint: { fr: 'Utilise «{{action}}» sur la page du projet pour rafraîchir ces données.', en: 'Use “{{action}}” on the project page to refresh this data.' },
     no_issues: { fr: 'Aucune anomalie détectée. 🎉', en: 'No issues found. 🎉' },
 
-    high_priority: { fr: 'Priorité haute',        en: 'High priority' },
-    this_week: { fr: 'À traiter cette semaine',   en: 'Due this week' },
-    upcoming: { fr: 'Échéances à venir',          en: 'Upcoming deadlines' },
-    upcoming_hint: { fr: 'Pas une anomalie de suivi — juste un rappel.', en: 'Not a tracking issue — just a heads-up.' },
-    remaining: { fr: 'Reste à traiter, par équipe', en: 'Remaining, by team' },
+    anomalies: { fr: 'Incohérences de suivi',     en: 'Tracking inconsistencies' },
+    anomalies_hint: { fr: 'Quelque chose ne colle pas — statut, dates, ou les deux.', en: 'Something doesn’t add up — status, dates, or both.' },
+    due_soon_section: { fr: 'Vigilance planning',  en: 'Planning watch' },
+    due_soon_hint: { fr: 'Pas une anomalie de suivi — juste une échéance à surveiller pour la maîtrise du planning.', en: 'Not a tracking issue — just a deadline worth keeping an eye on.' },
+    this_week: { fr: 'Cette semaine',             en: 'This week' },
+    next_weeks: { fr: 'Dans les 2 semaines',      en: 'Next 2 weeks' },
 
-    rule_no_start:    { fr: 'sans start date',    en: 'no start date' },
-    rule_no_end:      { fr: 'sans end date',      en: 'no end date' },
+    filter_label: { fr: 'Filtrer par équipe :',   en: 'Filter by team:' },
+    filter_all: { fr: 'Toutes les équipes',       en: 'All teams' },
 
-    detail_overdue:  { fr: 'End date dépassée depuis {{days}} j ({{date}}).', en: 'End date passed {{days}}d ago ({{date}}).' },
+    col_team: { fr: 'Équipe',                     en: 'Team' },
+    col_epic: { fr: 'Epic',                       en: 'Epic' },
+    col_problem: { fr: 'Problème',                en: 'Problem' },
+    col_contact: { fr: 'Contact',                 en: 'Contact' },
+    col_due: { fr: 'Échéance',                    en: 'Due' },
+
+    detail_overdue:  { fr: 'End date dépassée depuis {{days}} j ({{date}}) — statut toujours « {{status}} ».', en: 'End date passed {{days}}d ago ({{date}}) — status still "{{status}}".' },
     detail_due_soon: { fr: 'Échéance dans {{days}} j ({{date}}).', en: 'Due in {{days}}d ({{date}}).' },
-    detail_not_started: { fr: 'Start date dépassée depuis {{days}} j ({{date}}), toujours pas démarrée.', en: 'Start date passed {{days}}d ago ({{date}}), not started yet.' },
+    detail_not_started: { fr: 'Start date dépassée depuis {{days}} j ({{date}}) — statut toujours « {{status}} », non démarrée.', en: 'Start date passed {{days}}d ago ({{date}}) — status still "{{status}}", not started.' },
     detail_date_inconsistent: { fr: 'Start date ({{start}}) postérieure à la end date ({{end}}).', en: 'Start date ({{start}}) is after the end date ({{end}}).' },
+    detail_no_start: { fr: 'Sans start date.',    en: 'No start date.' },
+    detail_no_end: { fr: 'Sans end date.',        en: 'No end date.' },
 
-    epic_count: { fr: '{{count}} epic(s)',        en: '{{count}} epic(s)' },
     contact_reporter_fallback: { fr: '{{name}} (reporter, pas d’assignee)', en: '{{name}} (reporter, no assignee)' },
-    contact_none: { fr: 'non identifié',          en: 'unidentified' },
-    view_in_jira: { fr: 'Voir dans Jira →',       en: 'View in Jira →' }
+    contact_none: { fr: 'non identifié',          en: 'unidentified' }
   }
 };
 

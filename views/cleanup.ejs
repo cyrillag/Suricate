@@ -27,95 +27,103 @@
   </div>
 
   <%
-    const RULE_LABEL = {
-      no_start: 'cleanup.rule_no_start',
-      no_end:   'cleanup.rule_no_end'
-    };
-    function detailFor(item) {
-      if (item.rule === 'overdue')            return t('cleanup.detail_overdue', { days: item.days, date: item.date });
-      if (item.rule === 'due_this_week')       return t('cleanup.detail_due_soon', { days: item.days, date: item.date });
-      if (item.rule === 'due_soon')            return t('cleanup.detail_due_soon', { days: item.days, date: item.date });
-      if (item.rule === 'not_started')        return t('cleanup.detail_not_started', { days: item.days, date: item.date });
+    function problemText(item) {
+      if (item.rule === 'overdue')            return t('cleanup.detail_overdue', { days: item.days, date: item.date, status: item.epic.status });
+      if (item.rule === 'not_started')        return t('cleanup.detail_not_started', { days: item.days, date: item.date, status: item.epic.status });
       if (item.rule === 'date_inconsistent')  return t('cleanup.detail_date_inconsistent', { start: item.start, end: item.end });
+      if (item.rule === 'no_start')           return t('cleanup.detail_no_start');
+      if (item.rule === 'no_end')             return t('cleanup.detail_no_end');
       return '';
+    }
+    function dueText(item) {
+      return t('cleanup.detail_due_soon', { days: item.days, date: item.date });
     }
     function contactText(c) {
       if (!c) return t('cleanup.contact_none');
       if (c.isReporter) return t('cleanup.contact_reporter_fallback', { name: c.name });
       return c.name;
     }
-    // Renders one severity tier's rows: a team sub-header row, then that team's items,
-    // repeated per team — so a long tier reads as short per-team groups instead of one
-    // flat enumeration. Returns a string (raw HTML) for a shared `<table>`'s `<tbody>`.
-    function renderTierRows(byTeam) {
-      let html = '';
-      for (const [team, items] of byTeam.entries()) {
-        html += `<tr class="cleanup-team-row"><td colspan="3">${team} (${items.length})</td></tr>`;
-        for (const item of items) {
-          html += `
-          <tr>
-            <td style="white-space:nowrap"><a href="${issueUrl(item.epic.jira_key)}" target="_blank" rel="noopener"><strong>${item.epic.jira_key}</strong></a></td>
-            <td>${item.epic.summary}<br><span class="page-sub" style="margin:0">${detailFor(item)}</span></td>
-            <td style="white-space:nowrap;text-align:right">${contactText(item.contact)}</td>
-          </tr>`;
-        }
-      }
-      return html;
+    // One row, shared by every table on this page — Team is a real, filterable column
+    // (2026-10: replaced an earlier per-team sub-header grouping, which hid rows from
+    // anyone not scanning top-to-bottom) rather than a row-grouping scheme.
+    function row(item, detailText) {
+      const team = item.epic.team || '—';
+      return `
+      <tr data-team="${team}">
+        <td><strong>${team}</strong></td>
+        <td style="white-space:nowrap"><a href="${issueUrl(item.epic.jira_key)}" target="_blank" rel="noopener"><strong>${item.epic.jira_key}</strong></a><br><span class="page-sub" style="margin:0">${item.epic.summary}</span></td>
+        <td>${detailText}</td>
+        <td style="white-space:nowrap;text-align:right">${contactText(item.contact)}</td>
+      </tr>`;
     }
   %>
 
-  <% if (!result.counts.high && !result.counts.thisWeek && !result.counts.upcoming && !result.mediumByTeam.size) { %>
+  <% if (result.teams.length > 1) { %>
+  <div class="section-card" style="padding:14px 20px">
+    <label for="team-filter" style="font-size:13px;font-weight:600;color:var(--tx2);margin-right:8px"><%= t('cleanup.filter_label') %></label>
+    <select id="team-filter" class="field-input" style="display:inline-block;width:auto;padding:6px 10px">
+      <option value=""><%= t('cleanup.filter_all') %></option>
+      <% result.teams.forEach(team => { %>
+      <option value="<%= team %>"><%= team %></option>
+      <% }) %>
+    </select>
+  </div>
+  <% } %>
+
+  <% if (!result.anomalies.length && !result.thisWeek.length && !result.upcoming.length) { %>
   <div class="section-card">
     <div class="empty-state-inline"><%= t('cleanup.no_issues') %></div>
   </div>
   <% } %>
 
-  <% if (result.counts.high) { %>
+  <% if (result.anomalies.length) { %>
   <div class="section-card" style="border-top-color:var(--blk)">
-    <div class="section-card-header" style="color:var(--blk)">🔴 <%= t('cleanup.high_priority') %> (<%= result.counts.high %>)</div>
+    <div class="section-card-header" style="color:var(--blk)">⚠️ <%= t('cleanup.anomalies') %> (<%= result.anomalies.length %>)</div>
+    <p class="page-sub" style="margin:10px 20px"><%= t('cleanup.anomalies_hint') %></p>
     <table class="simple-table">
-      <tbody><%- renderTierRows(result.high) %></tbody>
+      <thead><tr><th><%= t('cleanup.col_team') %></th><th><%= t('cleanup.col_epic') %></th><th><%= t('cleanup.col_problem') %></th><th><%= t('cleanup.col_contact') %></th></tr></thead>
+      <tbody><%- result.anomalies.map(item => row(item, problemText(item))).join('') %></tbody>
     </table>
   </div>
   <% } %>
 
-  <% if (result.counts.thisWeek) { %>
-  <div class="section-card" style="border-top-color:var(--orange)">
-    <div class="section-card-header" style="color:var(--orange)">🟠 <%= t('cleanup.this_week') %> (<%= result.counts.thisWeek %>)</div>
-    <table class="simple-table">
-      <tbody><%- renderTierRows(result.thisWeek) %></tbody>
-    </table>
-  </div>
-  <% } %>
-
-  <% if (result.counts.upcoming) { %>
+  <% if (result.thisWeek.length || result.upcoming.length) { %>
   <div class="section-card">
-    <div class="section-card-header">📅 <%= t('cleanup.upcoming') %> (<%= result.counts.upcoming %>) — <span style="text-transform:none;font-weight:400;color:var(--tx2)"><%= t('cleanup.upcoming_hint') %></span></div>
-    <table class="simple-table">
-      <tbody><%- renderTierRows(result.upcoming) %></tbody>
-    </table>
-  </div>
-  <% } %>
+    <div class="section-card-header">📅 <%= t('cleanup.due_soon_section') %></div>
+    <p class="page-sub" style="margin:10px 20px"><%= t('cleanup.due_soon_hint') %></p>
 
-  <% if (result.mediumByTeam.size) { %>
-  <div class="section-card">
-    <div class="section-card-header">🟡 <%= t('cleanup.remaining') %></div>
+    <% if (result.thisWeek.length) { %>
+    <h4 style="margin:0;padding:10px 20px 0;font-size:13px;color:var(--orange)">🟠 <%= t('cleanup.this_week') %> (<%= result.thisWeek.length %>)</h4>
     <table class="simple-table">
-      <thead><tr><th>Team</th><th></th><th></th></tr></thead>
-      <tbody>
-      <% [...result.mediumByTeam.entries()].forEach(([team, bucket]) => { %>
-      <tr>
-        <td><strong><%= team %></strong></td>
-        <td><%= t('cleanup.epic_count', { count: bucket.keys.size }) %> —
-          <%= [...bucket.ruleCounts.entries()].map(([rule, count]) => `${t(RULE_LABEL[rule])} (${count})`).join(', ') %>
-        </td>
-        <td style="text-align:right"><a href="<%= keysJqlUrl([...bucket.keys]) %>" target="_blank" rel="noopener"><%= t('cleanup.view_in_jira') %></a></td>
-      </tr>
-      <% }) %>
-      </tbody>
+      <thead><tr><th><%= t('cleanup.col_team') %></th><th><%= t('cleanup.col_epic') %></th><th><%= t('cleanup.col_due') %></th><th><%= t('cleanup.col_contact') %></th></tr></thead>
+      <tbody><%- result.thisWeek.map(item => row(item, dueText(item))).join('') %></tbody>
     </table>
+    <% } %>
+
+    <% if (result.upcoming.length) { %>
+    <h4 style="margin:0;padding:10px 20px 0;font-size:13px;color:var(--tx2)"><%= t('cleanup.next_weeks') %> (<%= result.upcoming.length %>)</h4>
+    <table class="simple-table">
+      <thead><tr><th><%= t('cleanup.col_team') %></th><th><%= t('cleanup.col_epic') %></th><th><%= t('cleanup.col_due') %></th><th><%= t('cleanup.col_contact') %></th></tr></thead>
+      <tbody><%- result.upcoming.map(item => row(item, dueText(item))).join('') %></tbody>
+    </table>
+    <% } %>
   </div>
   <% } %>
 </div>
+
+<% if (result.teams.length > 1) { %>
+<script>
+(function () {
+  var select = document.getElementById('team-filter');
+  if (!select) return;
+  select.addEventListener('change', function () {
+    var team = select.value;
+    document.querySelectorAll('tr[data-team]').forEach(function (tr) {
+      tr.style.display = (!team || tr.getAttribute('data-team') === team) ? '' : 'none';
+    });
+  });
+})();
+</script>
+<% } %>
 </body>
 </html>
