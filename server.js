@@ -1,6 +1,7 @@
 const express    = require('express');
 const session    = require('express-session');
 const path       = require('path');
+const fs         = require('fs');
 const puppeteer  = require('puppeteer-core');
 const db         = require('./db');
 const jira       = require('./jira');
@@ -35,6 +36,36 @@ if (!BIGPICTURE_TOKEN) console.warn('WARNING: BIGPICTURE_API_TOKEN not set — P
 // it appear on prod. The code itself is on master: when it only lived on its feature branch, the
 // badge vanished every time another branch was deployed to the preview.
 const IS_PREVIEW = process.env.APP_ENV === 'preview';
+// Which preview this is (e.g. "contrib" for a contributor's own preview) and which commit it runs —
+// shown in the Preview badge and served by /version, so a contributor (or their Claude Code
+// session) can tell when their push is live. Set by ops/autodeploy.sh; empty on prod.
+const PREVIEW_NAME = process.env.PREVIEW_NAME || '';
+const APP_VERSION = process.env.APP_VERSION || '';
+
+// What the Preview badge shows: whose preview, and when it was last updated ("màj 05/10 10:42") —
+// a time a person can match against when they pushed, unlike a commit hash. The hash and the change's
+// message go in the tooltip. Read from the deploy agent's last-success file (ops/autodeploy.sh), with a
+// short cache: the file is written right after the new container starts, so it can't be read once at boot.
+let lastSuccessCache = { at: 0, value: null };
+function lastSuccessfulDeploy() {
+  const file = process.env.DEPLOY_STATUS_FILE && path.join(path.dirname(process.env.DEPLOY_STATUS_FILE), 'last-success.json');
+  if (!file) return null;
+  if (Date.now() - lastSuccessCache.at > 15000) {
+    let value = null;
+    try { value = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { /* not deployed by the agent yet */ }
+    lastSuccessCache = { at: Date.now(), value };
+  }
+  return lastSuccessCache.value;
+}
+function previewBadge() {
+  if (!IS_PREVIEW) return { label: '', title: '' };
+  const d = lastSuccessfulDeploy();
+  const when = d && d.at ? `màj ${d.at.slice(8, 10)}/${d.at.slice(5, 7)} ${d.at.slice(11, 16)}` : '';
+  return {
+    label: ['Preview', PREVIEW_NAME, when].filter(Boolean).join(' · '),
+    title: d ? `« ${d.message || ''} » (${d.commit || APP_VERSION})` : (APP_VERSION ? `(${APP_VERSION})` : '')
+  };
+}
 
 // No fallback: a hardcoded default here would let anyone who reads this (public) source forge
 // session cookies for any deployment that forgot to set the real secret.
@@ -451,8 +482,23 @@ app.use((req, res, next) => {
   res.locals.isCreator = !!(req.session && req.session.userId && whatsNew.isCreator(req.session.userId));
   if (res.locals.isCreator) res.locals.whatsNewCount = whatsNew.unseenCount(req.session.userId);
   res.locals.isPreview = IS_PREVIEW;
+  const badge = previewBadge();
+  res.locals.previewLabel = badge.label;
+  res.locals.previewTitle = badge.title;
   next();
 });
+// Unauthenticated, no data: what this instance runs — polled by the contributor tooling
+// (.claude/skills/suricate-preview) to know when a push is deployed. On a contributor preview it
+// also returns the last deploy's status and log tail (ops/autodeploy.sh writes it), since the
+// contributor has no access to the host to read a failed build's log.
+app.get('/version', (req, res) => {
+  let deploy = null;
+  if (process.env.DEPLOY_STATUS_FILE) {
+    try { deploy = JSON.parse(fs.readFileSync(process.env.DEPLOY_STATUS_FILE, 'utf8')); } catch (e) { /* none yet */ }
+  }
+  res.json({ env: IS_PREVIEW ? 'preview' : 'prod', name: PREVIEW_NAME || null, commit: APP_VERSION || null, deploy });
+});
+
 app.get('/lang/:code', (req, res) => {
   res.cookie('lang', req.params.code === 'en' ? 'en' : 'fr', { maxAge: 365 * 24 * 60 * 60 * 1000 });
   res.redirect(req.get('Referer') || '/');
@@ -512,6 +558,19 @@ app.post('/logout', (req, res) => req.session.destroy(() => res.redirect('/login
 // ── WHAT'S NEW ────────────────────────────────────────────────────
 // Readable by anyone logged in, but only creators get the nav badge pointing here. Opening the
 // page is what marks everything as seen.
+// Contributor onboarding guide — any logged-in user can open it, so the link can be sent to a PM
+// in any Claude organisation (an artifact can't be shared across organisations). The preview
+// table comes from ops/previews.json, so adding a contributor updates the page by itself.
+app.get('/contribuer', requireAuth, (req, res) => {
+  let previews = [];
+  try {
+    const raw = JSON.parse(fs.readFileSync(path.join(__dirname, 'ops', 'previews.json'), 'utf8'));
+    previews = Object.entries(raw).filter(([slug]) => !slug.startsWith('_')).map(([slug, p]) => ({ slug, name: p.name, port: p.port }));
+  } catch (e) { console.warn(`ops/previews.json unreadable: ${e.message}`); }
+  const host = (process.env.SURICATE_PUBLIC_URL || 'http://gw.lab.core.ovh.net:31621').replace(/:\d+\/?$/, '');
+  res.render('contribuer', { previews, host, repo: 'cyrillag/Suricate', userName: req.session.userName });
+});
+
 app.get('/whats-new', requireAuth, (req, res) => {
   const lastSeen = (db.prepare('SELECT whats_new_seen_at FROM users WHERE id=?').get(req.session.userId) || {}).whats_new_seen_at || null;
   whatsNew.markSeen(req.session.userId);
@@ -1018,7 +1077,8 @@ function buildReportHtml(proj, report, year, week, isOwner, lang, userName, noti
     stats, health, isOwner,
     backfilled: !!report.backfilled,
     generatedAt: formatDate(new Date(report.created_at * 1000).toISOString()),
-    lang, userName, confluenceUrl, notice, isPreview: IS_PREVIEW
+    lang, userName, confluenceUrl, notice, isPreview: IS_PREVIEW,
+    previewLabel: previewBadge().label, previewTitle: previewBadge().title
   });
 }
 

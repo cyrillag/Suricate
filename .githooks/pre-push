@@ -1,0 +1,17 @@
+#!/bin/sh
+# Suricate — refuses a direct push to master (see CONTRIBUTING.md). master only moves through a
+# reviewed pull request merged by the maintainer, who deploys prod from it. Enabled per clone with:
+#   git config core.hooksPath .githooks
+# The maintainer's own clone opts out with:  git config suricate.maintainer true
+if [ "$(git config --get suricate.maintainer)" = "true" ]; then
+  exit 0
+fi
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/master|refs/heads/main)
+      echo "✋ Push direct sur master refusé — passe par une branche feature/… et une pull request." >&2
+      echo "   (Pour tester : git push --force origin HEAD:preview/contrib — voir CONTRIBUTING.md)" >&2
+      exit 1 ;;
+  esac
+done
+exit 0
