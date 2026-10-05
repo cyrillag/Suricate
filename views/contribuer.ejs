@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title><%= isPreview ? '[PREVIEW] ' : '' %>Contribuer à Suricate — Suricate</title>
+<link rel="stylesheet" href="/app.css">
+<link rel="icon" type="image/png" href="/favicon-32.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<%# Contributor onboarding guide (FUNCTIONAL_RULES.md "Contributors & environments"). French only on
+    purpose: its audience is the PM community contributing to the code; the reference copy is
+    CONTRIBUTING.md in the repo. The preview table is rendered from ops/previews.json. %>
+<style>
+  .ctb{max-width:760px}
+  .ctb-hero{background:var(--mb);color:#fff;border-radius:var(--r);padding:30px 32px;position:relative;overflow:hidden;margin-bottom:8px}
+  .ctb-hero::before{content:"";position:absolute;right:-50px;top:0;width:300px;height:100%;background:rgba(255,255,255,.06);clip-path:polygon(100% 0,100% 100%,0 100%);pointer-events:none}
+  .ctb-hero::after{content:"";position:absolute;right:0;top:0;width:130px;height:60%;background:rgba(115,227,255,.16);clip-path:polygon(0 0,100% 0,100% 100%);pointer-events:none}
+  .ctb-eyebrow{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--yellow);margin:0 0 6px;position:relative}
+  .ctb-hero h1{font-size:34px;font-weight:700;line-height:1.1;margin:0 0 10px;position:relative}
+  .ctb-hero p{font-size:16px;color:rgba(255,255,255,.82);margin:0;max-width:60ch;position:relative}
+  .ctb section{margin-top:36px}
+  .ctb h2{font-size:22px;font-weight:700;color:var(--db);margin:0 0 6px;display:flex;align-items:center;gap:10px}
+  .ctb h2::before{content:"";width:11px;height:11px;flex-shrink:0;background:var(--mb);clip-path:polygon(0 0,100% 50%,0 100%)}
+  .ctb-lead{color:var(--tx2);margin:0 0 16px;max-width:64ch}
+  .ctb-flow{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .ctb-step{background:#fff;border:1px solid var(--bd);border-radius:var(--r);padding:14px 14px 16px;display:flex;flex-direction:column;gap:5px}
+  .ctb-step.me{border-top:4px solid var(--yellow)}
+  .ctb-step.maint{border-top:4px solid var(--mb)}
+  .ctb-step .n{font-size:12px;font-weight:700;color:var(--cobalt);letter-spacing:.06em}
+  .ctb-step b{font-size:15.5px;line-height:1.25;color:var(--db)}
+  .ctb-step span{font-size:14px;color:var(--tx2);line-height:1.45}
+  .ctb-legend{display:flex;gap:18px;font-size:13.5px;color:var(--tx2);margin-top:8px}
+  .ctb-legend i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+  @media(max-width:700px){.ctb-flow{grid-template-columns:1fr 1fr}}
+  @media(max-width:420px){.ctb-flow{grid-template-columns:1fr}}
+  .ctb-setup{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:14px;counter-reset:s}
+  .ctb-setup li{counter-increment:s;display:grid;grid-template-columns:30px 1fr;gap:4px 12px}
+  .ctb-setup li > *{grid-column:2;min-width:0}
+  .ctb-setup li::before{content:counter(s);grid-column:1;grid-row:1 / span 3;width:26px;height:26px;border-radius:50%;background:var(--mb);color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;margin-top:1px}
+  .ctb-setup .t{font-weight:600;color:var(--db)}
+  .ctb-note{font-size:14px;color:var(--tx2)}
+  .ctb-cmd{display:flex;align-items:stretch;background:#F2F3F7;border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;min-width:0}
+  .ctb-cmd code{flex:1;font-family:ui-monospace,Consolas,"Courier New",monospace;font-size:13.5px;padding:9px 12px;overflow-x:auto;white-space:pre;color:var(--db)}
+  .ctb-cmd button{border:0;border-left:1px solid var(--bd);background:transparent;color:var(--cobalt);font:600 13.5px var(--f);padding:0 14px;cursor:pointer;white-space:nowrap}
+  .ctb-cmd button:hover,.ctb-cmd button:focus-visible{background:#E8EFFF;outline:none}
+  .ctb code.i{font-family:ui-monospace,Consolas,"Courier New",monospace;font-size:.88em;background:#F2F3F7;padding:1px 5px;border-radius:3px}
+  .ctb-phrases{background:#fff;border:1px solid var(--bd);border-radius:var(--r)}
+  .ctb-phrase{display:grid;grid-template-columns:minmax(170px,32%) 1fr;gap:14px;padding:16px 18px;border-top:1px solid var(--bd2)}
+  .ctb-phrase:first-child{border-top:0}
+  .ctb-say{font-weight:700;font-size:17px;color:var(--db)}
+  .ctb-does{color:var(--tx2);font-size:14.5px}
+  .ctb-does strong{color:var(--tx)}
+  @media(max-width:560px){.ctb-phrase{grid-template-columns:1fr;gap:4px}}
+  .ctb-badge{background:#9A4B12;border-radius:var(--r);padding:14px 16px 18px;position:relative;display:flex;align-items:center;gap:12px;flex-wrap:wrap;overflow:hidden}
+  .ctb-badge::after{content:"";position:absolute;left:0;right:0;bottom:0;height:5px;background:repeating-linear-gradient(135deg,var(--yellow) 0 12px,#1A1A1A 12px 24px)}
+  .ctb-badge .brand{color:#fff;font-weight:700;font-size:17px}
+  .ctb-check{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+  .ctb-check div{background:#fff;border:1px solid var(--bd);border-radius:var(--r);padding:11px 14px;font-size:14.5px}
+  .ctb-check .ok{border-left:4px solid var(--done)}
+  .ctb-check .wait{border-left:4px solid var(--orange)}
+  .ctb-check b{display:block;color:var(--db)}
+  @media(max-width:560px){.ctb-check{grid-template-columns:1fr}}
+  .ctb-rules{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}
+  .ctb-rules li{display:grid;grid-template-columns:16px 1fr;gap:10px}
+  .ctb-rules li::before{content:"";width:9px;height:9px;margin-top:7px;background:var(--cobalt);clip-path:polygon(0 0,100% 50%,0 100%)}
+  .ctb-callout{background:#fff;border:1px solid var(--bd);border-left:4px solid var(--orange);border-radius:var(--r);padding:14px 18px}
+  .ctb-callout p{margin:0}
+  .ctb-callout p+p{margin-top:8px}
+  .ctb-maint{margin-top:44px;padding-top:24px;border-top:2px solid var(--bd2)}
+  .ctb-maint .ctb-eyebrow{color:var(--cobalt)}
+  .ctb ol.plain{padding-left:22px;margin:0;display:flex;flex-direction:column;gap:6px}
+  .ctb .num{font-variant-numeric:tabular-nums;white-space:nowrap}
+</style>
+</head>
+<body>
+<%- include('_nav', { userName }) %>
+<div class="app-body ctb">
+  <a href="/" class="back-link"><%= t('newProject.back') %></a>
+
+  <header class="ctb-hero">
+    <p class="ctb-eyebrow">Guide d'onboarding</p>
+    <h1>Contribuer à Suricate</h1>
+    <p>Tu proposes une évolution, tu la testes sur ta propre preview, le mainteneur la relit et la met en production. Claude Code fait le travail technique ; cette page te montre le circuit en dix minutes.</p>
+  </header>
+
+  <section>
+    <h2>Le circuit</h2>
+    <p class="ctb-lead">Quatre étapes, toujours les mêmes. Tu n'as besoin d'aucun accès à la machine qui héberge Suricate.</p>
+    <div class="ctb-flow">
+      <div class="ctb-step me"><span class="n">ÉTAPE 1</span><b>Tu décris ton besoin</b><span>Claude Code crée une branche et code la modification.</span></div>
+      <div class="ctb-step me"><span class="n">ÉTAPE 2</span><b>Tu testes sur ta preview</b><span>Ta version se met en ligne toute seule, en une minute environ.</span></div>
+      <div class="ctb-step me"><span class="n">ÉTAPE 3</span><b>Tu ouvres une Pull Request</b><span>Claude Code vérifie les règles du projet et l'envoie.</span></div>
+      <div class="ctb-step maint"><span class="n">ÉTAPE 4</span><b>Le mainteneur relit et met en prod</b><span>Il valide, fusionne, puis déploie pour tout le monde.</span></div>
+    </div>
+    <div class="ctb-legend"><span><i style="background:var(--yellow)"></i>toi</span><span><i style="background:var(--mb)"></i>le mainteneur</span></div>
+  </section>
+
+  <section>
+    <h2>Ton premier jour</h2>
+    <p class="ctb-lead">À faire une seule fois. Il te faut git, Claude Code, et un compte GitHub invité sur le projet par le mainteneur (le dépôt est privé).</p>
+    <ol class="ctb-setup">
+      <li><span class="t">Accepte l'invitation GitHub</span><span class="ctb-note">Tu la reçois par e-mail pour le dépôt <code class="i"><%= repo %></code>.</span></li>
+      <li><span class="t">Récupère le projet</span>
+        <div class="ctb-cmd"><code id="ctb-c1" tabindex="0">git clone https://github.com/<%= repo %>.git &amp;&amp; cd Suricate</code><button type="button" data-copy="ctb-c1">Copier</button></div></li>
+      <li><span class="t">Indique quelle preview est la tienne, et active le garde-fou</span>
+        <div class="ctb-cmd"><code id="ctb-c2" tabindex="0">git config suricate.preview ton-prenom
+git config core.hooksPath .githooks</code><button type="button" data-copy="ctb-c2">Copier</button></div>
+        <span class="ctb-note">Remplace <code class="i">ton-prenom</code> par ton nom dans le tableau des previews, plus bas. Le garde-fou t'empêche d'envoyer par erreur une modification directement en production.</span></li>
+      <li><span class="t">Ouvre Claude Code dans le dossier</span><span class="ctb-note">Il charge tout seul les règles du projet et ses outils. Facultatif mais pratique : installe la commande GitHub <code class="i">gh</code> et lance <code class="i">gh auth login</code>, pour que Claude Code puisse ouvrir tes Pull Requests à ta place.</span></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Au quotidien, trois phrases suffisent</h2>
+    <p class="ctb-lead">Parle à Claude Code normalement. Ces trois demandes couvrent tout le circuit.</p>
+    <div class="ctb-phrases">
+      <div class="ctb-phrase"><div class="ctb-say">« Je voudrais que… »</div><div class="ctb-does">Il crée une branche, lit d'abord les règles métier du projet, puis propose et code la modification. <strong>Si ta demande contredit une règle existante, il te le dit</strong> : c'est voulu, on en discute avant de changer la règle.</div></div>
+      <div class="ctb-phrase"><div class="ctb-say">« Mets ça sur ma preview »</div><div class="ctb-does">Il envoie ta version sur ta preview, attend qu'elle soit en ligne et te donne l'adresse. <strong>Si quelque chose casse, il lit l'erreur et corrige.</strong></div></div>
+      <div class="ctb-phrase"><div class="ctb-say">« Ouvre la PR »</div><div class="ctb-does">Il vérifie que tout est en ordre (règles documentées, textes en français et en anglais, nouveauté annoncée si elle est visible), puis ouvre la Pull Request. <strong>Ensuite, c'est au mainteneur.</strong></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Comment savoir que tu testes la bonne version</h2>
+    <p class="ctb-lead">Ta preview a une barre orange, pour ne jamais la confondre avec la production, et un badge à ton nom avec l'heure de la dernière mise à jour.</p>
+    <div class="ctb-badge" role="img" aria-label="Exemple : badge Preview, Aurélien, mise à jour le 05/10 à 11:34">
+      <span class="brand">Suricate</span>
+      <span class="env-badge">Preview · Aurélien · màj 05/10 11:34</span>
+    </div>
+    <div class="ctb-check">
+      <div class="ok"><b>L'heure suit ton dernier envoi</b>Tu as envoyé à 11:33, le badge dit 11:34 : c'est ta version.</div>
+      <div class="wait"><b>L'heure est plus ancienne</b>La mise en ligne n'est pas finie. Attends une minute et recharge la page.</div>
+    </div>
+    <p class="ctb-note">Au survol du badge, tu vois aussi le message de la dernière modification.</p>
+  </section>
+
+  <section>
+    <h2>Les previews</h2>
+    <p class="ctb-lead">Chacun a la sienne, avec sa propre base de données : tu peux y créer ou supprimer des rapports sans aucun risque pour la production.</p>
+    <table class="simple-table" style="background:#fff;border:1px solid var(--bd)">
+      <thead><tr><th>Qui</th><th>Nom à configurer</th><th>Adresse</th></tr></thead>
+      <tbody>
+        <tr><td>Production (tout le monde)</td><td>—</td><td class="num"><a href="<%= host %>:31621"><%= host.replace(/^https?:\/\//, '') %>:31621</a></td></tr>
+        <% previews.forEach(p => { %>
+        <tr><td><%= p.name %></td><td><code class="i"><%= p.slug %></code></td><td class="num"><a href="<%= host %>:<%= p.port %>"><%= host.replace(/^https?:\/\//, '') %>:<%= p.port %></a></td></tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <p class="ctb-note">Ces adresses ne sont accessibles que depuis le réseau OVHcloud (ou le VPN).</p>
+  </section>
+
+  <section>
+    <h2>Les règles du jeu</h2>
+    <ul class="ctb-rules">
+      <li><span><strong>On ne touche jamais directement à la production.</strong> Tout passe par une Pull Request que le mainteneur relit, puis c'est lui qui déploie.</span></li>
+      <li><span><strong>Les règles métier sont écrites</strong> dans <code class="i">FUNCTIONAL_RULES.md</code>, avec la raison de chacune (souvent un vrai incident). Si une évolution change une règle, on met le fichier à jour dans la même Pull Request.</span></li>
+      <li><span><strong>Ce que les PM verront s'annonce</strong> : une nouveauté visible a son entrée dans la page <a href="/whats-new">Nouveautés</a> et le digest Webex. Claude Code la rédige avec toi.</span></li>
+      <li><span><strong>L'interface parle français et anglais.</strong> Chaque nouveau texte existe dans les deux langues.</span></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Si quelque chose casse</h2>
+    <div class="ctb-callout">
+      <p><strong>Ta preview ne tombe pas.</strong> Si ta nouvelle version ne démarre pas, la précédente est remise en ligne automatiquement, et l'erreur est notée.</p>
+      <p>Claude Code lit cette erreur tout seul quand tu lui demandes de mettre sur ta preview. Tu peux aussi la voir à l'adresse de ta preview suivie de <code class="i">/version</code>. Corrige, puis renvoie : une version en échec n'est pas retentée.</p>
+      <p>Toujours bloqué au bout de quelques minutes ? Préviens le mainteneur, il peut regarder côté machine.</p>
+    </div>
+  </section>
+
+  <section class="ctb-maint">
+    <p class="ctb-eyebrow">Pour le mainteneur</p>
+    <h2>Accueillir une nouvelle personne</h2>
+    <p class="ctb-lead">Environ cinq minutes. Tout le reste de cette page s'applique tel quel à chaque nouveau contributeur.</p>
+    <ol class="plain">
+      <li>Ajouter une ligne à <code class="i">ops/previews.json</code> (nom court, prénom, port libre parmi 31626 à 31629), puis fusionner sur <code class="i">master</code>. Elle apparaît aussitôt dans le tableau ci-dessus.</li>
+      <li>Demander à Claude Code de créer sa preview : il lance sur la machine <code class="i">ops/new-preview.sh &lt;nom&gt;</code>, avec les accès Jira et Confluence, et une copie de la base de production si besoin.</li>
+      <li>Inviter la personne sur GitHub (<code class="i"><%= repo %></code> → Settings → Collaborators).</li>
+      <li>Lui envoyer le lien de cette page et son nom de preview.</li>
+    </ol>
+    <p class="ctb-note">Le détail technique est dans <code class="i">ops/README.md</code> du dépôt, et la version texte de ce guide dans <a href="https://github.com/<%= repo %>/blob/master/CONTRIBUTING.md" target="_blank" rel="noopener">CONTRIBUTING.md</a>.</p>
+  </section>
+</div>
+<script>
+  document.querySelectorAll('[data-copy]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var el = document.getElementById(btn.getAttribute('data-copy'));
+      function selectIt() {
+        var r = document.createRange(); r.selectNodeContents(el);
+        var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+        btn.textContent = 'Sélectionné';
+      }
+      try { navigator.clipboard.writeText(el.textContent).then(function () { btn.textContent = 'Copié'; }, selectIt); }
+      catch (e) { selectIt(); }
+      setTimeout(function () { btn.textContent = 'Copier'; }, 2000);
+    });
+  });
+</script>
+</body>
+</html>

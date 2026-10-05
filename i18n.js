@@ -13,7 +13,8 @@ const DICT = {
     new_tag:      { fr: 'Nouveau',                en: 'New' },
     for_creators: { fr: 'Créateurs de rapports',  en: 'Report creators' },
     shot_alt:     { fr: 'Capture d’écran : {{title}}', en: 'Screenshot: {{title}}' },
-    see_example:  { fr: 'Voir un exemple',        en: 'See an example' }
+    see_example:  { fr: 'Voir un exemple',        en: 'See an example' },
+    contribute_link: { fr: 'Envie de proposer une évolution ? Contribuer à Suricate →', en: 'Want to propose a change? Contribute to Suricate (in French) →' }
   },
   login: {
     subtitle: { fr: 'Connecte-toi avec ton email OVHcloud', en: 'Sign in with your OVHcloud email' },

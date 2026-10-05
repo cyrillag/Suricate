@@ -50,7 +50,9 @@ réussi. Un commit en échec n'est pas retenté en boucle : il faut pousser un c
    Le script crée le dossier, le `compose.yml`, le `preview.env` (secret de session propre + tokens, jamais
    `DIGEST_*`), copie la base si demandé, installe l'agent et sa ligne de cron.
 3. La preview se déploie toute seule au premier push sur `preview/<slug>`.
-4. Inviter la personne sur GitHub (repo privé `cyrillag/Suricate`) et lui envoyer le guide d'onboarding.
+4. Inviter la personne sur GitHub (repo privé `cyrillag/Suricate`) et lui envoyer le guide d'onboarding :
+   `http://gw.lab.core.ovh.net:31621/contribuer` (dans l'app, accessible à tout utilisateur connecté ; le
+   tableau des previews s'y met à jour tout seul depuis `ops/previews.json`).
 
 Attention au disque (≈1,5 Go libres) : chaque preview ajoute une image (couches en grande partie partagées)
 et une base. Après une modification de `ops/autodeploy.sh` mergée sur master, relancer
