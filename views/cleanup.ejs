@@ -27,12 +27,29 @@
   </div>
 
   <%
-    function problemText(item) {
-      if (item.rule === 'overdue')            return t('cleanup.detail_overdue', { days: item.days, date: item.date, status: item.epic.status });
-      if (item.rule === 'not_started')        return t('cleanup.detail_not_started', { days: item.days, date: item.date, status: item.epic.status });
-      if (item.rule === 'date_inconsistent')  return t('cleanup.detail_date_inconsistent', { start: item.start, end: item.end });
-      if (item.rule === 'no_start')           return t('cleanup.detail_no_start');
-      if (item.rule === 'no_end')             return t('cleanup.detail_no_end');
+    // Status/date contradiction vs. missing field: two equally-weighted clusters (neither
+    // is "worse"), each with its own badge colour so the *type* of problem is readable
+    // before the sentence next to it (2026-10, direct user feedback: a full sentence per
+    // row wasn't scannable once every anomaly type shared one undifferentiated table).
+    const BADGE = {
+      overdue:            { cls: 'tag-alert', key: 'cleanup.rule_overdue' },
+      not_started:        { cls: 'tag-alert', key: 'cleanup.rule_not_started' },
+      date_inconsistent:  { cls: 'tag-alert', key: 'cleanup.rule_date_inconsistent' },
+      no_assignee:        { cls: 'tag-info',  key: 'cleanup.rule_no_assignee' },
+      no_start:           { cls: 'tag-info',  key: 'cleanup.rule_no_start' },
+      no_end:             { cls: 'tag-info',  key: 'cleanup.rule_no_end' },
+    };
+    function badge(item) {
+      const b = BADGE[item.rule];
+      return `<span class="${b.cls}">${t(b.key)}</span>`;
+    }
+    // Only the rules with real substance beyond their badge get a detail sentence — a
+    // missing field's badge already says everything ("Sans start date"), so a repeated
+    // "No start date." underneath it would be pure noise.
+    function detailText(item) {
+      if (item.rule === 'overdue')           return t('cleanup.detail_overdue', { days: item.days, date: item.date, status: item.epic.status });
+      if (item.rule === 'not_started')       return t('cleanup.detail_not_started', { days: item.days, date: item.date, status: item.epic.status });
+      if (item.rule === 'date_inconsistent') return t('cleanup.detail_date_inconsistent', { start: item.start, end: item.end });
       return '';
     }
     function dueText(item) {
@@ -43,30 +60,59 @@
       if (c.isReporter) return t('cleanup.contact_reporter_fallback', { name: c.name });
       return c.name;
     }
-    // One row, shared by every table on this page — Team is a real, filterable column
-    // (2026-10: replaced an earlier per-team sub-header grouping, which hid rows from
-    // anyone not scanning top-to-bottom) rather than a row-grouping scheme.
-    function row(item, detailText) {
+    // One row, shared by every table on this page. Team and Assignee are both real,
+    // filterable columns/attributes (2026-10: replaced an earlier per-team sub-header
+    // grouping — a column you can filter serves the scan need without ever hiding a row
+    // from someone not reading top-to-bottom). Assignee filtering must cover "no assignee
+    // at all" as its own selectable value, not just real names — data-assignee is the
+    // empty string in that case, matched by the filter's own "(empty)" option.
+    function row(item, middleHtml) {
       const team = item.epic.team || '—';
+      const assignee = item.epic.assignee || '';
       return `
-      <tr data-team="${team}">
+      <tr data-team="${team}" data-assignee="${assignee}">
         <td><strong>${team}</strong></td>
         <td style="white-space:nowrap"><a href="${issueUrl(item.epic.jira_key)}" target="_blank" rel="noopener"><strong>${item.epic.jira_key}</strong></a><br><span class="page-sub" style="margin:0">${item.epic.summary}</span></td>
-        <td>${detailText}</td>
+        <td>${middleHtml}</td>
         <td style="white-space:nowrap;text-align:right">${contactText(item.contact)}</td>
       </tr>`;
     }
+    function anomalyRow(item) {
+      const detail = detailText(item);
+      return row(item, `${badge(item)}${detail ? `<br><span class="page-sub" style="margin:0">${detail}</span>` : ''}`);
+    }
+    function dueRow(item) {
+      return row(item, dueText(item));
+    }
   %>
 
-  <% if (result.teams.length > 1) { %>
-  <div class="section-card" style="padding:14px 20px">
-    <label for="team-filter" style="font-size:13px;font-weight:600;color:var(--tx2);margin-right:8px"><%= t('cleanup.filter_label') %></label>
-    <select id="team-filter" class="field-input" style="display:inline-block;width:auto;padding:6px 10px">
-      <option value=""><%= t('cleanup.filter_all') %></option>
-      <% result.teams.forEach(team => { %>
-      <option value="<%= team %>"><%= team %></option>
-      <% }) %>
-    </select>
+  <% if (result.teams.length > 1 || result.assignees.length > 1 || result.hasUnassigned) { %>
+  <div class="section-card" style="padding:14px 20px;display:flex;flex-wrap:wrap;gap:18px;align-items:center">
+    <% if (result.teams.length > 1) { %>
+    <div>
+      <label for="team-filter" style="font-size:13px;font-weight:600;color:var(--tx2);margin-right:6px"><%= t('cleanup.filter_team_label') %></label>
+      <select id="team-filter" class="field-input" style="display:inline-block;width:auto;padding:6px 10px">
+        <option value=""><%= t('cleanup.filter_all') %></option>
+        <% result.teams.forEach(team => { %>
+        <option value="<%= team %>"><%= team %></option>
+        <% }) %>
+      </select>
+    </div>
+    <% } %>
+    <% if (result.assignees.length > 1 || (result.assignees.length && result.hasUnassigned)) { %>
+    <div>
+      <label for="assignee-filter" style="font-size:13px;font-weight:600;color:var(--tx2);margin-right:6px"><%= t('cleanup.filter_assignee_label') %></label>
+      <select id="assignee-filter" class="field-input" style="display:inline-block;width:auto;padding:6px 10px">
+        <option value=""><%= t('cleanup.filter_all') %></option>
+        <% if (result.hasUnassigned) { %>
+        <option value="__empty__"><%= t('cleanup.filter_unassigned') %></option>
+        <% } %>
+        <% result.assignees.forEach(name => { %>
+        <option value="<%= name %>"><%= name %></option>
+        <% }) %>
+      </select>
+    </div>
+    <% } %>
   </div>
   <% } %>
 
@@ -82,7 +128,7 @@
     <p class="page-sub" style="margin:10px 20px"><%= t('cleanup.anomalies_hint') %></p>
     <table class="simple-table">
       <thead><tr><th><%= t('cleanup.col_team') %></th><th><%= t('cleanup.col_epic') %></th><th><%= t('cleanup.col_problem') %></th><th><%= t('cleanup.col_contact') %></th></tr></thead>
-      <tbody><%- result.anomalies.map(item => row(item, problemText(item))).join('') %></tbody>
+      <tbody><%- result.anomalies.map(anomalyRow).join('') %></tbody>
     </table>
   </div>
   <% } %>
@@ -96,7 +142,7 @@
     <h4 style="margin:0;padding:10px 20px 0;font-size:13px;color:var(--orange)">🟠 <%= t('cleanup.this_week') %> (<%= result.thisWeek.length %>)</h4>
     <table class="simple-table">
       <thead><tr><th><%= t('cleanup.col_team') %></th><th><%= t('cleanup.col_epic') %></th><th><%= t('cleanup.col_due') %></th><th><%= t('cleanup.col_contact') %></th></tr></thead>
-      <tbody><%- result.thisWeek.map(item => row(item, dueText(item))).join('') %></tbody>
+      <tbody><%- result.thisWeek.map(dueRow).join('') %></tbody>
     </table>
     <% } %>
 
@@ -104,26 +150,31 @@
     <h4 style="margin:0;padding:10px 20px 0;font-size:13px;color:var(--tx2)"><%= t('cleanup.next_weeks') %> (<%= result.upcoming.length %>)</h4>
     <table class="simple-table">
       <thead><tr><th><%= t('cleanup.col_team') %></th><th><%= t('cleanup.col_epic') %></th><th><%= t('cleanup.col_due') %></th><th><%= t('cleanup.col_contact') %></th></tr></thead>
-      <tbody><%- result.upcoming.map(item => row(item, dueText(item))).join('') %></tbody>
+      <tbody><%- result.upcoming.map(dueRow).join('') %></tbody>
     </table>
     <% } %>
   </div>
   <% } %>
 </div>
 
-<% if (result.teams.length > 1) { %>
 <script>
 (function () {
-  var select = document.getElementById('team-filter');
-  if (!select) return;
-  select.addEventListener('change', function () {
-    var team = select.value;
+  var teamSelect = document.getElementById('team-filter');
+  var assigneeSelect = document.getElementById('assignee-filter');
+  if (!teamSelect && !assigneeSelect) return;
+  function applyFilters() {
+    var team = teamSelect ? teamSelect.value : '';
+    var assignee = assigneeSelect ? assigneeSelect.value : '';
     document.querySelectorAll('tr[data-team]').forEach(function (tr) {
-      tr.style.display = (!team || tr.getAttribute('data-team') === team) ? '' : 'none';
+      var teamOk = !team || tr.getAttribute('data-team') === team;
+      var rowAssignee = tr.getAttribute('data-assignee') || '';
+      var assigneeOk = !assignee || (assignee === '__empty__' ? rowAssignee === '' : rowAssignee === assignee);
+      tr.style.display = (teamOk && assigneeOk) ? '' : 'none';
     });
-  });
+  }
+  if (teamSelect) teamSelect.addEventListener('change', applyFilters);
+  if (assigneeSelect) assigneeSelect.addEventListener('change', applyFilters);
 })();
 </script>
-<% } %>
 </body>
 </html>

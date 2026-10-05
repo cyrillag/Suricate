@@ -17,8 +17,9 @@ function daysBetween(a, b) {
 // important, which isn't the point):
 //
 // - ANOMALIES: something is actually wrong — overdue, not started despite a past start
-//   date, inconsistent dates, or a missing start/end date. All five rules are listed
-//   individually, with equal weight, in one table.
+//   date, inconsistent dates, or missing assignee/start/end date. All six rules are listed
+//   individually, with equal weight, in one table (no_assignee was dropped then reinstated
+//   in the same week, 2026-10 — the user reconsidered after using the redesigned page).
 // - Due-soon ("this week" / "next 2 weeks"): not an anomaly at all — a perfectly healthy
 //   epic lands here purely because its end date is close. Kept in its own section, for
 //   planning vigilance, not tracking hygiene.
@@ -43,6 +44,7 @@ function checkEpic(epic, today) {
   const { start_date: start, end_date: end } = epic;
 
   if (!isDone) {
+    if (!epic.assignee) findings.push({ rule: 'no_assignee' });
     if (!start) findings.push({ rule: 'no_start' });
     if (!end) findings.push({ rule: 'no_end' });
   }
@@ -78,7 +80,7 @@ function contact(epic) {
   return null;
 }
 
-const ANOMALY_RULES = new Set(['overdue', 'not_started', 'date_inconsistent', 'no_start', 'no_end']);
+const ANOMALY_RULES = new Set(['overdue', 'not_started', 'date_inconsistent', 'no_assignee', 'no_start', 'no_end']);
 
 function byTeamThenKey(a, b) {
   return (a.epic.team || '').localeCompare(b.epic.team || '') || a.epic.jira_key.localeCompare(b.epic.jira_key);
@@ -94,11 +96,14 @@ function runQualityCheck(epics, today = new Date()) {
   const thisWeek = [];
   const upcoming = [];
   const teams = new Set();
+  const assignees = new Set(); // real names only; "unassigned" is a separate flag, not a name
+  let hasUnassigned = false;
 
   for (const epic of epics) {
     const findings = checkEpic(epic, today);
     if (!findings.length) continue;
     teams.add(epic.team || '—');
+    if (epic.assignee) assignees.add(epic.assignee); else hasUnassigned = true;
     for (const f of findings) {
       const item = { epic, contact: contact(epic), ...f };
       if (ANOMALY_RULES.has(f.rule)) anomalies.push(item);
@@ -116,6 +121,8 @@ function runQualityCheck(epics, today = new Date()) {
     thisWeek,
     upcoming,
     teams: [...teams].sort((a, b) => a.localeCompare(b)),
+    assignees: [...assignees].sort((a, b) => a.localeCompare(b)),
+    hasUnassigned,
     totalEpics: epics.length,
   };
 }

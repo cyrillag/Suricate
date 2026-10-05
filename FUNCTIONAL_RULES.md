@@ -695,8 +695,17 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   is just as much a planning problem).
   - **⚠️ Incohérences de suivi / Tracking inconsistencies**: overdue (end date passed, status
     still active); not started despite a past start date; inconsistent dates (start after
-    end); missing start date; missing end date. All five listed individually, in one table,
-    with equal visual weight — no rule is demoted to a count.
+    end); missing assignee; missing start date; missing end date. All six listed
+    individually, in one table, with equal visual weight — no rule is demoted to a count.
+    Each row leads with a short, coloured badge naming the rule itself (e.g. "En retard",
+    "Sans start date") before any detail sentence — added 2026-10, direct feedback that a
+    full sentence per row wasn't something you could scan, you had to read it. Two badge
+    colours, not a severity scale: red (`tag-alert`) for a status/date contradiction
+    (overdue, not started, inconsistent dates), neutral (`tag-info`) for a missing field
+    (assignee, start, end) — same size/weight for both, since neither cluster is "worse".
+    A missing-field row has no further detail sentence (the badge already says everything);
+    a contradiction row keeps its sentence underneath, since that one carries information
+    the badge can't (the actual day count, date and current status).
   - **📅 Vigilance planning / Planning watch**: 🟠 due this week (end date within 7 days) and
     an unlabelled "next 2 weeks" group (end date 8–14 days out). Explicitly **not** an
     anomaly — a perfectly healthy epic lands here purely because it's closing soon. Kept in
@@ -708,16 +717,21 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   depuis {{days}}j, statut toujours « {{status}} »", not just the date delta with the status
   left for the reader to cross-reference from elsewhere on the row (direct user feedback,
   2026-10: the original wording wasn't explicit enough).
-- **Team is a real, filterable column — not a row-grouping scheme.** An earlier version
-  (2026-10, briefly) grouped rows under a per-team sub-header; replaced by a plain "Team"
-  column plus a `<select>` filter (vanilla JS, toggles `tr[data-team]` visibility) after
-  direct feedback — a column you can filter on serves the same scanning need without ever
-  hiding a row from someone who isn't reading top-to-bottom.
-- **Missing-start/end-date checks are skipped once an epic's `mapStatus` bucket is `done`** —
-  closed work doesn't need its dates backfilled. This reuses `jira.mapStatus`'s own
-  done/in-progress/paused/blocked/to-start buckets (the same ones driving the Deliverable matrix
-  and health badge) rather than Jira's raw status, so paused/on-hold epics keep this app's
-  already-agreed semantics instead of a generically re-derived one.
+- **Team and Assignee are real, filterable columns/attributes — not a row-grouping scheme.**
+  An earlier version (2026-10, briefly) grouped rows under a per-team sub-header; replaced by
+  a plain "Team" column plus a `<select>` filter (vanilla JS, toggles `tr[data-team]`
+  visibility) after direct feedback — a column you can filter on serves the same scanning
+  need without ever hiding a row from someone who isn't reading top-to-bottom. The Assignee
+  filter works the same way and combines with the Team one (both must match), and **"no
+  assignee at all" is its own selectable value** (`data-assignee=""`, a dedicated "(vide —
+  sans assignee)" option) — not just a list of real names, so a PM can isolate exactly the
+  unassigned epics in one click.
+- **Missing-assignee/start/end-date checks are skipped once an epic's `mapStatus` bucket is
+  `done`** — closed work doesn't need its ownership or dates backfilled. This reuses
+  `jira.mapStatus`'s own done/in-progress/paused/blocked/to-start buckets (the same ones
+  driving the Deliverable matrix and health badge) rather than Jira's raw status, so
+  paused/on-hold epics keep this app's already-agreed semantics instead of a generically
+  re-derived one.
 - **A Cancelled or Rejected epic is skipped from every check, not just the missing-metadata
   ones** — same treatment as a Done epic (no overdue/not-started/inconsistent-dates/
   missing-metadata findings). `mapStatus` has no bucket for "irrelevant, stop checking" (it
@@ -726,13 +740,16 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   exclusion Planning already applies, extended here to also cover Rejected. Without this, a
   cancelled epic with a stale past end date read as an active, overdue tracking problem (seen
   in production: NCC-2865 and CLDAPI-2009, both Cancelled, both flagged as overdue/not-started).
-- **No missing-assignee check.** A missing assignee doesn't stop a project moving forward, so
-  it's not flagged as an anomaly — only missing start/end date do. The sibling Webex bot
-  (jira-hygiene-report) made the same call shortly after (both tools are allowed to diverge,
-  but didn't here — keep them in sync if one changes this again).
+- **Missing-assignee is back as an anomaly** (reinstated 2026-10, the same week it was
+  dropped — direct user feedback after trying the redesigned page: a missing assignee *is*
+  worth flagging). The sibling Webex bot (jira-hygiene-report) does **not** have this rule —
+  the two tools previously stayed in sync on this exact point and now diverge; revisit there
+  too if this sticks.
 - **The "responsible" contact shown on every row is the assignee, falling back to the
-  reporter** when the assignee is empty — purely a display choice, never tied to whether a
-  row is flagged at all.
+  reporter** when the assignee is empty. Display-only and independent of the Assignee
+  filter above, which reads the real `epic.assignee` field, not this fallback — filtering to
+  "(vide)" can still show a row whose Contact column displays a reporter's name; that's
+  intentional (the empty assignee is still true, the reporter is just who to chase about it).
 - **Visible to every authenticated user, no ownership check** — same rule as the
   project-detail and report-view pages (see Visibility & permissions): it's read-only, and a
   weekly report is routinely shared with people who don't own the project.

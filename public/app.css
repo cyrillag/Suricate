@@ -172,6 +172,16 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 
 /* TAGS */
 .tag{font-size:12px;background:var(--gnd);border:1px solid var(--bd2);padding:3px 9px;border-radius:2px;color:var(--tx2);margin-right:5px;display:inline-block}
+/* Cleanup: a row's problem type, readable before the detail sentence next to it (2026-10,
+   direct user feedback — scanning a type name is immediate, reading a full sentence isn't).
+   Same size/weight as .tag on purpose: a missing field is as real an anomaly as a status
+   contradiction, so neither gets a visually "louder" treatment — only the colour differs,
+   marking the two natural clusters (status/date contradiction vs. missing field). */
+.tag-alert{font-size:12px;font-weight:700;background:#FEF0EE;border:1px solid #F4A17D;padding:3px 9px;border-radius:2px;color:var(--blk);margin-right:5px;display:inline-block;white-space:nowrap}
+/* Same weight as .tag-alert, neutral colour — the "missing field" cluster (not a status/date
+   contradiction, but an equally real gap). A plain .tag reads lighter/decorative elsewhere in
+   the app (ETA, counts), so this is its own class rather than bolding .tag globally. */
+.tag-info{font-size:12px;font-weight:700;background:var(--gnd);border:1px solid var(--bd2);padding:3px 9px;border-radius:2px;color:var(--tx2);margin-right:5px;display:inline-block;white-space:nowrap}
 
 @media(max-width:700px){
   .project-grid{grid-template-columns:1fr}

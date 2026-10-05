@@ -181,8 +181,10 @@ const DICT = {
     this_week: { fr: 'Cette semaine',             en: 'This week' },
     next_weeks: { fr: 'Dans les 2 semaines',      en: 'Next 2 weeks' },
 
-    filter_label: { fr: 'Filtrer par équipe :',   en: 'Filter by team:' },
-    filter_all: { fr: 'Toutes les équipes',       en: 'All teams' },
+    filter_team_label: { fr: 'Équipe :',          en: 'Team:' },
+    filter_assignee_label: { fr: 'Assignee :',    en: 'Assignee:' },
+    filter_all: { fr: 'Toutes',                   en: 'All' },
+    filter_unassigned: { fr: '(vide — sans assignee)', en: '(empty — no assignee)' },
 
     col_team: { fr: 'Équipe',                     en: 'Team' },
     col_epic: { fr: 'Epic',                       en: 'Epic' },
@@ -190,12 +192,17 @@ const DICT = {
     col_contact: { fr: 'Contact',                 en: 'Contact' },
     col_due: { fr: 'Échéance',                    en: 'Due' },
 
+    rule_overdue: { fr: 'En retard',              en: 'Overdue' },
+    rule_not_started: { fr: 'Non démarrée',       en: 'Not started' },
+    rule_date_inconsistent: { fr: 'Dates incohérentes', en: 'Inconsistent dates' },
+    rule_no_assignee: { fr: 'Sans assignee',      en: 'No assignee' },
+    rule_no_start: { fr: 'Sans start date',       en: 'No start date' },
+    rule_no_end: { fr: 'Sans end date',           en: 'No end date' },
+
     detail_overdue:  { fr: 'End date dépassée depuis {{days}} j ({{date}}) — statut toujours « {{status}} ».', en: 'End date passed {{days}}d ago ({{date}}) — status still "{{status}}".' },
     detail_due_soon: { fr: 'Échéance dans {{days}} j ({{date}}).', en: 'Due in {{days}}d ({{date}}).' },
-    detail_not_started: { fr: 'Start date dépassée depuis {{days}} j ({{date}}) — statut toujours « {{status}} », non démarrée.', en: 'Start date passed {{days}}d ago ({{date}}) — status still "{{status}}", not started.' },
+    detail_not_started: { fr: 'Start date dépassée depuis {{days}} j ({{date}}) — statut toujours « {{status}} ».', en: 'Start date passed {{days}}d ago ({{date}}) — status still "{{status}}".' },
     detail_date_inconsistent: { fr: 'Start date ({{start}}) postérieure à la end date ({{end}}).', en: 'Start date ({{start}}) is after the end date ({{end}}).' },
-    detail_no_start: { fr: 'Sans start date.',    en: 'No start date.' },
-    detail_no_end: { fr: 'Sans end date.',        en: 'No end date.' },
 
     contact_reporter_fallback: { fr: '{{name}} (reporter, pas d’assignee)', en: '{{name}} (reporter, no assignee)' },
     contact_none: { fr: 'non identifié',          en: 'unidentified' }
