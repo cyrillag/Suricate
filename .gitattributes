@@ -1,0 +1,4 @@
+# Shell scripts and git hooks must keep LF endings, also when checked out on Windows
+# (a CRLF shebang breaks them: "/bin/sh^M: bad interpreter").
+*.sh text eol=lf
+.githooks/* text eol=lf
