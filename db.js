@@ -165,6 +165,14 @@ ensureColumn('projects', 'bigpicture_box_id', 'bigpicture_box_id TEXT');
 // populated via the BigPicture path — existing epics_cache readers (Cleanup, project detail epic
 // count) don't look at this column and are unaffected by its presence.
 ensureColumn('epics_cache', 'parent_key', 'parent_key TEXT');
+// The cached issue's own Jira issuetype. Most epics_cache writers only ever fetch Epics, but
+// Confluence-sourced workstreams and Planning Light's BigPicture-scoped search can both
+// legitimately cache non-Epic rows (a workstream's Jira cell, or a box's narrowing query, can
+// reference a Task/Story/Bug) — fine for the Deliverable matrix/Planning, which care about
+// status regardless of type, but Cleanup must only ever look at Epics (see its route in
+// server.js). NULL on rows cached before this column existed, until their next refresh —
+// treated as "unknown, don't show" by Cleanup rather than assumed to be an Epic.
+ensureColumn('epics_cache', 'issuetype', 'issuetype TEXT');
 // The fully-resolved Planning Light tree (scope + hierarchy + rollup dates + hide/rename/group
 // overrides already applied), frozen at report-generation time — same frozen-snapshot rule as
 // workstreams_snapshot_json/epics_snapshot_json: a past week's report must never silently change

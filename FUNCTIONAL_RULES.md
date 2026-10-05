@@ -688,6 +688,17 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   were removed project-wide (see Project onboarding & editing) — Cleanup reuses the existing
   Generate/Refresh form as-is (shown on the Cleanup page too when the viewer is the owner)
   instead of introducing its own refresh action.
+- **Epics only — never a Task/Story/Bug, even though `epics_cache` isn't epic-exclusive.**
+  Two of its writers legitimately cache non-Epic rows: a Confluence-sourced workstream's Jira
+  cell can embed a Task/Story/Bug directly (`getEpicsByKeys`), and Planning Light's
+  BigPicture-scoped search resolves a box's own narrowing query, not an epic hierarchy walk
+  (`searchByJql` — verified against a real box: 246 issues, only 31 Epics). Both are correct
+  for the Deliverable matrix/Planning, which care about status regardless of type, but a
+  real bug (2026-10, user-reported on a project using Planning Light): Cleanup had no type
+  filter of its own and was checking those Task/Story/Bug rows as if they were epics. Fixed
+  with an `issuetype` column on `epics_cache`, populated by every writer, filtered to `=
+  'Epic'` in Cleanup's own query — a row cached before this column existed has it NULL and
+  is excluded too (not assumed to be an Epic) until its next refresh repopulates it.
 - **Two groups, not a severity ladder** (reworked 2026-10 from an earlier 4-tier
   high/this-week/upcoming/medium split, after the user pushed back: collapsing missing
   start/end dates into a lesser, count-only tier made them read as less important than an

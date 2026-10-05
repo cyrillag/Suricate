@@ -247,7 +247,7 @@ const upsertWorkstreamFromConfluence = db.prepare(`
   ON CONFLICT(project_id,deliverable,name) DO UPDATE SET
     team=excluded.team, jira_key=excluded.jira_key, default_status=excluded.default_status, sort_order=excluded.sort_order`);
 
-const insEpicCache = db.prepare('INSERT OR REPLACE INTO epics_cache(project_id,jira_key,summary,team,status,start_date,end_date,assignee,reporter,parent_key,cached_at) VALUES(?,?,?,?,?,?,?,?,?,?,unixepoch())');
+const insEpicCache = db.prepare('INSERT OR REPLACE INTO epics_cache(project_id,jira_key,summary,team,status,start_date,end_date,assignee,reporter,parent_key,issuetype,cached_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,unixepoch())');
 
 // Full tree-walk auto-discovery from a root LVL2 epic — creates BOTH the workstream list
 // (grouped by team) AND epics_cache. Used only for projects with no Confluence page: once a
@@ -257,7 +257,7 @@ const insEpicCache = db.prepare('INSERT OR REPLACE INTO epics_cache(project_id,j
 async function seedWorkstreamsFromJiraTree(projectId, rootEpic) {
   const epics = await jira.getChildEpics(JIRA_TOKEN, rootEpic);
   epics.forEach((e, i) => {
-    insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter, null);
+    insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter, null, e.type);
     upsertWorkstreamFromJira.run(projectId, e.deliverable, e.summary, e.team, e.key, i);
   });
   reconcileWorkstreams(projectId, epics.map(e => ({ deliverable: e.deliverable, name: e.summary })));
@@ -272,7 +272,7 @@ async function seedWorkstreamsFromJiraTree(projectId, rootEpic) {
 async function refreshEpicStatuses(projectId, jiraKeyFields) {
   const keys = [...new Set(jiraKeyFields.flatMap(splitJiraKeys))];
   const epics = await jira.getEpicsByKeys(JIRA_TOKEN, keys);
-  epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter, null));
+  epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter, null, e.type));
   return epics.length;
 }
 
@@ -285,7 +285,7 @@ async function refreshEpicStatuses(projectId, jiraKeyFields) {
 // path (FUNCTIONAL_RULES.md "Planning Light").
 async function refreshFullEpicTree(projectId, rootEpic) {
   const epics = await jira.getPortfolioEpics(JIRA_TOKEN, rootEpic);
-  epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter, null));
+  epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter, null, e.type));
   return epics.length;
 }
 
@@ -296,7 +296,7 @@ async function refreshFullEpicTree(projectId, rootEpic) {
 async function resolvePlanningTree(projectId, boxId, rootEpic) {
   const { queries, manualKeys } = await bigpicture.getScopeDefinition(BIGPICTURE_TOKEN, boxId);
   const epics = await jira.searchByJql(JIRA_TOKEN, queries, manualKeys);
-  epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter, e.parentKey));
+  epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter, e.parentKey, e.type));
   return buildPlanningTree(epics, rootEpic);
 }
 
@@ -738,7 +738,11 @@ app.get('/projects/:slug/cleanup', requireAuth, (req, res) => {
   const proj = db.prepare('SELECT p.*, u.name as owner_name FROM projects p JOIN users u ON u.id=p.user_id WHERE p.slug=?').get(req.params.slug);
   if (!proj) return res.status(404).send('Project not found.');
   const isOwner = proj.user_id === req.session.userId;
-  const epics = db.prepare('SELECT * FROM epics_cache WHERE project_id=? ORDER BY team, jira_key').all(proj.id);
+  // issuetype='Epic' only — Confluence-sourced workstreams and Planning Light's BigPicture
+  // scope can both cache a Task/Story/Bug alongside real epics in this same table (see
+  // db.js's issuetype column comment); Cleanup only ever checks Epics. A row cached before
+  // this column existed has issuetype NULL and is excluded too, not assumed to be an Epic.
+  const epics = db.prepare("SELECT * FROM epics_cache WHERE project_id=? AND issuetype='Epic' ORDER BY team, jira_key").all(proj.id);
   const lastSynced = epics.reduce((max, e) => Math.max(max, e.cached_at || 0), 0) || null;
   const result = qualityCheck.runQualityCheck(epics);
   res.render('cleanup', {

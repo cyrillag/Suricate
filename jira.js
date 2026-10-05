@@ -105,6 +105,7 @@ async function getChildEpics(token, rootEpic) {
     team:       extractTeam(i.key),
     deliverable,
     status:     i.fields.status?.name || 'To Do',
+    type:       i.fields.issuetype?.name || null,
     assignee:   i.fields.assignee?.displayName || null,
     reporter:   i.fields.reporter?.displayName || null,
     // No fallback to duedate/created/resolutiondate: an epic with no Start/End date filled in
@@ -161,6 +162,7 @@ async function getPortfolioEpics(token, rootEpic) {
     key:      i.key,
     summary:  i.fields.summary,
     team:     extractTeam(i.key),
+    type:     i.fields.issuetype?.name || null,
     status:   i.fields.status?.name || 'To Do',
     assignee: i.fields.assignee?.displayName || null,
     reporter: i.fields.reporter?.displayName || null,
@@ -263,6 +265,12 @@ async function getEpicsByKeys(token, keys) {
       key:      i.key,
       summary:  i.fields.summary,
       team:     extractTeam(i.key),
+      // This path (Confluence-sourced workstream keys) is the one place an epics_cache row
+      // can legitimately be a non-Epic — a workstream's Jira cell can embed a Task/Story/Bug
+      // directly (see FUNCTIONAL_RULES.md matrix rules). Fine for the Deliverable matrix,
+      // which cares about status regardless of type — but Cleanup must filter these out
+      // (see server.js's cleanup route), so the type has to travel with the row.
+      type:     i.fields.issuetype?.name || null,
       status:   i.fields.status?.name || 'To Do',
       assignee: i.fields.assignee?.displayName || null,
       reporter: i.fields.reporter?.displayName || null,
