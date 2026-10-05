@@ -240,3 +240,5 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 .wn-shot{display:block;max-width:100%;height:auto;border:1px solid var(--bd2);border-radius:var(--r);box-shadow:0 1px 4px rgba(0,24,94,.08)}
 .wn-link{display:inline-block;margin-top:12px;font-size:14px;font-weight:600;color:var(--cobalt);text-decoration:none}
 .wn-link:hover{text-decoration:underline}
+/* Cleanup: confirmation after an in-place refresh (same footprint as the warning banner). */
+.cl-refreshed{background:#EEF7E0;color:var(--done);border:1px solid #BDE475;padding:11px 14px;border-radius:var(--r);font-size:13px;margin-bottom:16px}

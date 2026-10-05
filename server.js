@@ -745,11 +745,35 @@ app.get('/projects/:slug/cleanup', requireAuth, (req, res) => {
   const epics = db.prepare("SELECT * FROM epics_cache WHERE project_id=? AND issuetype='Epic' ORDER BY team, jira_key").all(proj.id);
   const lastSynced = epics.reduce((max, e) => Math.max(max, e.cached_at || 0), 0) || null;
   const result = qualityCheck.runQualityCheck(epics);
+  const syncWarning = req.query.syncSource ? { source: req.query.syncSource, message: req.query.syncMessage || '' } : null;
+  const refreshed = req.query.refreshed != null ? parseInt(req.query.refreshed, 10) : null;
   res.render('cleanup', {
-    proj, isOwner, result, lastSynced, formatDate,
+    proj, isOwner, result, lastSynced, formatDate, syncWarning, refreshed,
     issueUrl: qualityCheck.jiraIssueUrl,
     userName: req.session.userName, currentWeek: currentWeekStr()
   });
+});
+
+// Refresh Cleanup's data from its own page — it used to say "use Generate on the project page",
+// a round trip every time (and a report regenerated as a side effect). Re-reads exactly the epics
+// Cleanup checks, the same way report generation does (BigPicture scope for a Planning Light
+// project, the full portfolio walk otherwise, plus the epics behind the Confluence workstreams),
+// into epics_cache only: no report row, no workstream list touched. Open to any logged-in viewer,
+// like the page itself — it only reads Jira; nothing a PM configured can change through it.
+app.post('/projects/:slug/cleanup/refresh', requireAuth, async (req, res) => {
+  const proj = db.prepare('SELECT * FROM projects WHERE slug=?').get(req.params.slug);
+  if (!proj) return res.status(404).send('Project not found.');
+  const back = `/projects/${proj.slug}/cleanup`;
+  try {
+    if (proj.bigpicture_box_id && BIGPICTURE_TOKEN) await resolvePlanningTree(proj.id, proj.bigpicture_box_id, proj.jira_root_epic);
+    else await refreshFullEpicTree(proj.id, proj.jira_root_epic);
+    const wsKeys = db.prepare("SELECT jira_key FROM workstreams WHERE project_id=? AND jira_key IS NOT NULL AND jira_key<>''").all(proj.id).map(w => w.jira_key);
+    if (wsKeys.length) await refreshEpicStatuses(proj.id, wsKeys);
+    const n = db.prepare("SELECT COUNT(*) n FROM epics_cache WHERE project_id=? AND issuetype='Epic'").get(proj.id).n;
+    res.redirect(`${back}?refreshed=${n}`);
+  } catch (err) {
+    res.redirect(`${back}?${warningQuery(errorWarning(res.locals.t, err))}`);
+  }
 });
 
 // ── REPORT GENERATION ────────────────────────────────────────────
