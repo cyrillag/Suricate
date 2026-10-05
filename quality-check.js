@@ -80,7 +80,9 @@ function contact(epic) {
   return null;
 }
 
-const ANOMALY_RULES = new Set(['overdue', 'not_started', 'date_inconsistent', 'no_assignee', 'no_start', 'no_end']);
+const ANOMALY_RULES = ['overdue', 'not_started', 'date_inconsistent', 'no_assignee', 'no_start', 'no_end'];
+const ANOMALY_RULE_SET = new Set(ANOMALY_RULES);
+const RULE_RANK = new Map(ANOMALY_RULES.map((r, i) => [r, i]));
 
 function byTeamThenKey(a, b) {
   return (a.epic.team || '').localeCompare(b.epic.team || '') || a.epic.jira_key.localeCompare(b.epic.jira_key);
@@ -105,14 +107,27 @@ function runQualityCheck(epics, today = new Date()) {
     if (!findings.length) continue;
     teams.add(epic.team || '—');
     if (epic.assignee) assignees.add(epic.assignee); else hasUnassigned = true;
-    for (const f of findings) {
-      const item = { epic, contact: contact(epic), ...f };
-      if (ANOMALY_RULES.has(f.rule)) {
-        anomalies.push(item);
-        rulesSeen.add(f.rule);
-      }
-      else if (f.rule === 'due_this_week') thisWeek.push(item);
-      else if (f.rule === 'due_soon') upcoming.push(item);
+
+    // One row per epic, not per finding: an epic missing both its start and end date used to
+    // produce two near-identical rows (same team/epic/contact, differing only by a small
+    // badge in the middle column) — easy to scan past the second one and conclude only the
+    // first problem exists (2026-10, user-reported: an epic missing both dates was reported
+    // as having "only" a missing start date). All of an epic's anomaly findings are now
+    // grouped onto one row, each with its own badge, ordered by RULE_RANK (contradictions
+    // before missing fields) regardless of the order checkEpic found them in.
+    const anomalyFindings = findings
+      .filter(f => ANOMALY_RULE_SET.has(f.rule))
+      .sort((a, b) => RULE_RANK.get(a.rule) - RULE_RANK.get(b.rule));
+    if (anomalyFindings.length) {
+      anomalyFindings.forEach(f => rulesSeen.add(f.rule));
+      anomalies.push({ epic, contact: contact(epic), findings: anomalyFindings });
+    }
+
+    const due = findings.find(f => f.rule === 'due_this_week' || f.rule === 'due_soon');
+    if (due) {
+      const item = { epic, contact: contact(epic), ...due };
+      if (due.rule === 'due_this_week') thisWeek.push(item);
+      else upcoming.push(item);
     }
   }
 
@@ -129,7 +144,7 @@ function runQualityCheck(epics, today = new Date()) {
     hasUnassigned,
     // Fixed, meaningful order (contradiction rules first, then missing-field ones) rather
     // than alphabetical — ANOMALY_RULES is already declared in that order.
-    rules: [...ANOMALY_RULES].filter(r => rulesSeen.has(r)),
+    rules: ANOMALY_RULES.filter(r => rulesSeen.has(r)),
     totalEpics: epics.length,
   };
 }

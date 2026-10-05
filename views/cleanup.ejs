@@ -46,10 +46,10 @@
     // Only the rules with real substance beyond their badge get a detail sentence — a
     // missing field's badge already says everything ("Sans start date"), so a repeated
     // "No start date." underneath it would be pure noise.
-    function detailText(item) {
-      if (item.rule === 'overdue')           return t('cleanup.detail_overdue', { days: item.days, date: item.date, status: item.epic.status });
-      if (item.rule === 'not_started')       return t('cleanup.detail_not_started', { days: item.days, date: item.date, status: item.epic.status });
-      if (item.rule === 'date_inconsistent') return t('cleanup.detail_date_inconsistent', { start: item.start, end: item.end });
+    function detailText(f) {
+      if (f.rule === 'overdue')           return t('cleanup.detail_overdue', { days: f.days, date: f.date, status: f.status });
+      if (f.rule === 'not_started')       return t('cleanup.detail_not_started', { days: f.days, date: f.date, status: f.status });
+      if (f.rule === 'date_inconsistent') return t('cleanup.detail_date_inconsistent', { start: f.start, end: f.end });
       return '';
     }
     function dueText(item) {
@@ -93,9 +93,19 @@
         <td style="white-space:nowrap;text-align:right">${contactText(item.contact)}</td>
       </tr>`;
     }
+    // An epic can trip several anomaly rules at once (e.g. missing both its start and end
+    // date) — all of them render as separate badges on this ONE row (item.findings, already
+    // ordered contradictions-first by quality-check.js), not as separate rows. A second row
+    // for the same epic used to be easy to miss, since team/epic/contact looked identical to
+    // the row above it (2026-10, user-reported: an epic missing both dates was read as
+    // missing only one).
     function anomalyRow(item) {
-      const detail = detailText(item);
-      return row(item, `${badge(item)}${detail ? `<br><span class="page-sub" style="margin:0">${detail}</span>` : ''}`, item.rule);
+      const middleHtml = item.findings.map(f => {
+        const detail = detailText(f);
+        return `${badge(f)}${detail ? `<br><span class="page-sub" style="margin:0">${detail}</span>` : ''}`;
+      }).join('<br>');
+      const rulesAttr = item.findings.map(f => f.rule).join(' ');
+      return row(item, middleHtml, rulesAttr);
     }
     function dueRow(item) {
       return row(item, dueText(item));
@@ -209,9 +219,11 @@
       var rowAssignee = tr.getAttribute('data-assignee') || '';
       var assigneeOk = !assignee || (assignee === '__empty__' ? rowAssignee === '' : rowAssignee === assignee);
       // The Problem filter only ever applies inside the Incohérences table (rows there
-      // carry data-rule) — a row with no data-rule (Vigilance) is never affected by it.
+      // carry data-rule, space-separated when an epic trips several rules at once) — a row
+      // with no data-rule (Vigilance) is never affected by it.
       var inAnomalies = anomaliesSection && anomaliesSection.contains(tr);
-      var problemOk = !problem || !inAnomalies || tr.getAttribute('data-rule') === problem;
+      var rowRules = (tr.getAttribute('data-rule') || '').split(' ');
+      var problemOk = !problem || !inAnomalies || rowRules.indexOf(problem) !== -1;
       tr.style.display = (teamOk && assigneeOk && problemOk) ? '' : 'none';
     });
   }

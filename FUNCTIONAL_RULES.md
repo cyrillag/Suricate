@@ -707,7 +707,7 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   - **⚠️ Incohérences de suivi / Tracking inconsistencies**: overdue (end date passed, status
     still active); not started despite a past start date; inconsistent dates (start after
     end); missing assignee; missing start date; missing end date. All six listed
-    individually, in one table, with equal visual weight — no rule is demoted to a count.
+    individually, with equal visual weight — no rule is demoted to a count.
     Each row leads with a short, coloured badge naming the rule itself (e.g. "En retard",
     "Sans start date") before any detail sentence — added 2026-10, direct feedback that a
     full sentence per row wasn't something you could scan, you had to read it. Two badge
@@ -717,6 +717,14 @@ access model trivial to reason about. There is exactly one distinction: **the cr
     A missing-field row has no further detail sentence (the badge already says everything);
     a contradiction row keeps its sentence underneath, since that one carries information
     the badge can't (the actual day count, date and current status).
+  - **One row per epic, not per finding** (fixed 2026-10, real bug: an epic missing both its
+    start and end date produced two separate, near-identical rows — same team/epic/contact,
+    differing only by the badge — and the second one was reported as if it didn't exist,
+    because it read as a near-duplicate of the row above rather than a continuation of it).
+    An epic tripping several anomaly rules at once now gets all of them stacked as separate
+    badges (and, where applicable, detail sentences) on a single row, ordered contradictions-
+    first then missing-fields (the fixed order above) regardless of which rule `checkEpic`
+    found first.
   - **📅 Vigilance planning / Planning watch**: 🟠 due this week (end date within 7 days) and
     an unlabelled "next 2 weeks" group (end date 8–14 days out). Explicitly **not** an
     anomaly — a perfectly healthy epic lands here purely because it's closing soon. Kept in
@@ -767,9 +775,11 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   direct feedback) — populated from whichever rules are actually present (`result.rules`,
   already in the fixed contradiction-then-missing-field order), reusing the same `rule_*`
   labels as the badges so the filter's wording matches what's on screen. It only ever applies
-  to the Incohérences table (`data-rule` is only set on anomaly rows) — Vigilance planning
-  rows have no rule to filter by and are deliberately left untouched by it, consistent with
-  that section always being visible regardless of filter state (see below).
+  to the Incohérences table (`data-rule` is only set on anomaly rows, space-separated when an
+  epic trips several rules at once — matches if the selected rule is any one of them) —
+  Vigilance planning rows have no rule to filter by and are deliberately left untouched by
+  it, consistent with that section always being visible regardless of filter state (see
+  below).
 - **The Epic column is widened (420px) and its summary clamped to 2 lines**
   (`-webkit-line-clamp`), not cropped to a hard character count — short summaries don't pad
   the row, long ones never overflow into the next column. The full summary is always
