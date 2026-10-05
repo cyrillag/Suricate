@@ -175,6 +175,7 @@ const DICT = {
     no_issues: { fr: 'Aucune anomalie détectée. 🎉', en: 'No issues found. 🎉' },
 
     high_priority: { fr: 'Priorité haute',        en: 'High priority' },
+    this_week: { fr: 'À traiter cette semaine',   en: 'Due this week' },
     upcoming: { fr: 'Échéances à venir',          en: 'Upcoming deadlines' },
     upcoming_hint: { fr: 'Pas une anomalie de suivi — juste un rappel.', en: 'Not a tracking issue — just a heads-up.' },
     remaining: { fr: 'Reste à traiter, par équipe', en: 'Remaining, by team' },

@@ -33,7 +33,8 @@
     };
     function detailFor(item) {
       if (item.rule === 'overdue')            return t('cleanup.detail_overdue', { days: item.days, date: item.date });
-      if (item.rule === 'due_soon')           return t('cleanup.detail_due_soon', { days: item.days, date: item.date });
+      if (item.rule === 'due_this_week')       return t('cleanup.detail_due_soon', { days: item.days, date: item.date });
+      if (item.rule === 'due_soon')            return t('cleanup.detail_due_soon', { days: item.days, date: item.date });
       if (item.rule === 'not_started')        return t('cleanup.detail_not_started', { days: item.days, date: item.date });
       if (item.rule === 'date_inconsistent')  return t('cleanup.detail_date_inconsistent', { start: item.start, end: item.end });
       return '';
@@ -43,44 +44,55 @@
       if (c.isReporter) return t('cleanup.contact_reporter_fallback', { name: c.name });
       return c.name;
     }
+    // Renders one severity tier's rows: a team sub-header row, then that team's items,
+    // repeated per team — so a long tier reads as short per-team groups instead of one
+    // flat enumeration. Returns a string (raw HTML) for a shared `<table>`'s `<tbody>`.
+    function renderTierRows(byTeam) {
+      let html = '';
+      for (const [team, items] of byTeam.entries()) {
+        html += `<tr class="cleanup-team-row"><td colspan="3">${team} (${items.length})</td></tr>`;
+        for (const item of items) {
+          html += `
+          <tr>
+            <td style="white-space:nowrap"><a href="${issueUrl(item.epic.jira_key)}" target="_blank" rel="noopener"><strong>${item.epic.jira_key}</strong></a></td>
+            <td>${item.epic.summary}<br><span class="page-sub" style="margin:0">${detailFor(item)}</span></td>
+            <td style="white-space:nowrap;text-align:right">${contactText(item.contact)}</td>
+          </tr>`;
+        }
+      }
+      return html;
+    }
   %>
 
-  <% if (!result.high.length && !result.upcoming.length && !result.mediumByTeam.size) { %>
+  <% if (!result.counts.high && !result.counts.thisWeek && !result.counts.upcoming && !result.mediumByTeam.size) { %>
   <div class="section-card">
     <div class="empty-state-inline"><%= t('cleanup.no_issues') %></div>
   </div>
   <% } %>
 
-  <% if (result.high.length) { %>
+  <% if (result.counts.high) { %>
   <div class="section-card" style="border-top-color:var(--blk)">
-    <div class="section-card-header" style="color:var(--blk)">🔴 <%= t('cleanup.high_priority') %> (<%= result.high.length %>)</div>
+    <div class="section-card-header" style="color:var(--blk)">🔴 <%= t('cleanup.high_priority') %> (<%= result.counts.high %>)</div>
     <table class="simple-table">
-      <tbody>
-      <% result.high.forEach(item => { %>
-      <tr>
-        <td style="white-space:nowrap"><a href="<%= issueUrl(item.epic.jira_key) %>" target="_blank" rel="noopener"><strong><%= item.epic.jira_key %></strong></a></td>
-        <td><%= item.epic.summary %><br><span class="page-sub" style="margin:0"><%= detailFor(item) %></span></td>
-        <td style="white-space:nowrap;text-align:right"><%= contactText(item.contact) %></td>
-      </tr>
-      <% }) %>
-      </tbody>
+      <tbody><%- renderTierRows(result.high) %></tbody>
     </table>
   </div>
   <% } %>
 
-  <% if (result.upcoming.length) { %>
-  <div class="section-card">
-    <div class="section-card-header">📅 <%= t('cleanup.upcoming') %> (<%= result.upcoming.length %>) — <span style="text-transform:none;font-weight:400;color:var(--tx2)"><%= t('cleanup.upcoming_hint') %></span></div>
+  <% if (result.counts.thisWeek) { %>
+  <div class="section-card" style="border-top-color:var(--orange)">
+    <div class="section-card-header" style="color:var(--orange)">🟠 <%= t('cleanup.this_week') %> (<%= result.counts.thisWeek %>)</div>
     <table class="simple-table">
-      <tbody>
-      <% result.upcoming.forEach(item => { %>
-      <tr>
-        <td style="white-space:nowrap"><a href="<%= issueUrl(item.epic.jira_key) %>" target="_blank" rel="noopener"><strong><%= item.epic.jira_key %></strong></a></td>
-        <td><%= item.epic.summary %><br><span class="page-sub" style="margin:0"><%= detailFor(item) %></span></td>
-        <td style="white-space:nowrap;text-align:right"><%= contactText(item.contact) %></td>
-      </tr>
-      <% }) %>
-      </tbody>
+      <tbody><%- renderTierRows(result.thisWeek) %></tbody>
+    </table>
+  </div>
+  <% } %>
+
+  <% if (result.counts.upcoming) { %>
+  <div class="section-card">
+    <div class="section-card-header">📅 <%= t('cleanup.upcoming') %> (<%= result.counts.upcoming %>) — <span style="text-transform:none;font-weight:400;color:var(--tx2)"><%= t('cleanup.upcoming_hint') %></span></div>
+    <table class="simple-table">
+      <tbody><%- renderTierRows(result.upcoming) %></tbody>
     </table>
   </div>
   <% } %>
@@ -91,7 +103,7 @@
     <table class="simple-table">
       <thead><tr><th>Team</th><th></th><th></th></tr></thead>
       <tbody>
-      <% [...result.mediumByTeam.entries()].sort((a,b) => a[0].localeCompare(b[0])).forEach(([team, bucket]) => { %>
+      <% [...result.mediumByTeam.entries()].forEach(([team, bucket]) => { %>
       <tr>
         <td><strong><%= team %></strong></td>
         <td><%= t('cleanup.epic_count', { count: bucket.keys.size }) %> —
