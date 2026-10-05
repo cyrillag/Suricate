@@ -1,0 +1,5 @@
+{
+  "_comment": "One preview per person: slug -> display name and host port (gateway forwards 31625-31629; 31623/31624 are taken). Used by ops/new-preview.sh and the suricate-preview / suricate-ship skills. Branch preview/<slug> deploys to that preview.",
+  "cyril":    { "name": "Cyril",    "port": 31622 },
+  "aurelien": { "name": "Aurélien", "port": 31625 }
+}
