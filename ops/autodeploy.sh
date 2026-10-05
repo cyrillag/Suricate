@@ -66,8 +66,21 @@ log "deploying ${SHORT} — ${MSG}"
 gh_status pending "Déploiement de la preview ${SLOT} en cours…"
 write_status deploying
 git checkout -q --force --detach "$SHA"
-sed -i '/^APP_VERSION=/d' "$BASE/${SLOT}.env"
-echo "APP_VERSION=${SHORT}" >> "$BASE/${SLOT}.env"
+PREV_SHORT="$(sed -n 's/^APP_VERSION=//p' "$BASE/${SLOT}.env" | tail -1)"
+set_version() { sed -i '/^APP_VERSION=/d' "$BASE/${SLOT}.env"; echo "APP_VERSION=$1" >> "$BASE/${SLOT}.env"; }
+set_version "$SHORT"
+
+# A commit that doesn't start must not leave the preview dead: the contributor would then see
+# neither the app nor the failure log (served by the app itself on /version) — seen in testing.
+# So the last image that started fine is tagged, and put back on failure.
+rollback() {
+  if docker image inspect "${PROJECT}:last-good" > /dev/null 2>&1; then
+    set_version "$PREV_SHORT"
+    docker tag "${PROJECT}:last-good" "suricate-${SLOT}:latest"
+    docker compose -p "$PROJECT" -f "$BASE/compose.yml" up -d --no-build >> "$BASE/last-build.log" 2>&1
+    echo "→ rolled back to the last working version (${PREV_SHORT:-?})" >> "$BASE/last-build.log"
+  fi
+}
 
 if docker compose -p "$PROJECT" -f "$BASE/compose.yml" up -d --build > "$BASE/last-build.log" 2>&1; then
   ok=""
@@ -76,13 +89,17 @@ if docker compose -p "$PROJECT" -f "$BASE/compose.yml" up -d --build > "$BASE/la
     sleep 2
   done
   if [ -n "$ok" ]; then
+    docker tag "suricate-${SLOT}:latest" "${PROJECT}:last-good"
     log "ok"; write_status success; gh_status success "Preview ${SLOT} à jour (${SHORT})"
   else
     docker compose -p "$PROJECT" -f "$BASE/compose.yml" logs --tail 40 app >> "$BASE/last-build.log" 2>&1
-    log "started but /version never showed ${SHORT}"; write_status failure; gh_status failure "La preview n'a pas démarré — voir /version"
+    rollback
+    log "started but /version never showed ${SHORT} — rolled back"; write_status failure
+    gh_status failure "${SHORT} ne démarre pas — log sur ${PUBLIC_URL}/version"
   fi
 else
-  log "build failed"; write_status failure; gh_status failure "Build KO — voir ${PUBLIC_URL}/version"
+  rollback
+  log "build failed"; write_status failure; gh_status failure "Build KO — log sur ${PUBLIC_URL}/version"
 fi
 cat "$BASE/last-build.log" >> "$LOG"
 echo "$SHA" > "$STATE"                    # never retry the same commit in a loop: push a fix instead
