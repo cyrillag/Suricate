@@ -72,7 +72,7 @@
       return `
       <tr data-team="${team}" data-assignee="${assignee}">
         <td><strong>${team}</strong></td>
-        <td style="white-space:nowrap"><a href="${issueUrl(item.epic.jira_key)}" target="_blank" rel="noopener"><strong>${item.epic.jira_key}</strong></a><br><span class="page-sub" style="margin:0">${item.epic.summary}</span></td>
+        <td style="max-width:320px"><span style="white-space:nowrap"><a href="${issueUrl(item.epic.jira_key)}" target="_blank" rel="noopener"><strong>${item.epic.jira_key}</strong></a></span><br><span class="page-sub" style="margin:0;word-break:break-word">${item.epic.summary}</span></td>
         <td>${middleHtml}</td>
         <td style="white-space:nowrap;text-align:right">${contactText(item.contact)}</td>
       </tr>`;
