@@ -795,6 +795,11 @@ access model trivial to reason about. There is exactly one distinction: **the cr
 - **Claude Code is the expected tool on both sides**: `CLAUDE.md` (loaded automatically) carries the
   conventions; skills `suricate-preview` / `suricate-ship` drive testing and PRs; the existing QA
   hooks and agents apply to contributors too.
+- **The onboarding guide lives in the app, at `/contribuer`** (any logged-in user), not only in an
+  external page: a Claude artifact can't be shared across Claude organisations (the maintainer and the
+  first contributor are in different ones), while every PM can open Suricate. Its preview table is
+  rendered from `ops/previews.json`. French only, as an exception to the FR+EN rule: it's addressed to
+  the French-speaking PM community contributing to the code; `CONTRIBUTING.md` is its text version.
 - `/version` (unauthenticated) returns the environment, preview name and deployed commit — no data.
   The Preview badge shows `Preview · <Name> · màj <dd/mm hh:mm>` — the time of the last successful
   deploy, which a person can match against when they pushed (a commit hash, tried first, meant

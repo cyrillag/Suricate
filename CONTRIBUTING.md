@@ -1,7 +1,7 @@
 # Contribuer à Suricate — référence
 
-> Pour démarrer, lis d'abord le **guide d'onboarding** (lien envoyé par le mainteneur). Ce fichier en est la
-> version de référence, dans le repo.
+> Pour démarrer, lis d'abord le **guide d'onboarding**, dans Suricate même :
+> http://gw.lab.core.ovh.net:31621/contribuer (connexion requise). Ce fichier en est la version texte, dans le repo.
 
 ## Le circuit
 

@@ -558,6 +558,19 @@ app.post('/logout', (req, res) => req.session.destroy(() => res.redirect('/login
 // ── WHAT'S NEW ────────────────────────────────────────────────────
 // Readable by anyone logged in, but only creators get the nav badge pointing here. Opening the
 // page is what marks everything as seen.
+// Contributor onboarding guide — any logged-in user can open it, so the link can be sent to a PM
+// in any Claude organisation (an artifact can't be shared across organisations). The preview
+// table comes from ops/previews.json, so adding a contributor updates the page by itself.
+app.get('/contribuer', requireAuth, (req, res) => {
+  let previews = [];
+  try {
+    const raw = JSON.parse(fs.readFileSync(path.join(__dirname, 'ops', 'previews.json'), 'utf8'));
+    previews = Object.entries(raw).filter(([slug]) => !slug.startsWith('_')).map(([slug, p]) => ({ slug, name: p.name, port: p.port }));
+  } catch (e) { console.warn(`ops/previews.json unreadable: ${e.message}`); }
+  const host = (process.env.SURICATE_PUBLIC_URL || 'http://gw.lab.core.ovh.net:31621').replace(/:\d+\/?$/, '');
+  res.render('contribuer', { previews, host, repo: 'cyrillag/Suricate', userName: req.session.userName });
+});
+
 app.get('/whats-new', requireAuth, (req, res) => {
   const lastSeen = (db.prepare('SELECT whats_new_seen_at FROM users WHERE id=?').get(req.session.userId) || {}).whats_new_seen_at || null;
   whatsNew.markSeen(req.session.userId);
