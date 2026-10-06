@@ -106,7 +106,9 @@
         <div class="ctb-cmd"><code id="ctb-c2" tabindex="0">git config suricate.preview ton-prenom
 git config core.hooksPath .githooks</code><button type="button" data-copy="ctb-c2">Copier</button></div>
         <span class="ctb-note">Remplace <code class="i">ton-prenom</code> par ton nom dans le tableau des previews, plus bas. Le garde-fou t'empêche d'envoyer par erreur une modification directement en production.</span></li>
-      <li><span class="t">Ouvre Claude Code dans le dossier</span><span class="ctb-note">Il charge tout seul les règles du projet et ses outils. Facultatif mais pratique : installe la commande GitHub <code class="i">gh</code> et lance <code class="i">gh auth login</code>, pour que Claude Code puisse ouvrir tes Pull Requests à ta place.</span></li>
+      <li><span class="t">Lance Claude Code depuis ce dossier</span>
+        <div class="ctb-cmd"><code id="ctb-c3" tabindex="0">claude</code><button type="button" data-copy="ctb-c3">Copier</button></div>
+        <span class="ctb-note">Tant que tu le lances depuis le dossier <code class="i">Suricate</code>, il connaît tout seul les règles du projet et sait faire les trois demandes ci-dessous : rien d'autre à configurer.</span></li>
     </ol>
   </section>
 
@@ -116,7 +118,7 @@ git config core.hooksPath .githooks</code><button type="button" data-copy="ctb-c
     <div class="ctb-phrases">
       <div class="ctb-phrase"><div class="ctb-say">« Je voudrais que… »</div><div class="ctb-does">Il crée une branche, lit d'abord les règles métier du projet, puis propose et code la modification. <strong>Si ta demande contredit une règle existante, il te le dit</strong> : c'est voulu, on en discute avant de changer la règle.</div></div>
       <div class="ctb-phrase"><div class="ctb-say">« Mets ça sur ma preview »</div><div class="ctb-does">Il envoie ta version sur ta preview, attend qu'elle soit en ligne et te donne l'adresse. <strong>Si quelque chose casse, il lit l'erreur et corrige.</strong></div></div>
-      <div class="ctb-phrase"><div class="ctb-say">« Ouvre la PR »</div><div class="ctb-does">Il vérifie que tout est en ordre (règles documentées, textes en français et en anglais, nouveauté annoncée si elle est visible), puis ouvre la Pull Request. <strong>Ensuite, c'est au mainteneur.</strong></div></div>
+      <div class="ctb-phrase"><div class="ctb-say">« Ouvre la PR »</div><div class="ctb-does">Il vérifie que tout est en ordre (règles documentées, textes en français et en anglais, nouveauté annoncée si elle est visible), puis prépare la Pull Request et te donne le lien pour l'envoyer en un clic. <strong>Ensuite, c'est au mainteneur.</strong></div></div>
     </div>
   </section>
 
