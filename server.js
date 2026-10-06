@@ -346,12 +346,18 @@ function buildPlanningTree(epics, rootEpic) {
     // "No dates yet" (e.g. PUBM-53549) and 5 more showed dates that weren't the ones in Jira.
     node.start = node.start || (starts.length ? starts.reduce((a, b) => a < b ? a : b) : null);
     node.end   = node.end   || (ends.length ? ends.reduce((a, b) => a > b ? a : b) : null);
-    // A Phase/Deliverable's Jira status, on the other hand, is a workflow placeholder ("Request" on
-    // every BGP one) — it's always computed from below.
+    // A Phase/Deliverable's Jira status starts as a workflow placeholder ("Request" on BGP, mapped to
+    // To Start) — that alone says nothing, so it's computed from below. But once the PM moves it in
+    // Jira it's real information and must count: BGP's GA phase and APAC availability were In
+    // Progress in Jira while every child was still "Request", and showed To Start. Done in Jira
+    // wins outright (the PM closed it); otherwise the own status joins the children's roll-up.
     const plannedLevel = node.structured && REPORTED_LEVEL_TYPES.has(node.type);
     if (plannedLevel) {
+      const own = node.status;
+      const childStatuses = node.children.map(c => c.status);
       // Same roll-up as every other level in this app (status.js).
-      node.status = rollupStatus(node.children.map(c => c.status));
+      node.status = own === 'done' ? 'done'
+        : rollupStatus(own === 'ts' ? childStatuses : [own, ...childStatuses]);
     }
     return node;
   }

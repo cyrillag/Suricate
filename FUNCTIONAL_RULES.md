@@ -298,10 +298,14 @@ path (`refreshFullEpicTree`).
   - The Phase/Deliverable case that first motivated the exception still holds under the general
     rule (BGP: Technical delivery set to 01/12/25 → 03/11/26 in Jira, while its children only covered
     02/03/26 → 15/09/26 — Jira's dates are shown).
-  - **Their status, however, is always computed from below** (same worst-of rule as a group: Done
-    only if every child is, then Blocked > In Progress > To Start) — their Jira workflow status is a
-    placeholder ("Request" on every BGP Phase/Deliverable), which would otherwise show everything as
-    To Start. A Phase/Deliverable with no child in scope keeps its own mapped status.
+  - **Their status, however, combines their own Jira status with their children's** (same worst-of
+    rule as a group: Done only if every child is, then Blocked > In Progress > To Start). Their Jira
+    workflow status starts as a placeholder ("Request" on BGP, mapped to To Start), which alone
+    would show everything as To Start — so a To Start/Request own status is ignored and the status
+    is computed from below only. Once the PM moves it in Jira, it counts: Done in Jira wins
+    outright; any other own status joins the children's roll-up (BGP: GA phase LVL2-27646 and APAC
+    availability LVL2-27762 were In Progress in Jira while every child was still "Request", and
+    showed To Start). A Phase/Deliverable with no child in scope keeps its own mapped status.
   - **On a Phase/Deliverable-structured box, the hierarchy follows "Parent-Child" links only** — the
     `cf[16100]`/Epic Link fallbacks are ignored (`searchByJql`'s `linkParentKey`). Verified on BGP:
     old NETDC epics still attached to the ALPHA phase via Parent Link only (no link) pushed its end
