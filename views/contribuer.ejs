@@ -106,7 +106,12 @@
         <div class="ctb-cmd"><code id="ctb-c2" tabindex="0">git config suricate.preview ton-prenom
 git config core.hooksPath .githooks</code><button type="button" data-copy="ctb-c2">Copier</button></div>
         <span class="ctb-note">Remplace <code class="i">ton-prenom</code> par ton nom dans le tableau des previews, plus bas. Le garde-fou t'empêche d'envoyer par erreur une modification directement en production.</span></li>
-      <li><span class="t">Ouvre Claude Code dans le dossier</span><span class="ctb-note">Il charge tout seul les règles du projet et ses outils. Facultatif mais pratique : installe la commande GitHub <code class="i">gh</code> et lance <code class="i">gh auth login</code>, pour que Claude Code puisse ouvrir tes Pull Requests à ta place.</span></li>
+      <li><span class="t">Lance Claude Code depuis ce dossier</span>
+        <div class="ctb-cmd"><code id="ctb-c3" tabindex="0">claude</code><button type="button" data-copy="ctb-c3">Copier</button></div>
+        <span class="ctb-note">Tant que tu le lances depuis le dossier <code class="i">Suricate</code>, il connaît tout seul les règles du projet et sait faire les trois demandes ci-dessous : rien d'autre à configurer.</span></li>
+      <li><span class="t">Facultatif : laisse Claude Code ouvrir les Pull Requests à ta place</span>
+        <div class="ctb-cmd"><code id="ctb-c4" tabindex="0">gh auth login</code><button type="button" data-copy="ctb-c4">Copier</button></div>
+        <span class="ctb-note">Installe d'abord l'outil GitHub en ligne de commande (<a href="https://cli.github.com" target="_blank" rel="noopener">cli.github.com</a>), puis connecte-le une fois à ton compte avec cette commande. Sans lui, tout marche quand même : Claude Code te donne un lien, et tu ouvres la Pull Request toi-même dans le navigateur.</span></li>
     </ol>
   </section>
 
