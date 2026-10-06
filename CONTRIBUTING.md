@@ -29,7 +29,7 @@ git config suricate.preview <mon-slug>    # mon nom dans ops/previews.json, ex. 
 Puis ouvrir Claude Code dans ce dossier : il charge `CLAUDE.md` (les règles du projet), les skills
 `suricate-preview` et `suricate-ship`, et les agents de QA.
 
-Facultatif : installer la CLI GitHub `gh` (https://cli.github.com) puis `gh auth login` une fois,
+Pas nécessaire, et volontairement absent de la page `/contribuer` (public non technique) : installer la CLI GitHub `gh` (https://cli.github.com) puis `gh auth login` une fois,
 pour que Claude Code ouvre les Pull Requests lui-même. Sans `gh`, il donne un lien et on ouvre la PR
 dans le navigateur.
 
