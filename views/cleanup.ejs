@@ -20,11 +20,19 @@
         <span class="tag"><%= t('cleanup.last_synced', { when: lastSynced ? new Date(lastSynced * 1000).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : t('cleanup.never_synced') }) %></span>
       </p>
       <p class="page-sub" style="margin-top:-6px"><%= t('cleanup.subtitle') %></p>
-      <% if (isOwner) { %>
-      <p class="page-sub" style="margin-top:-6px"><%= t('cleanup.refresh_hint', { action: t('detail.generate_report') }) %></p>
-      <% } %>
     </div>
+    <%# Refresh in place (POST /projects/:slug/cleanup/refresh) — Jira can take a few seconds, so the
+        button says so while the request runs instead of looking frozen. %>
+    <form method="POST" action="/projects/<%= proj.slug %>/cleanup/refresh" onsubmit="var b=this.querySelector('button');b.disabled=true;b.textContent=<%= JSON.stringify(t('cleanup.refreshing')) %>;">
+      <button type="submit" class="btn-primary"><%= t('cleanup.refresh') %></button>
+    </form>
   </div>
+
+  <% if (syncWarning) { %>
+  <div class="auth-error" role="alert">⚠ <% if (['jira', 'confluence', 'bigpicture'].includes(syncWarning.source)) { %><strong><%= t('detail.source_' + syncWarning.source) %></strong> — <% } %><%= syncWarning.message %></div>
+  <% } else if (refreshed !== null && !isNaN(refreshed)) { %>
+  <div class="cl-refreshed" role="status"><%= t('cleanup.refreshed', { count: refreshed }) %></div>
+  <% } %>
 
   <%
     // Status/date contradiction vs. missing field: two equally-weighted clusters (neither

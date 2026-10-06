@@ -684,10 +684,15 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   Cancelled/Canceled epics). Fixing what Cleanup flags therefore also fixes what Planning
   and the Deliverable matrix show — that's the whole point of putting it here rather than as
   a separate standalone tool.
-- **No separate sync button.** Same reasoning as the Sync Jira/Sync Confluence buttons that
-  were removed project-wide (see Project onboarding & editing) — Cleanup reuses the existing
-  Generate/Refresh form as-is (shown on the Cleanup page too when the viewer is the owner)
-  instead of introducing its own refresh action.
+- **Cleanup refreshes in place** ("↻ Rafraîchir depuis Jira", `POST /projects/:slug/cleanup/refresh`),
+  then comes back to the Cleanup page with a confirmation (or the error banner). It used to send
+  the PM to the project page's Generate button and back — a round trip after every Jira fix, with a
+  report regenerated as a side effect (2026-10, user feedback). It re-reads exactly what Cleanup
+  checks, the way report generation does (BigPicture scope for a Planning Light project, the full
+  portfolio walk otherwise, plus the epics behind the Confluence workstreams), into `epics_cache`
+  only — no report row, no workstream list. Open to any logged-in viewer, like the page: it only
+  reads Jira. The earlier "no separate sync button" rule came from buttons with no visible effect;
+  this one's effect is the page it lands back on.
 - **Epics only — never a Task/Story/Bug, even though `epics_cache` isn't epic-exclusive.**
   Two of its writers legitimately cache non-Epic rows: a Confluence-sourced workstream's Jira
   cell can embed a Task/Story/Bug directly (`getEpicsByKeys`), and Planning Light's

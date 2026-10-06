@@ -171,7 +171,9 @@ const DICT = {
     epics_checked: { fr: '{{count}} epics vérifiées', en: '{{count}} epics checked' },
     last_synced: { fr: 'Dernière synchro Jira : {{when}}', en: 'Last Jira sync: {{when}}' },
     never_synced: { fr: 'jamais',                 en: 'never' },
-    refresh_hint: { fr: 'Utilise «{{action}}» sur la page du projet pour rafraîchir ces données.', en: 'Use “{{action}}” on the project page to refresh this data.' },
+    refresh: { fr: '↻ Rafraîchir depuis Jira', en: '↻ Refresh from Jira' },
+    refreshing: { fr: 'Rafraîchissement…', en: 'Refreshing…' },
+    refreshed: { fr: 'Données rafraîchies depuis Jira : {{count}} epic(s) vérifiée(s).', en: 'Data refreshed from Jira: {{count}} epic(s) checked.' },
     no_issues: { fr: 'Aucune anomalie détectée. 🎉', en: 'No issues found. 🎉' },
 
     anomalies: { fr: 'Incohérences de suivi',     en: 'Tracking inconsistencies' },
