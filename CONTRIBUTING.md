@@ -33,6 +33,17 @@ Facultatif : installer la CLI GitHub `gh` (https://cli.github.com) puis `gh auth
 pour que Claude Code ouvre les Pull Requests lui-même. Sans `gh`, il donne un lien et on ouvre la PR
 dans le navigateur.
 
+Sous Windows sans compte admin, `winget install GitHub.cli` échoue (installeur `.msi` machine,
+code 1602). Installer plutôt le `.zip` dans son profil, puis rouvrir un terminal :
+
+```powershell
+$v = (Invoke-RestMethod https://api.github.com/repos/cli/cli/releases/latest).tag_name.TrimStart('v')
+Invoke-WebRequest "https://github.com/cli/cli/releases/download/v$v/gh_${v}_windows_amd64.zip" -OutFile "$env:TEMP\gh.zip"
+Expand-Archive "$env:TEMP\gh.zip" "$env:LOCALAPPDATA\gh" -Force
+$p = [Environment]::GetEnvironmentVariable('Path', 'User')
+if ($p -notlike "*$env:LOCALAPPDATA\gh\bin*") { [Environment]::SetEnvironmentVariable('Path', "$p;$env:LOCALAPPDATA\gh\bin", 'User') }
+```
+
 ## Avec Claude Code
 
 | Tu dis | Il fait |
