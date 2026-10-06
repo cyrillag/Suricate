@@ -1,5 +1,22 @@
 [
   {
+    "id": "2026-10-custom-milestones",
+    "date": "2026-10-06",
+    "audience": "creators",
+    "title": {
+      "fr": "Jalons libres : autant d’Alpha et de Beta que nécessaire",
+      "en": "Free milestones: as many Alphas and Betas as you need"
+    },
+    "short": {
+      "fr": "Alpha interne et publique, Beta fermée et ouverte… Nommez et ordonnez vous-même les jalons du projet, chacun avec sa New Feature LVL2.",
+      "en": "Internal and public Alpha, closed and open Beta… Name and order your project’s milestones yourself, each with its LVL2 New Feature."
+    },
+    "body": {
+      "fr": "Dans ⚙ Configurer, les trois champs fixes Alpha / Beta / GA laissent place à une liste de jalons : ajoutez-en autant que nécessaire (10 max), donnez-leur le nom de votre choix, associez à chacun sa New Feature LVL2 (clé ou URL) et réordonnez-les. Un aperçu montre ce que l’identité du projet affichera. Vos jalons existants ont été repris tels quels. Chaque rapport fige sa liste de jalons à la génération : renommer ou supprimer un jalon ne modifie plus les rapports passés.",
+      "en": "In ⚙ Configure, the three fixed Alpha / Beta / GA fields become a milestone list: add as many as you need (up to 10), name them as you like, link each to its LVL2 New Feature (key or URL) and reorder them. A preview shows what the project identity will display. Your existing milestones were carried over as-is. Each report freezes its milestone list at generation: renaming or removing a milestone no longer changes past reports."
+    }
+  },
+  {
     "id": "2026-10-cleanup-redesign",
     "date": "2026-10-05",
     "audience": "all",

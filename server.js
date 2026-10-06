@@ -88,18 +88,59 @@ function getBrowser() {
 }
 process.on('SIGTERM', async () => { if (browserPromise) (await browserPromise).close(); });
 
-// A single optional milestone epic key (Alpha/Beta/GA — see FUNCTIONAL_RULES.md "Milestones") —
-// accepts either the bare key ("LVL2-9493") or a full Jira issue URL (e.g.
+// A single milestone's LVL2 New Feature key (see FUNCTIONAL_RULES.md "Milestones") — accepts
+// either the bare key ("LVL2-9493") or a full Jira issue URL (e.g.
 // "https://jira.ovhcloud.tools/browse/LVL2-9493"), pasted straight from the browser's address bar
-// like the Confluence URL field already allows. Blank or malformed input both just mean "not set"
-// rather than a validation error, since these fields are always optional — this also reaches a
-// REST path segment (jira.getRootEpicMeta), so validating the shape still matters even though
-// there's no error path for a bad one.
+// like the Confluence URL field already allows. Returns null for anything that isn't key-shaped —
+// this reaches a REST path segment (jira.getRootEpicMeta), so validating the shape matters.
 function parseMilestoneEpic(raw) {
   const trimmed = (raw || '').trim().replace(/\/+$/, '');
   const keyMatch = trimmed.match(/([A-Z][A-Z0-9]*-\d+)$/i);
   const key = (keyMatch ? keyMatch[1] : trimmed).toUpperCase();
   return /^[A-Z][A-Z0-9]*-\d+$/.test(key) ? key : null;
+}
+
+// A project's milestones are a free, ordered list chosen by its PM (see FUNCTIONAL_RULES.md
+// "Milestones") — NULL until db.js's one-time seed has run for a project created since the last
+// boot, which just means "none".
+const MAX_MILESTONES = 10;
+function projectMilestones(proj) {
+  try { return JSON.parse(proj.milestones_json || '[]'); } catch { return []; }
+}
+
+// The Edit form posts milestone_name / milestone_key once per row, in display order (a single row
+// arrives as a plain string, hence the concat). A fully blank row is dropped — it's what "Add a
+// milestone" leaves behind when the PM changes their mind. Unlike the old fixed fields, a key that
+// was typed but doesn't parse is an error rather than a silent "not set": with free names,
+// dropping it would leave a milestone quietly stuck on "TBD" with nothing telling the PM why. A
+// missing key is allowed (the line shows "TBD"; the form warns before saving).
+function parseMilestoneList(body, t) {
+  const names = [].concat(body.milestone_name ?? []);
+  const keys = [].concat(body.milestone_key ?? []);
+  const list = [];
+  for (let i = 0; i < Math.max(names.length, keys.length); i++) {
+    const name = String(names[i] ?? '').trim().slice(0, 60);
+    const rawKey = String(keys[i] ?? '').trim();
+    if (!name && !rawKey) continue;
+    if (!name) return { error: t('editProject.err_milestone_name', { n: list.length + 1 }) };
+    const key = rawKey ? parseMilestoneEpic(rawKey) : null;
+    if (rawKey && !key) return { error: t('editProject.err_milestone_key', { name }) };
+    list.push({ name, key });
+  }
+  if (list.length > MAX_MILESTONES) return { error: t('editProject.err_milestone_max', { max: MAX_MILESTONES }) };
+  return { list };
+}
+
+// A report's milestone lines: its own frozen list when it has one. A report generated before the
+// list existed is rebuilt from its frozen Alpha/Beta/GA columns, with the lines the project had in
+// those three legacy fields — no longer written, so that stays stable too.
+function reportMilestones(proj, report) {
+  if (report.milestones_list_snapshot_json) return JSON.parse(report.milestones_list_snapshot_json);
+  return [
+    { name: 'Alpha', key: proj.milestone_alpha, end: report.milestone_alpha_end, status: report.milestone_alpha_status },
+    { name: 'Beta',  key: proj.milestone_beta,  end: report.milestone_beta_end,  status: report.milestone_beta_status },
+    { name: 'GA',    key: proj.milestone_ga,    end: report.milestone_ga_end,    status: report.milestone_ga_status }
+  ].filter(m => m.key);
 }
 
 function slugify(name) {
@@ -664,16 +705,21 @@ function confluenceUrlFor(space, page) {
 app.get('/projects/:slug/edit', requireAuth, (req, res) => {
   const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
   if (!proj) return res.status(404).send('Project not found.');
-  res.render('project-edit', { proj, confluenceUrl: confluenceUrlFor(proj.confluence_space, proj.confluence_page), error: null, userName: req.session.userName });
+  res.render('project-edit', { proj, milestones: projectMilestones(proj), confluenceUrl: confluenceUrlFor(proj.confluence_space, proj.confluence_page), error: null, userName: req.session.userName });
 });
 
 app.post('/projects/:slug/edit', requireAuth, async (req, res) => {
   const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
   if (!proj) return res.status(404).send('Project not found.');
-  const { name, jira_root_epic, confluence_url, milestone_alpha, milestone_beta, milestone_ga, bigpicture_box_id } = req.body;
-  const rerender = error => res.render('project-edit', { proj: { ...proj, name, jira_root_epic, milestone_alpha, milestone_beta, milestone_ga, bigpicture_box_id }, confluenceUrl: confluence_url, error, userName: req.session.userName });
+  const { name, jira_root_epic, confluence_url, bigpicture_box_id } = req.body;
+  // A rejected save gives the form back exactly as typed, milestone rows included.
+  const typedKeys = [].concat(req.body.milestone_key ?? []);
+  const typedMilestones = [].concat(req.body.milestone_name ?? []).map((n, i) => ({ name: n, key: typedKeys[i] || '' }));
+  const rerender = error => res.render('project-edit', { proj: { ...proj, name, jira_root_epic, bigpicture_box_id }, milestones: typedMilestones, confluenceUrl: confluence_url, error, userName: req.session.userName });
 
   if (!name?.trim() || !jira_root_epic?.trim()) return rerender(res.locals.t('editProject.err_required'));
+  const milestones = parseMilestoneList(req.body, res.locals.t);
+  if (milestones.error) return rerender(milestones.error);
   const confPage = await confluence.resolvePageUrl(CONFLUENCE_TOKEN, confluence_url);
   if (!confPage) return rerender(res.locals.t('editProject.err_confluence_url'));
 
@@ -688,9 +734,9 @@ app.post('/projects/:slug/edit', requireAuth, async (req, res) => {
   const boxId = (bigpicture_box_id || '').trim() || null;
 
   db.prepare(`UPDATE projects SET name=?,jira_root_epic=?,eta=?,confluence_space=?,confluence_page=?,
-      milestone_alpha=?,milestone_beta=?,milestone_ga=?,bigpicture_box_id=? WHERE id=?`)
+      milestones_json=?,bigpicture_box_id=? WHERE id=?`)
     .run(name.trim(), epic, eta, confPage.space, confPage.page,
-      parseMilestoneEpic(milestone_alpha), parseMilestoneEpic(milestone_beta), parseMilestoneEpic(milestone_ga), boxId, proj.id);
+      JSON.stringify(milestones.list), boxId, proj.id);
 
   res.redirect(`/projects/${proj.slug}`);
 });
@@ -816,22 +862,22 @@ async function generateReportRow(proj, year, week) {
   catch (err) { console.warn(`Could not read ETA from ${proj.jira_root_epic}: ${err.message}`); }
   db.prepare('UPDATE projects SET eta=? WHERE id=?').run(formatDate(etaIso), proj.id);
 
-  // Same re-read-on-every-generate treatment as the root epic's own ETA above, for each of the up
-  // to 3 fixed milestone epics a project optionally names (see FUNCTIONAL_RULES.md "Milestones") —
-  // frozen into this report row so a past week's Project Identity chips never silently change if
-  // one of these dates moves in Jira after the fact.
-  const milestoneEnds = {};
-  const milestoneStatuses = {};
-  for (const field of ['milestone_alpha', 'milestone_beta', 'milestone_ga']) {
-    milestoneEnds[field] = null;
-    milestoneStatuses[field] = null;
-    if (!proj[field]) continue;
-    try {
-      const meta = await jira.getRootEpicMeta(JIRA_TOKEN, proj[field]);
-      milestoneEnds[field] = meta.eta;
-      milestoneStatuses[field] = meta.status;
+  // Same re-read-on-every-generate treatment as the root epic's own ETA above, for each milestone
+  // the project lists (see FUNCTIONAL_RULES.md "Milestones") — the whole list (names, order,
+  // dates, statuses) is frozen into this report row, so a past week's Project Identity never
+  // silently changes when a date moves in Jira or the PM renames/removes a milestone afterwards.
+  const milestoneSnapshot = [];
+  for (const m of projectMilestones(proj)) {
+    const line = { name: m.name, key: m.key || null, end: null, status: null };
+    if (m.key) {
+      try {
+        const meta = await jira.getRootEpicMeta(JIRA_TOKEN, m.key);
+        line.end = meta.eta;
+        line.status = meta.status;
+      }
+      catch (err) { console.warn(`Could not read End date from ${m.key}: ${err.message}`); }
     }
-    catch (err) { console.warn(`Could not read End date from ${proj[field]}: ${err.message}`); }
+    milestoneSnapshot.push(line);
   }
 
   // Planning Light (see FUNCTIONAL_RULES.md): when a project has opted in via bigpicture_box_id,
@@ -871,8 +917,8 @@ async function generateReportRow(proj, year, week) {
   // regenerated at all — but the intent is "set once at creation", not "recomputed every write").
   const backfilled = isPastWeek(year, week) ? 1 : 0;
 
-  db.prepare(`INSERT INTO reports(project_id,year,week,exec_summary,highlights_json,risks_json,workstream_statuses_json,workstreams_snapshot_json,epics_snapshot_json,planning_snapshot_json,eta_snapshot,eta_delayed,milestone_alpha_end,milestone_beta_end,milestone_ga_end,milestone_alpha_status,milestone_beta_status,milestone_ga_status,backfilled,updated_at)
-    VALUES(?,?,?,?,?,?,'{}',?,?,?,?,?,?,?,?,?,?,?,?,unixepoch())
+  db.prepare(`INSERT INTO reports(project_id,year,week,exec_summary,highlights_json,risks_json,workstream_statuses_json,workstreams_snapshot_json,epics_snapshot_json,planning_snapshot_json,eta_snapshot,eta_delayed,milestones_list_snapshot_json,backfilled,updated_at)
+    VALUES(?,?,?,?,?,?,'{}',?,?,?,?,?,?,?,unixepoch())
     ON CONFLICT(project_id,year,week) DO UPDATE SET
       exec_summary=excluded.exec_summary,
       highlights_json=excluded.highlights_json,
@@ -882,15 +928,9 @@ async function generateReportRow(proj, year, week) {
       planning_snapshot_json=excluded.planning_snapshot_json,
       eta_snapshot=excluded.eta_snapshot,
       eta_delayed=excluded.eta_delayed,
-      milestone_alpha_end=excluded.milestone_alpha_end,
-      milestone_beta_end=excluded.milestone_beta_end,
-      milestone_ga_end=excluded.milestone_ga_end,
-      milestone_alpha_status=excluded.milestone_alpha_status,
-      milestone_beta_status=excluded.milestone_beta_status,
-      milestone_ga_status=excluded.milestone_ga_status,
+      milestones_list_snapshot_json=excluded.milestones_list_snapshot_json,
       updated_at=unixepoch()`).run(proj.id, year, week, execSummary, JSON.stringify(highlights), JSON.stringify(risks), JSON.stringify(resolvedWs), JSON.stringify(epics), planningTree ? JSON.stringify(planningTree) : null, etaIso, etaDelayed ? 1 : 0,
-      milestoneEnds.milestone_alpha, milestoneEnds.milestone_beta, milestoneEnds.milestone_ga,
-      milestoneStatuses.milestone_alpha, milestoneStatuses.milestone_beta, milestoneStatuses.milestone_ga, backfilled);
+      JSON.stringify(milestoneSnapshot), backfilled);
   return { warnings };
 }
 
@@ -976,7 +1016,7 @@ function computeHealth({ etaDelayed, blockedCount, risks }) {
 }
 
 // One row per week for the project page's history table (modelled on the PMs' Confluence "Flash
-// reports history" page: weather, trend, Alpha/Beta/GA, open risks, points to clarify), read only
+// reports history" page: weather, trend, milestone dates, open risks, points to clarify), read only
 // from each report's own frozen snapshot columns — never from live data, so a past week shows
 // what that week's report said. Each row is compared with the previous *existing* report (a gap
 // week is skipped, not treated as a reset): milestone/ETA moves in days, and a trend that
@@ -984,16 +1024,19 @@ function computeHealth({ etaDelayed, blockedCount, risks }) {
 // stable otherwise.
 function reportHistory(proj, limit) {
   const rows = db.prepare(`SELECT year, week, eta_snapshot, eta_delayed, risks_json, highlights_json,
-    workstreams_snapshot_json, milestone_alpha_end, milestone_beta_end, milestone_ga_end
+    workstreams_snapshot_json, milestones_list_snapshot_json, milestone_alpha_end, milestone_beta_end, milestone_ga_end
     FROM reports WHERE project_id=?`).all(proj.id);
   const byKey = new Map(rows.map(r => [`${r.year}-${r.week}`, r]));
-  const dateFields = [
-    ['alpha', 'milestone_alpha_end', proj.milestone_alpha],
-    ['beta',  'milestone_beta_end',  proj.milestone_beta],
-    ['ga',    'milestone_ga_end',    proj.milestone_ga]
-  ].filter(([, , configured]) => configured);
-  // No Alpha/Beta/GA configured: the project's single target date (ETA) stands in for them.
-  if (!dateFields.length) dateFields.push(['eta', 'eta_snapshot', true]);
+  // One column per milestone the project lists today, each week's value looked up in that week's
+  // own frozen list — by Jira key first (survives a rename), then by name (a milestone without a
+  // key, or whose key was swapped). A milestone a past week didn't have yet shows "—" there.
+  // No milestone listed: the project's single target date (ETA) stands in for them.
+  const columns = projectMilestones(proj);
+  const sameName = (a, b) => String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+  const pick = (list, col) => (col.key && list.find(m => m.key === col.key)) || list.find(m => sameName(m.name, col.name));
+  const datesOf = r => columns.length
+    ? columns.map(col => pick(reportMilestones(proj, r), col)?.end || null)
+    : [r.eta_snapshot || null];
   const dayDiff = (a, b) => Math.round((new Date(a) - new Date(b)) / 86400000);
 
   // Oldest first, so each row can be compared with the one before it.
@@ -1013,11 +1056,10 @@ function reportHistory(proj, limit) {
       donePct: ws && ws.length ? Math.round(count('done') / ws.length * 100) : null,
       risks: risks.length,
       clarify: (highlights.clarify || []).length,
-      dates: dateFields.map(([name, col]) => {
-        const value = r[col] || null, before = prev ? prev.raw[col] || null : undefined;
-        return { name, value, before, delta: value && before ? dayDiff(value, before) : 0 };
-      }),
-      raw: r
+      dates: datesOf(r).map((value, i) => {
+        const before = prev ? prev.dates[i].value : undefined;
+        return { value, before, delta: value && before ? dayDiff(value, before) : 0 };
+      })
     };
     if (prev && row.health && prev.health) {
       const slipped = row.dates.some(d => d.delta > 0);
@@ -1028,7 +1070,8 @@ function reportHistory(proj, limit) {
     prev = row;
     return row;
   });
-  return { dateColumns: dateFields.map(([name]) => name), rows: out.reverse().slice(0, limit) };
+  const dateColumns = columns.length ? columns.map(c => ({ name: c.name })) : [{ eta: true }];
+  return { dateColumns, rows: out.reverse().slice(0, limit) };
 }
 
 // ── REPORT VIEW ───────────────────────────────────────────────────
@@ -1056,20 +1099,14 @@ function buildReportHtml(proj, report, year, week, isOwner, lang, userName, noti
   // null for every project that hasn't opted in (no bigpicture_box_id) or predates this feature —
   // report-gen.js falls back to the flat epicsForView list in that case.
   const planningTree = report.planning_snapshot_json ? JSON.parse(report.planning_snapshot_json) : null;
-  // Up to 3 fixed milestone lines (Alpha/Beta/GA — see FUNCTIONAL_RULES.md "Milestones"), each
-  // only included if the project actually named that epic. Dates/statuses come from this report's
-  // own frozen snapshot columns, same "never silently change on an old week" rule as eta_snapshot —
-  // a legacy row from before these columns existed just has NULL in all three, so nothing shows.
+  // The milestone lines this report froze, in the PM's order (see FUNCTIONAL_RULES.md "Milestones";
+  // reportMilestones covers reports older than the free list), same "never silently change on an
+  // old week" rule as eta_snapshot.
   // "done" is a past-dated milestone whose epic is actually Done — shown as "DONE" instead of a
   // stale-looking expired date. Evaluated against today (not the report's own week) since it's
   // read-time framing, same as the Gantt's own "Today" marker.
   const todayIso = new Date().toISOString().slice(0, 10);
-  const milestonesForView = [
-    { name: 'Alpha', key: proj.milestone_alpha, end: report.milestone_alpha_end, status: report.milestone_alpha_status },
-    { name: 'Beta',  key: proj.milestone_beta,  end: report.milestone_beta_end,  status: report.milestone_beta_status },
-    { name: 'GA',    key: proj.milestone_ga,    end: report.milestone_ga_end,    status: report.milestone_ga_status }
-  ]
-    .filter(m => m.key)
+  const milestonesForView = reportMilestones(proj, report)
     .map(m => ({ ...m, done: !!(m.end && m.end < todayIso && jira.mapStatus(m.status) === 'done') }));
 
   const stats = { done:0, prog:0, paus:0, blk:0, ts:0, total: resolvedWs.length };

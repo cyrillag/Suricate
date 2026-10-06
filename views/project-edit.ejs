@@ -17,7 +17,7 @@
       <h1 class="page-title"><%= t('editProject.title') %></h1>
     </div>
   </div>
-  <div class="form-card">
+  <div class="form-card form-card-wide">
     <% if (error) { %><div class="auth-error"><%= error %></div><% } %>
     <form method="POST" action="/projects/<%= proj.slug %>/edit">
       <div class="field-group">
@@ -38,22 +38,65 @@
         <input class="field-input" type="url" id="confluence_url" name="confluence_url" value="<%= confluenceUrl %>" required>
       </div>
       <div class="field-group">
-        <label class="field-label"><%= t('editProject.milestones_label') %> <span class="optional"><%= t('editProject.milestones_optional') %></span></label>
+        <%
+          // Free, ordered milestone list (see FUNCTIONAL_RULES.md "Milestones"). Rows are rendered
+          // here so the form works as-is; the script below only adds/moves/removes rows and keeps
+          // numbering, labels, the no-key warning and the preview in sync.
+          const MS_MAX = 10;
+          const msCount = n => n === 0 ? t('editProject.milestones_count_0') : n === 1 ? t('editProject.milestones_count_1') : t('editProject.milestones_count_n', { n });
+          const ICON = {
+            up: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15"></polyline></svg>',
+            down: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>',
+            remove: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>'
+          };
+          const msRow = (m, n) => `
+            <li class="ms-row">
+              <span class="ms-num" aria-hidden="true">${n}</span>
+              <input class="field-input ms-name" type="text" name="milestone_name" maxlength="60" value="${escapeAttr(m.name)}" aria-label="${escapeAttr(t('editProject.milestone_name_aria', { n }))}">
+              <input class="field-input ms-key" type="text" name="milestone_key" value="${escapeAttr(m.key)}" placeholder="${escapeAttr(t('editProject.milestone_key_placeholder'))}" aria-label="${escapeAttr(t('editProject.milestone_key_aria', { n }))}">
+              <span class="ms-actions">
+                <button type="button" class="ms-btn" data-act="up" aria-label="${escapeAttr(t('editProject.milestone_up', { n }))}" title="${escapeAttr(t('editProject.milestone_up', { n }))}">${ICON.up}</button>
+                <button type="button" class="ms-btn" data-act="down" aria-label="${escapeAttr(t('editProject.milestone_down', { n }))}" title="${escapeAttr(t('editProject.milestone_down', { n }))}">${ICON.down}</button>
+                <button type="button" class="ms-btn danger" data-act="remove" aria-label="${escapeAttr(t('editProject.milestone_remove', { n }))}" title="${escapeAttr(t('editProject.milestone_remove', { n }))}">${ICON.remove}</button>
+              </span>
+              <p class="ms-warn" hidden>${escapeAttr(t('editProject.milestone_no_key_warn'))}</p>
+            </li>`;
+          function escapeAttr(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+        %>
+        <div class="ms-head">
+          <span class="field-label" id="ms-label"><%= t('editProject.milestones_label') %> <span class="optional"><%= t('editProject.milestones_optional') %></span></span>
+          <span class="ms-count" id="ms-count"><%= msCount(milestones.length) %></span>
+        </div>
         <p class="field-hint"><%= t('editProject.milestones_hint') %></p>
-        <div class="milestone-fields">
-          <div>
-            <label class="field-hint" for="milestone_alpha">Alpha</label>
-            <input class="field-input" type="text" id="milestone_alpha" name="milestone_alpha" value="<%= proj.milestone_alpha || '' %>" placeholder="LVL2-9493">
+        <div id="ms-editor" class="<%= milestones.length ? '' : 'is-empty' %>">
+          <div class="ms-empty">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4h11l-2 4 2 4H5"></path></svg>
+            <strong><%= t('editProject.milestones_empty_title') %></strong>
+            <span class="field-hint"><%= t('editProject.milestones_empty_text') %></span>
           </div>
-          <div>
-            <label class="field-hint" for="milestone_beta">Beta</label>
-            <input class="field-input" type="text" id="milestone_beta" name="milestone_beta" value="<%= proj.milestone_beta || '' %>" placeholder="LVL2-9494">
+          <div class="ms-cols" aria-hidden="true"><span></span><span><%= t('editProject.milestone_name_col') %></span><span><%= t('editProject.milestone_key_col') %></span></div>
+          <ol class="ms-list" id="ms-list" aria-labelledby="ms-label"><% milestones.forEach((m, i) => { %><%- msRow(m, i + 1) %><% }) %></ol>
+          <div class="ms-tools">
+            <button type="button" class="ms-add" data-add=""><span aria-hidden="true">+</span> <%= t('editProject.milestone_add') %></button>
+            <div class="ms-quick">
+              <span class="field-hint"><%= t('editProject.milestone_quick') %></span>
+              <% ['Alpha', 'Beta', 'GA'].forEach(n => { %><button type="button" class="ms-chip" data-add="<%= n %>">+ <%= n %></button><% }) %>
+              <button type="button" class="ms-chip outline" data-preset="Alpha|Beta|GA"><%= t('editProject.milestone_preset') %></button>
+            </div>
           </div>
-          <div>
-            <label class="field-hint" for="milestone_ga">GA</label>
-            <input class="field-input" type="text" id="milestone_ga" name="milestone_ga" value="<%= proj.milestone_ga || '' %>" placeholder="LVL2-9510">
+          <div class="ms-preview" id="ms-preview" hidden>
+            <span class="ms-preview-title"><%= t('editProject.milestones_preview') %></span>
+            <div class="ms-preview-cards" id="ms-preview-cards"></div>
           </div>
         </div>
+        <template id="ms-row-template"><%- msRow({ name: '', key: '' }, '{{n}}') %></template>
+        <script type="application/json" id="ms-i18n"><%- JSON.stringify({
+          max: MS_MAX,
+          count0: t('editProject.milestones_count_0'), count1: t('editProject.milestones_count_1'), countN: t('editProject.milestones_count_n'),
+          nameAria: t('editProject.milestone_name_aria'), keyAria: t('editProject.milestone_key_aria'),
+          up: t('editProject.milestone_up'), down: t('editProject.milestone_down'), remove: t('editProject.milestone_remove'),
+          previewDate: t('editProject.milestone_preview_date'), previewNone: t('editProject.milestone_preview_none')
+        }).replace(/</g, '\\u003c') %></script>
       </div>
       <div class="field-group">
         <label class="field-label" for="bigpicture_box_id"><%= t('editProject.bigpicture_label') %> <span class="optional"><%= t('editProject.bigpicture_optional') %></span></label>
@@ -70,5 +113,94 @@
     </div>
   </div>
 </div>
+<script>
+(function () {
+  var editor = document.getElementById('ms-editor');
+  var list = document.getElementById('ms-list');
+  var tpl = document.getElementById('ms-row-template');
+  var T = JSON.parse(document.getElementById('ms-i18n').textContent);
+  var countEl = document.getElementById('ms-count');
+  var preview = document.getElementById('ms-preview');
+  var cards = document.getElementById('ms-preview-cards');
+  var fill = function (s, n) { return s.split('{{n}}').join(n); };
+  // Same key shape as server.js's parseMilestoneEpic: a bare key or an issue URL ending in one.
+  var keyOf = function (raw) {
+    var m = raw.trim().replace(/\/+$/, '').match(/([A-Z][A-Z0-9]*-\d+)$/i);
+    return m ? m[1].toUpperCase() : '';
+  };
+  var rows = function () { return Array.prototype.slice.call(list.children); };
+
+  function sync() {
+    var all = rows();
+    all.forEach(function (li, i) {
+      var n = i + 1;
+      li.querySelector('.ms-num').textContent = n;
+      li.querySelector('.ms-name').setAttribute('aria-label', fill(T.nameAria, n));
+      li.querySelector('.ms-key').setAttribute('aria-label', fill(T.keyAria, n));
+      ['up', 'down', 'remove'].forEach(function (act) {
+        var b = li.querySelector('[data-act="' + act + '"]');
+        b.setAttribute('aria-label', fill(T[act], n));
+        b.title = fill(T[act], n);
+      });
+      li.querySelector('[data-act="up"]').disabled = i === 0;
+      li.querySelector('[data-act="down"]').disabled = i === all.length - 1;
+      var named = li.querySelector('.ms-name').value.trim();
+      var noKey = !li.querySelector('.ms-key').value.trim();
+      li.querySelector('.ms-warn').hidden = !(named && noKey);
+      li.querySelector('.ms-key').classList.toggle('is-warn', !!(named && noKey));
+    });
+    editor.classList.toggle('is-empty', all.length === 0);
+    countEl.textContent = all.length === 0 ? T.count0 : all.length === 1 ? T.count1 : fill(T.countN, all.length);
+    editor.querySelectorAll('[data-add],[data-preset]').forEach(function (b) { b.disabled = all.length >= T.max; });
+    // Preview: what the report's Project Identity will show, built with textContent only.
+    cards.textContent = '';
+    var shown = all.filter(function (li) { return li.querySelector('.ms-name').value.trim(); });
+    preview.hidden = shown.length === 0;
+    shown.forEach(function (li, i) {
+      if (i) { var sep = document.createElement('span'); sep.className = 'ms-preview-sep'; sep.setAttribute('aria-hidden', 'true'); sep.textContent = '›'; cards.appendChild(sep); }
+      var card = document.createElement('div'); card.className = 'ms-preview-card';
+      var name = document.createElement('strong'); name.textContent = li.querySelector('.ms-name').value.trim();
+      var key = keyOf(li.querySelector('.ms-key').value);
+      var sub = document.createElement('span'); sub.textContent = key ? T.previewDate.split('{{key}}').join(key) : T.previewNone;
+      card.appendChild(name); card.appendChild(sub); cards.appendChild(card);
+    });
+  }
+
+  function addRow(name) {
+    if (rows().length >= T.max) return;
+    var li = tpl.content.firstElementChild.cloneNode(true);
+    li.querySelector('.ms-name').value = name || '';
+    list.appendChild(li);
+    sync();
+    // A quick-add already has its name: go straight to the New Feature field.
+    li.querySelector(name ? '.ms-key' : '.ms-name').focus();
+  }
+
+  editor.addEventListener('click', function (e) {
+    var b = e.target.closest('button');
+    if (!b || !editor.contains(b)) return;
+    if (b.hasAttribute('data-add')) return addRow(b.getAttribute('data-add'));
+    if (b.hasAttribute('data-preset')) { b.getAttribute('data-preset').split('|').forEach(function (n) { addRow(n); }); return; }
+    var li = b.closest('.ms-row');
+    var act = b.getAttribute('data-act');
+    if (act === 'up' && li.previousElementSibling) list.insertBefore(li, li.previousElementSibling);
+    if (act === 'down' && li.nextElementSibling) list.insertBefore(li.nextElementSibling, li);
+    if (act === 'remove') {
+      // Keep keyboard focus somewhere sensible once the row (and its button) is gone.
+      var next = li.nextElementSibling || li.previousElementSibling;
+      li.remove();
+      sync();
+      (next ? next.querySelector('.ms-name') : editor.querySelector('.ms-add')).focus();
+      return;
+    }
+    sync();
+    // Moving a row re-renders nothing, so the clicked button keeps focus unless it just got
+    // disabled (row reached the top/bottom) — then hand focus to its sibling arrow.
+    if (b.disabled) li.querySelector(act === 'up' ? '[data-act="down"]' : '[data-act="up"]').focus();
+  });
+  editor.addEventListener('input', sync);
+  sync();
+})();
+</script>
 </body>
 </html>
