@@ -140,10 +140,8 @@ ensureColumn('reports', 'eta_delayed', 'eta_delayed INTEGER DEFAULT 0');
 // column, which is the safe default (no false "this was backfilled" claim on old normal reports).
 ensureColumn('reports', 'backfilled', 'backfilled INTEGER DEFAULT 0');
 
-// Up to 3 fixed, manually-configured milestone epics (Alpha/Beta/GA — see FUNCTIONAL_RULES.md
-// "Milestones") — all optional, since not every project has all three phases. Their own End dates
-// are frozen per-report the same way the root epic's own eta_snapshot already is, one column each
-// rather than a JSON blob since there are always exactly these three, never a variable list.
+// Legacy: up to 3 fixed, manually-configured milestone epics (Alpha/Beta/GA), End dates frozen
+// per report one column each. Superseded by the free list just below; no longer written.
 ensureColumn('projects', 'milestone_alpha', 'milestone_alpha TEXT');
 ensureColumn('projects', 'milestone_beta', 'milestone_beta TEXT');
 ensureColumn('projects', 'milestone_ga', 'milestone_ga TEXT');
@@ -155,6 +153,22 @@ ensureColumn('reports', 'milestone_ga_end', 'milestone_ga_end TEXT');
 ensureColumn('reports', 'milestone_alpha_status', 'milestone_alpha_status TEXT');
 ensureColumn('reports', 'milestone_beta_status', 'milestone_beta_status TEXT');
 ensureColumn('reports', 'milestone_ga_status', 'milestone_ga_status TEXT');
+// The three fixed fields above turned out too rigid (issue #16: a project with both an internal and
+// a public Alpha, another with a closed and an open Beta) — milestones are now a free, ordered list
+// of {name, key} chosen by the PM, and each report freezes the whole list it showed ({name, key,
+// end, status} per line), names included, so renaming or removing a milestone later no longer
+// rewrites past weeks. The legacy columns stay as read-only history: they seed the list once
+// below, and a report generated before the list existed is still rendered from them.
+ensureColumn('projects', 'milestones_json', 'milestones_json TEXT');
+ensureColumn('reports', 'milestones_list_snapshot_json', 'milestones_list_snapshot_json TEXT');
+{
+  const seed = db.prepare('UPDATE projects SET milestones_json=? WHERE id=?');
+  for (const p of db.prepare('SELECT id, milestone_alpha, milestone_beta, milestone_ga FROM projects WHERE milestones_json IS NULL').all()) {
+    const list = [['Alpha', p.milestone_alpha], ['Beta', p.milestone_beta], ['GA', p.milestone_ga]]
+      .filter(([, key]) => key).map(([name, key]) => ({ name, key }));
+    seed.run(JSON.stringify(list), p.id);
+  }
+}
 
 // Planning Light (see FUNCTIONAL_RULES.md) — a project opts in by setting its BigPicture box ID;
 // projects that leave this unset keep the existing portfolioChildrenOf-based Planning behavior

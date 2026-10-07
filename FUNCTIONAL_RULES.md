@@ -136,30 +136,46 @@ to be re-applied here by hand rather than resolved by merging code:
 ## Milestones
 
 Some projects (not all) have distinct phases with their own target dates — typically Alpha / Beta /
-GA. Project Identity can show one end date per phase a project actually has.
+GA, but not always just those three (issue #16: one project has an internal *and* a public Alpha,
+another a closed *and* an open Beta). Project Identity can show one end date per phase a project
+actually has.
 
-- **Manually configured, never auto-discovered.** A project optionally names up to 3 fixed LVL2
-  issues — at OVHcloud these are **New Features** (LVL2 issue type), not epics, and the UI says so —
-  `milestone_alpha`/`milestone_beta`/`milestone_ga` (Edit page, "Project milestones") — each a
-  single Jira key, all independently optional since not every project has all three phases (or any
-  of them). A first version tried auto-discovering an arbitrary-named, arbitrary-count set of
+- **A free, ordered list chosen by the PM, never auto-discovered.** A project optionally lists its
+  milestones (Edit page, "Project milestones"), in chronological order, as `projects.milestones_json`
+  — `[{name, key}]`, at most 10. The name is free text (≤ 60 chars, shown as-is, not translated —
+  it's PM content like the rest of the report); the key is the milestone's LVL2 issue — at OVHcloud
+  these are **New Features** (LVL2 issue type), not epics, and the UI says so. The form adds rows
+  one by one or via quick-add chips (`+ Alpha`, `+ Beta`, `+ GA`, and a "classic Alpha / Beta / GA"
+  preset on an empty list), reorders them with up/down arrows, and previews the lines the Project
+  Identity will show. **Replaced** the 3 fixed `milestone_alpha`/`_beta`/`_ga` fields, which could
+  not express a second Alpha or Beta; each existing project's list was seeded once from them
+  (db.js), same names and keys, so nothing changed for a project until its PM edits the list.
+- **Validation on save**: a fully blank row is ignored; a row with a key but no name is refused (a
+  line needs a label); a key that was typed but isn't key-shaped is refused, naming the milestone —
+  with free names, silently dropping it (what the old fixed fields did) would leave a line stuck on
+  "TBD" with nothing telling the PM why. A named row **without** a key is allowed (the PM may not
+  have created the New Feature yet): it shows "TBD", and the form warns under the row before saving.
+- Earlier history: a first version tried auto-discovering an arbitrary-named, arbitrary-count set of
   milestones from the Jira epic hierarchy (a non-Epic "New Feature" child of the root epic) or a
   Confluence `<h2>` heading convention, and used that to also group the Deliverable matrix by
   milestone. **Retired**: tested against a real project (BGP), the Jira hierarchy it relied on
   didn't actually separate the phases a PM has in mind — nearly every epic sat under a single
   "beta"-named parent regardless of which real phase it belonged to — so the auto-detected grouping
   was unreliable, and no project had adopted the Confluence heading convention it would have needed
-  instead. Three fixed, explicitly-named fields are simpler and don't depend on a Jira hierarchy
-  shape that doesn't reliably hold.
-- The Edit page field for each accepts either the bare key (`LVL2-9493`) or a full Jira issue URL
-  pasted straight from the browser's address bar (`parseMilestoneEpic` in server.js strips it down
-  to the trailing key) — same convenience the Confluence page URL field already offers.
-- Each milestone's own End date is read from Jira (same `getRootEpicMeta` call the root epic's own
-  Target ETA already uses) and **frozen into the report row at generation time**
-  (`reports.milestone_alpha_end`/`_beta_end`/`_ga_end`), exactly like `eta_snapshot` — a past week's
-  report must never silently change because one of these dates moved in Jira after the fact. A
-  report generated before these columns existed just has NULL in all three, so it shows the plain
-  Target ETA instead, same as a project with no milestones configured at all.
+  instead. Explicitly-named milestones, each pointing at its own New Feature, are simpler and don't
+  depend on a Jira hierarchy shape that doesn't reliably hold.
+- Each key field accepts either the bare key (`LVL2-9493`) or a full Jira issue URL pasted straight
+  from the browser's address bar (`parseMilestoneEpic` in server.js strips it down to the trailing
+  key) — same convenience the Confluence page URL field already offers.
+- Each milestone's own End date and status are read from Jira (same `getRootEpicMeta` call the root
+  epic's own Target ETA already uses) and **the whole list is frozen into the report row at
+  generation time** (`reports.milestones_list_snapshot_json`: `[{name, key, end, status}]`, in
+  order), exactly like `eta_snapshot` — a past week's report must never silently change because a
+  date moved in Jira, or because the PM renamed, reordered or removed a milestone afterwards. A
+  report generated before the list existed is rendered from its frozen `milestone_alpha_end`/
+  `_beta_end`/`_ga_end` (+ `_status`) columns, with the lines the project had in the 3 legacy fields
+  (which are no longer written, so that fallback is stable too); one older still has NULL there and
+  shows those lines as "TBD".
 - **Milestones replace the Target ETA display, they don't sit alongside it.** When a project has
   any milestone set, the "Target ETA" identity-cell shows one line per phase (`Alpha — 28 Nov 2025`,
   in the exact same `.f-value` styling the single date used — plain text, no background/border) in
@@ -169,26 +185,29 @@ GA. Project Identity can show one end date per phase a project actually has.
   no reason. The `eta-delayed-note`/health-dot underneath are unaffected either way — they track the
   *root epic's own* End date (`eta_snapshot`/`eta_delayed`), a separate concern from which phase
   dates are being displayed above them.
-- A milestone line is shown only for a field the project actually set (`proj.milestone_alpha` etc.
-  non-null) — the ones left blank never appear, not even as "TBD". If the field is set but Jira had
-  no End date on that epic (or the read failed), the line still shows with "TBD" — same "no
-  fabricated fallback, but don't hide something the PM explicitly configured" logic as the rest of
-  this app. One edge case accepted as-is: a PM changing or clearing one of these 3 fields changes
-  which lines appear on *every* past report too, not just future ones (whether a line appears at
-  all is read live from `projects`, only the date shown per line is frozen) — unlike the rest of
-  this app's frozen-snapshot fields, since which phases a project tracks is closer to a project
-  identity fact than a weekly status.
+- A report shows exactly the milestones its frozen list holds, in that order. If a milestone has
+  no key, or Jira had no End date on it (or the read failed), the line still shows with "TBD" — same
+  "no fabricated fallback, but don't hide something the PM explicitly configured" logic as the rest
+  of this app. **Changed with the free list**: with the 3 fixed fields, *which* lines appeared was
+  read live from `projects` (clearing Beta removed it from every past report too) and that was
+  accepted as a project-identity fact; with free, renameable names the frozen dates could no longer
+  be matched back to a live field, so the list is now frozen whole like every other snapshot.
+- **Project page history** (one date column per milestone): the columns are the milestones the
+  project lists *today*; each week's value is looked up in that week's own frozen list, by key
+  first (survives a rename) then by name (a milestone without a key, or whose key was swapped). A
+  milestone a past week didn't have yet shows "—". With no milestone listed, the single ETA column
+  stands in, as before.
 - **A milestone whose date has passed AND whose epic is actually Done shows "DONE" instead of the
   now-stale-looking past date** — a completed Alpha showing e.g. "28 Nov 2025" months later reads
-  as an overdue warning rather than a finished phase. Both the raw Jira status (`milestone_*_status`
-  columns) and the date are frozen per report like everything else here, but "is the date in the
+  as an overdue warning rather than a finished phase. Both the raw Jira status and the date are
+  frozen per report like everything else here, but "is the date in the
   past" is evaluated against *today* (real time, at view time) rather than the report's own week —
   the same read-time framing the Gantt's own "Today" marker already uses, not a frozen fact about
   that week. A milestone that's Done but whose date is still in the future (an unusual/inconsistent
   data state) keeps showing the date, not "DONE" — both conditions are required.
 - The Deliverable matrix is always flat, never grouped by milestone — the retired auto-grouping
-  attempt tried this and it's not part of the current design; regrouping it around these 3 fixed
-  fields wouldn't actually solve the problem that got the old mechanism retired (see above), since
+  attempt tried this and it's not part of the current design; regrouping it around the PM's
+  milestone list wouldn't actually solve the problem that got the old mechanism retired (see above), since
   the underlying Jira hierarchy still doesn't separate the phases either way.
 
 ## Planning Light (BigPicture-scoped planning)
@@ -434,14 +453,14 @@ path (`refreshFullEpicTree`).
   page (Date, Météo, Tendance, Alpha, Beta, GA, open risks, points to clarify) so they can stop
   maintaining it by hand. Columns: **health** (the report's own badge and wording, untranslated like
   the report itself, with a weather icon: ☀️ On Track, ⛅ At Risk, 🌧️ Delayed), **trend**,
-  **Alpha/Beta/GA end dates** (only the milestones the project configured; the single ETA when
-  none is), **% of workstreams Done**, **open risks** and **points to clarify**. A week with no
+  **one end date per milestone the project lists** (see "Milestones" for how each week's value is
+  matched; the single ETA when none is listed), **% of workstreams Done**, **open risks** and **points to clarify**. A week with no
   report says "Pas de rapport généré" / "No report generated" right after the week (it used to
   sit at the far right, where it went unnoticed). To keep the table from scrolling sideways, the
   trend arrow sits in the health cell (no column of its own) and the row actions (view / regenerate /
   delete) are icon-only buttons — 28×28 targets, label as title + aria-label.
 - **Every figure comes from that week's own frozen report** (`reportHistory` in server.js: its
-  snapshot columns — workstreams, risks, highlights, milestone ends, `eta_snapshot`), never from live
+  snapshot columns — workstreams, risks, highlights, milestone list, `eta_snapshot`), never from live
   data: a past week shows what that week's report said, same rule as the report itself. A legacy
   row without a workstreams snapshot shows "—" for health, trend and Done rather than
   guessing.

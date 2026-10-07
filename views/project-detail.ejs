@@ -73,7 +73,7 @@
       <thead><tr>
         <th><%= t('detail.week_col') %></th>
         <th><%= t('detail.hist_health') %></th>
-        <% dateColumns.forEach(c => { %><th><%= t('detail.hist_date_' + c) %></th><% }) %>
+        <% dateColumns.forEach(c => { %><th><%= c.eta ? t('detail.hist_date_eta') : c.name %></th><% }) %>
         <th class="num"><%= t('detail.hist_done') %></th>
         <th class="num"><%= t('detail.hist_risks') %></th>
         <th class="num"><%= t('detail.hist_clarify') %></th>
