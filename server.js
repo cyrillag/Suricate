@@ -817,11 +817,18 @@ app.post('/projects/:slug/cleanup/refresh', requireAuth, async (req, res) => {
   if (!proj) return res.status(404).send('Project not found.');
   const back = `/projects/${proj.slug}/cleanup`;
   try {
+    // Every writer below upserts, so a row none of them re-reads (an epic since dropped from the
+    // BigPicture scope or the Confluence table, or a key changed by a Jira project rename) used to
+    // keep its old data forever — and kept being flagged: NCC-2946 stayed overdue after its project
+    // was renamed NPC and NPC-2946's End date fixed (2026-10, Private boot M1). Anything not rewritten by this refresh
+    // is deleted once it has fully succeeded; on any failure nothing is pruned.
+    const startedAt = db.prepare('SELECT unixepoch() t').get().t;
     if (proj.bigpicture_box_id && BIGPICTURE_TOKEN) await resolvePlanningTree(proj.id, proj.bigpicture_box_id, proj.jira_root_epic);
     else await refreshFullEpicTree(proj.id, proj.jira_root_epic);
     const wsKeys = db.prepare("SELECT jira_key FROM workstreams WHERE project_id=? AND jira_key IS NOT NULL AND jira_key<>''").all(proj.id).map(w => w.jira_key);
     if (wsKeys.length) await refreshEpicStatuses(proj.id, wsKeys);
-    const n = db.prepare("SELECT COUNT(*) n FROM epics_cache WHERE project_id=? AND issuetype='Epic'").get(proj.id).n;
+    db.prepare('DELETE FROM epics_cache WHERE project_id=? AND cached_at < ?').run(proj.id, startedAt);
+    const n =db.prepare("SELECT COUNT(*) n FROM epics_cache WHERE project_id=? AND issuetype='Epic'").get(proj.id).n;
     res.redirect(`${back}?refreshed=${n}`);
   } catch (err) {
     res.redirect(`${back}?${warningQuery(errorWarning(res.locals.t, err))}`);

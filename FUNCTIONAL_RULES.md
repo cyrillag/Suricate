@@ -716,6 +716,12 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   only — no report row, no workstream list. Open to any logged-in viewer, like the page: it only
   reads Jira. The earlier "no separate sync button" rule came from buttons with no visible effect;
   this one's effect is the page it lands back on.
+- **The Cleanup refresh reconciles `epics_cache`, it doesn't just upsert** (same rule as the
+  workstream sync above). Once the whole refresh has succeeded, every row of the project it did
+  not rewrite is deleted; on any failure nothing is deleted. Real bug (2026-10, Private boot M1):
+  the Jira project NCC was renamed NPC, so every refresh wrote NPC-2946 with its fixed End date
+  while the old NCC-2946 row kept its 2026-10-02 date and stayed "overdue" forever (≈300 such
+  orphan rows on that project: renamed keys, epics moved out of the scope).
 - **Epics only — never a Task/Story/Bug, even though `epics_cache` isn't epic-exclusive.**
   Two of its writers legitimately cache non-Epic rows: a Confluence-sourced workstream's Jira
   cell can embed a Task/Story/Bug directly (`getEpicsByKeys`), and Planning Light's
