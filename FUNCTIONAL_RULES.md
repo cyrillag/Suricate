@@ -722,6 +722,13 @@ access model trivial to reason about. There is exactly one distinction: **the cr
   the Jira project NCC was renamed NPC, so every refresh wrote NPC-2946 with its fixed End date
   while the old NCC-2946 row kept its 2026-10-02 date and stayed "overdue" forever (≈300 such
   orphan rows on that project: renamed keys, epics moved out of the scope).
+  **Generate does the same**, with one more condition since it tolerates partial failures (a
+  Confluence sync error, a failed epic status refresh, an unresolved BigPicture scope all still
+  produce a report): it prunes only if every one of its writers succeeded. Without a BigPicture
+  box it prunes before the report is frozen, so Planning's snapshot doesn't carry orphans either;
+  a Planning Light project's scope is only re-read during generation, so it prunes right after.
+  The current week's auto-generation on first visit does not prune (it doesn't re-sync the
+  workstreams first).
 - **Epics only — never a Task/Story/Bug, even though `epics_cache` isn't epic-exclusive.**
   Two of its writers legitimately cache non-Epic rows: a Confluence-sourced workstream's Jira
   cell can embed a Task/Story/Bug directly (`getEpicsByKeys`), and Planning Light's
