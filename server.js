@@ -330,6 +330,17 @@ async function refreshFullEpicTree(projectId, rootEpic) {
   return epics.length;
 }
 
+// Every epics_cache writer upserts, so a row no refresh re-reads anymore (an epic since dropped from
+// the BigPicture scope or the Confluence table, or a key changed by a Jira project rename) used to
+// keep its old data forever — NCC-2946 stayed flagged overdue in Cleanup after its project was
+// renamed NPC and NPC-2946's End date fixed (2026-10, Private boot M1). A refresh takes
+// epicsCacheClock() before writing, then calls pruneEpicsCache only once every writer has succeeded:
+// anything it did not rewrite is deleted. Never called after a partial refresh.
+const epicsCacheClock = () => db.prepare('SELECT unixepoch() t').get().t;
+function pruneEpicsCache(projectId, startedAt) {
+  db.prepare('DELETE FROM epics_cache WHERE project_id=? AND cached_at < ?').run(projectId, startedAt);
+}
+
 // Planning Light (see FUNCTIONAL_RULES.md): the scope comes from BigPicture's own box
 // configuration, not a raw Jira portfolio walk. Fetches the box's narrowingQuery/manuallyAddedTasks
 // (bigpicture.js), runs that JQL through the plain Jira search API (jira.js's searchByJql), caches
@@ -444,9 +455,12 @@ async function syncConfluenceProject(projectId, spaceKey, page) {
     );
   });
   reconcileWorkstreams(projectId, workstreams);
+  // Swallowed, but reported back: Generate must not prune epics_cache after a refresh that didn't
+  // actually re-read these epics (see pruneEpicsCache).
+  let epicsRefreshed = true;
   try { await refreshEpicStatuses(projectId, workstreams.map(w => w.jira_key)); }
-  catch (err) { console.warn(`Epic status refresh failed for project ${projectId}: ${err.message}`); }
-  return { version: pageData.version, workstreams };
+  catch (err) { epicsRefreshed = false; console.warn(`Epic status refresh failed for project ${projectId}: ${err.message}`); }
+  return { version: pageData.version, workstreams, epicsRefreshed };
 }
 
 // ISO week helpers
@@ -817,18 +831,13 @@ app.post('/projects/:slug/cleanup/refresh', requireAuth, async (req, res) => {
   if (!proj) return res.status(404).send('Project not found.');
   const back = `/projects/${proj.slug}/cleanup`;
   try {
-    // Every writer below upserts, so a row none of them re-reads (an epic since dropped from the
-    // BigPicture scope or the Confluence table, or a key changed by a Jira project rename) used to
-    // keep its old data forever — and kept being flagged: NCC-2946 stayed overdue after its project
-    // was renamed NPC and NPC-2946's End date fixed (2026-10, Private boot M1). Anything not rewritten by this refresh
-    // is deleted once it has fully succeeded; on any failure nothing is pruned.
-    const startedAt = db.prepare('SELECT unixepoch() t').get().t;
+    const startedAt = epicsCacheClock();
     if (proj.bigpicture_box_id && BIGPICTURE_TOKEN) await resolvePlanningTree(proj.id, proj.bigpicture_box_id, proj.jira_root_epic);
     else await refreshFullEpicTree(proj.id, proj.jira_root_epic);
     const wsKeys = db.prepare("SELECT jira_key FROM workstreams WHERE project_id=? AND jira_key IS NOT NULL AND jira_key<>''").all(proj.id).map(w => w.jira_key);
     if (wsKeys.length) await refreshEpicStatuses(proj.id, wsKeys);
-    db.prepare('DELETE FROM epics_cache WHERE project_id=? AND cached_at < ?').run(proj.id, startedAt);
-    const n =db.prepare("SELECT COUNT(*) n FROM epics_cache WHERE project_id=? AND issuetype='Epic'").get(proj.id).n;
+    pruneEpicsCache(proj.id, startedAt);
+    const n = db.prepare("SELECT COUNT(*) n FROM epics_cache WHERE project_id=? AND issuetype='Epic'").get(proj.id).n;
     res.redirect(`${back}?refreshed=${n}`);
   } catch (err) {
     res.redirect(`${back}?${warningQuery(errorWarning(res.locals.t, err))}`);
@@ -938,7 +947,7 @@ async function generateReportRow(proj, year, week) {
       milestones_list_snapshot_json=excluded.milestones_list_snapshot_json,
       updated_at=unixepoch()`).run(proj.id, year, week, execSummary, JSON.stringify(highlights), JSON.stringify(risks), JSON.stringify(resolvedWs), JSON.stringify(epics), planningTree ? JSON.stringify(planningTree) : null, etaIso, etaDelayed ? 1 : 0,
       JSON.stringify(milestoneSnapshot), backfilled);
-  return { warnings };
+  return { warnings, planningResolved: !!planningTree };
 }
 
 app.post('/projects/:slug/reports/generate', requireAuth, async (req, res) => {
@@ -973,9 +982,13 @@ app.post('/projects/:slug/reports/generate', requireAuth, async (req, res) => {
   // sync itself succeeded — folding it into the one action people actually look for feedback
   // from fixes that.
   let syncFailure = null;
+  // epics_cache is pruned only when every writer of this run succeeded (see pruneEpicsCache).
+  const startedAt = epicsCacheClock();
+  let cacheComplete = true;
   try {
     if (proj.confluence_space && proj.confluence_page) {
-      await syncConfluenceProject(proj.id, proj.confluence_space, proj.confluence_page);
+      const synced = await syncConfluenceProject(proj.id, proj.confluence_space, proj.confluence_page);
+      if (!synced.epicsRefreshed) cacheComplete = false;
       // Planning Light projects get their epics_cache population from resolvePlanningTree instead
       // (called inside generateReportRow, right below) — running both would just double the Jira
       // calls for a flat epic set the BigPicture-scoped Planning section no longer renders.
@@ -985,7 +998,12 @@ app.post('/projects/:slug/reports/generate', requireAuth, async (req, res) => {
     }
   } catch (err) {
     syncFailure = errorWarning(res.locals.t, err);
+    cacheComplete = false;
   }
+  // Without a BigPicture box, every writer has run by now: prune before the report freezes its
+  // epics, so Planning's snapshot doesn't carry the orphans either. A Planning Light project's scope
+  // is only re-read inside generateReportRow — pruned after it, and only if that scope resolved.
+  if (cacheComplete && !proj.bigpicture_box_id) pruneEpicsCache(proj.id, startedAt);
 
   let generated;
   try {
@@ -993,6 +1011,7 @@ app.post('/projects/:slug/reports/generate', requireAuth, async (req, res) => {
   } catch (err) {
     return res.redirect(`/projects/${proj.slug}?${warningQuery(errorWarning(res.locals.t, err))}`);
   }
+  if (cacheComplete && proj.bigpicture_box_id && generated.planningResolved) pruneEpicsCache(proj.id, startedAt);
 
   // The report itself was generated — show it, with whatever went wrong on the way as a banner on
   // top (a failed pre-sync means some data may be stale; a Planning Light failure means the
