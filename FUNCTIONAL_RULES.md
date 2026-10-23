@@ -41,6 +41,15 @@ to be re-applied here by hand rather than resolved by merging code:
   roll-up: Done only if *all* its epics are Done, otherwise Blocked if any is Blocked, otherwise
   In Progress if any is In Progress, otherwise To Start. Example: 4 epics Done + 1 In Progress ⇒
   the workstream shows In Progress, not Done.
+- **An old Jira key in the Confluence page still works.** When a project is renamed or an issue
+  moved, Jira keeps resolving the old key but answers under the current one. Suricate records
+  the correspondence (`epic_key_aliases`, rebuilt on every workstream epic refresh) and the matrix
+  looks a workstream's keys up through it; Planning and Cleanup only ever see the current key, so
+  nothing is duplicated. Real bug (2026-10, BGP): NCC was renamed NPC; "vRack / vRack Services"
+  (Technical design and Technical implementation) fell to To Start although its epics were Done.
+  It had been hidden for a while by stale NCC-* rows in `epics_cache`, and surfaced as soon as
+  the refreshes started deleting those (see Cleanup). Updating the page to the new keys is still
+  cleaner, but no longer required.
 - A workstream with no Jira epic at all gets its status from a manually-set Confluence status
   lozenge in the same "Jira" cell instead (a PM types the status by hand when there's nothing to
   link to Jira for). The lozenge's colour is decorative only — only its title text is the status

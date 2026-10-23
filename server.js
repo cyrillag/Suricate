@@ -257,6 +257,10 @@ function resolveWorkstreamsAndEpics(projectId, legacyStatusOverrides) {
   const workstreams = db.prepare('SELECT * FROM workstreams WHERE project_id=? ORDER BY sort_order').all(projectId);
   const epicRows    = db.prepare('SELECT * FROM epics_cache WHERE project_id=? ORDER BY (end_date IS NULL), end_date').all(projectId);
   const epicsByKey  = new Map(epicRows.map(e => [e.jira_key, e]));
+  // A workstream may still reference an epic by an old key (see epic_key_aliases in db.js).
+  db.prepare('SELECT old_key, new_key FROM epic_key_aliases WHERE project_id=?').all(projectId).forEach(a => {
+    if (!epicsByKey.has(a.old_key) && epicsByKey.has(a.new_key)) epicsByKey.set(a.old_key, epicsByKey.get(a.new_key));
+  });
 
   const resolvedWs = workstreams.map(ws => ({
     ...ws,
@@ -314,6 +318,10 @@ async function refreshEpicStatuses(projectId, jiraKeyFields) {
   const keys = [...new Set(jiraKeyFields.flatMap(splitJiraKeys))];
   const epics = await jira.getEpicsByKeys(JIRA_TOKEN, keys);
   epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter, null, e.type));
+  // Called with every workstream key of the project each time, so the alias list is rebuilt whole.
+  db.prepare('DELETE FROM epic_key_aliases WHERE project_id=?').run(projectId);
+  const insAlias = db.prepare('INSERT OR REPLACE INTO epic_key_aliases(project_id,old_key,new_key) VALUES(?,?,?)');
+  epics.forEach(e => e.requestedAs.forEach(oldKey => insAlias.run(projectId, oldKey, e.key)));
   return epics.length;
 }
 

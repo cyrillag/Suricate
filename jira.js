@@ -276,7 +276,27 @@ async function getEpicsByKeys(token, keys) {
       reporter: i.fields.reporter?.displayName || null,
       // Same "no invented dates" rule as getChildEpics — leave blank if unset.
       start:    i.fields.customfield_10110 || null,
-      end:      i.fields.customfield_10111 || null
+      end:      i.fields.customfield_10111 || null,
+      requestedAs: []
+    }));
+  }
+  // A key typed in a Confluence page can be an old one: Jira still resolves it (the JQL above
+  // returns the issue) but under its CURRENT key, so the caller can't match it back to what it
+  // asked for. Real case (2026-10, BGP): project NCC renamed NPC, every NCC-* workstream fell to
+  // "To start" though its epics were Done. Each requested key missing from the results is resolved
+  // on its own (the issue endpoint follows old keys) and recorded on the matching result. A key
+  // that doesn't resolve (deleted, no access) is just left unmatched, as before.
+  const found = new Map(results.map(r => [r.key, r]));
+  const missing = uniqueKeys.filter(k => !found.has(k));
+  for (let i = 0; i < missing.length; i += 10) {
+    await Promise.all(missing.slice(i, i + 10).map(async oldKey => {
+      try {
+        const issue = await api(token, `/issue/${encodeURIComponent(oldKey)}`, { fields: 'issuetype' });
+        const current = found.get(issue.key);
+        if (current && issue.key !== oldKey) current.requestedAs.push(oldKey);
+      } catch (err) {
+        console.warn(`Could not resolve Jira key ${oldKey}: ${err.message}`);
+      }
     }));
   }
   return results;
