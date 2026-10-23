@@ -187,6 +187,16 @@ ensureColumn('epics_cache', 'parent_key', 'parent_key TEXT');
 // server.js). NULL on rows cached before this column existed, until their next refresh —
 // treated as "unknown, don't show" by Cleanup rather than assumed to be an Epic.
 ensureColumn('epics_cache', 'issuetype', 'issuetype TEXT');
+// Old Jira key → current key, for keys typed in a Confluence page that Jira now returns under
+// another key (project renamed, issue moved). epics_cache only holds current keys, so the
+// Deliverable matrix looks a workstream's keys up through this table too (see
+// resolveWorkstreamsAndEpics). Rewritten for the whole project on every workstream epic refresh.
+db.exec(`CREATE TABLE IF NOT EXISTS epic_key_aliases (
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  old_key    TEXT    NOT NULL,
+  new_key    TEXT    NOT NULL,
+  PRIMARY KEY (project_id, old_key)
+)`);
 // The fully-resolved Planning Light tree (scope + hierarchy + rollup dates + hide/rename/group
 // overrides already applied), frozen at report-generation time — same frozen-snapshot rule as
 // workstreams_snapshot_json/epics_snapshot_json: a past week's report must never silently change
