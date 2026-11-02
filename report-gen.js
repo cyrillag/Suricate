@@ -485,6 +485,9 @@ function renderPlanningSection({ visiblePlanningRows, hasPartialDatesPlanning, p
         <div class="gantt-lhdr planning-lhdr"><span class="pl-hdr-summary">Summary</span><span class="pl-hdr-status">Status</span></div>
         ${lrows}
       </div>
+      <div class="planning-splitter" id="planning-splitter" role="separator" aria-orientation="vertical" tabindex="0"
+           aria-controls="planning-lcol" aria-label="Largeur de la colonne des intitulés (glisser, flèches gauche/droite, double-clic pour réinitialiser)"
+           title="Glisser pour élargir ou réduire la colonne des intitulés — double-clic : largeur par défaut"></div>
       <div class="planning-rscroll">
         <div class="gantt-rcol" style="width:${planningMonths.length * PLANNING_MONTH_PX}px">
           <div class="gantt-months">${monthsHtml}</div>
@@ -530,8 +533,47 @@ function PLANNING_COLLAPSE_JS() {
       }
     });
   });
-})();`;
+})();
+${PLANNING_SPLITTER_JS}`;
 }
+
+// Draggable separator between the label column (Summary + Status) and the timeline — long summaries
+// get room on demand, the timeline gets it back just as easily (2026-11, PM request). Pointer drag,
+// arrow keys (accessibility), double-click resets. The width is a per-viewer reading preference,
+// kept in that browser's localStorage only — never in the report, which stays identical for everyone
+// (and the PDF export, which has no stored preference, always renders the default width).
+const PLANNING_SPLITTER_JS = `
+(function(){
+  var col=document.getElementById('planning-lcol'), handle=document.getElementById('planning-splitter');
+  if(!col||!handle)return;
+  var KEY='suricate.planningLabelWidth', DEF=340, MIN=200, STEP=24;
+  function max(){ var outer=col.parentNode.getBoundingClientRect().width; return Math.max(MIN, Math.round(outer-220)); }
+  function apply(w, save){
+    w=Math.round(Math.min(max(), Math.max(MIN, w)));
+    col.style.width=w+'px';
+    handle.setAttribute('aria-valuenow', w); handle.setAttribute('aria-valuemin', MIN); handle.setAttribute('aria-valuemax', max());
+    if(save){ try{ localStorage.setItem(KEY, String(w)); }catch(e){} }
+  }
+  var stored=null; try{ stored=parseInt(localStorage.getItem(KEY),10); }catch(e){}
+  apply(stored>0?stored:DEF, false);
+  var startX=0, startW=0, dragging=false;
+  handle.addEventListener('pointerdown', function(e){
+    dragging=true; startX=e.clientX; startW=col.getBoundingClientRect().width;
+    handle.setPointerCapture(e.pointerId); handle.classList.add('dragging'); document.body.style.userSelect='none'; e.preventDefault();
+  });
+  handle.addEventListener('pointermove', function(e){ if(dragging) apply(startW+e.clientX-startX, false); });
+  function stop(e){ if(!dragging)return; dragging=false; handle.classList.remove('dragging'); document.body.style.userSelect='';
+    apply(col.getBoundingClientRect().width, true); }
+  handle.addEventListener('pointerup', stop); handle.addEventListener('pointercancel', stop);
+  handle.addEventListener('dblclick', function(){ apply(DEF, true); });
+  handle.addEventListener('keydown', function(e){
+    var w=col.getBoundingClientRect().width;
+    if(e.key==='ArrowLeft'){ apply(w-STEP, true); e.preventDefault(); }
+    else if(e.key==='ArrowRight'){ apply(w+STEP, true); e.preventDefault(); }
+    else if(e.key==='Home'){ apply(DEF, true); e.preventDefault(); }
+  });
+  window.addEventListener('resize', function(){ apply(col.getBoundingClientRect().width, false); });
+})();`;
 
 function GANTT_JS(epics) {
   // The timeline's own start is always exactly 6 months before today — same rolling-window rule
@@ -812,7 +854,15 @@ const CSS = `
   /* Planning Light (see FUNCTIONAL_RULES.md) — reuses .gantt-outer/.gantt-rcol/.gantt-months/
      .gantt-body/.gantt-bar/.gantt-vline/.gantt-legend as-is; only the left label column becomes a
      wider 2-sub-column (Summary, Status) tree instead of the classic single team/key/name row. */
-  .planning-lcol{width:340px}
+  .planning-lcol{width:340px;flex-shrink:0}
+  /* Resize handle: a 10px strip (hit area widened to 24px by ::after, WCAG target size) with a grip
+     that turns cobalt on hover/focus/drag. Not printed: the PDF keeps the default layout. */
+  .planning-splitter{position:relative;width:10px;flex-shrink:0;margin-left:-5px;margin-right:-5px;cursor:col-resize;z-index:5;touch-action:none}
+  .planning-splitter::after{content:'';position:absolute;top:0;bottom:0;left:-7px;right:-7px}
+  .planning-splitter::before{content:'';position:absolute;top:0;bottom:0;left:4px;width:2px;background:transparent;transition:background .15s}
+  .planning-splitter:hover::before,.planning-splitter:focus-visible::before,.planning-splitter.dragging::before{background:var(--cobalt)}
+  .planning-splitter:focus-visible{outline:none}
+  @media print{.planning-splitter{display:none}}
   /* Only the timeline scrolls; the label column is outside the scroller, so it stays fixed. */
   .planning-outer{overflow-x:visible}
   .planning-rscroll{flex:1;min-width:0;overflow-x:auto}

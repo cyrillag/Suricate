@@ -1,5 +1,22 @@
 [
   {
+    "id": "2026-11-planning-splitter",
+    "date": "2026-11-02",
+    "audience": "all",
+    "title": {
+      "fr": "Planning : la colonne des intitulés se redimensionne",
+      "en": "Planning: the label column can be resized"
+    },
+    "short": {
+      "fr": "Fais glisser le séparateur entre les intitulés et la frise pour lire les libellés longs ; double-clic pour revenir à la largeur par défaut.",
+      "en": "Drag the divider between the labels and the timeline to read long summaries; double-click to go back to the default width."
+    },
+    "body": {
+      "fr": "Dans la section Planning, un séparateur vertical sépare la colonne des intitulés et statuts de la frise. Fais-le glisser pour élargir les intitulés trop longs, ou pour redonner de la place à la frise. Au clavier : flèches gauche et droite. Double-clic : largeur par défaut. La largeur choisie est mémorisée dans ton navigateur ; le rapport reste le même pour tout le monde, export PDF compris.",
+      "en": "In the Planning section, a vertical divider separates the summary/status column from the timeline. Drag it to widen long summaries, or to give the timeline more room. Keyboard: left and right arrows. Double-click: default width. Your width is remembered in your browser; the report stays the same for everyone, PDF export included."
+    }
+  },
+  {
     "id": "2026-10-custom-milestones",
     "date": "2026-10-06",
     "audience": "creators",
