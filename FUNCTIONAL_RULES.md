@@ -372,8 +372,10 @@ path (`refreshFullEpicTree`).
   effective dates (own or rolled up): by end date, or by start when there's no end, then by start;
   undated items last. Jira's search order meant nothing here (BGP's GA phase appeared above
   ALPHA/BETA). Applies to every Planning Light box.
-- **The label column is resizable** — a draggable separator between Summary/Status and the timeline
-  (pointer drag, left/right arrows, double-click or Home resets to the default 340px; min 200px, and the
+- **The label column is resizable, on both plannings** — Planning Light and the classic Gantt (it first
+  shipped on Planning Light only, while most projects use the classic Gantt). A draggable separator between
+  the labels and the timeline (pointer drag, left/right arrows, double-click or Home resets to the default —
+  340px on Planning Light, 228px on the classic Gantt, each remembered separately; min 200px, and the
   timeline always keeps at least ~220px). The width is a per-viewer reading preference stored in that
   browser's localStorage only, never in the report: the report stays identical for everyone, and the PDF
   export (no stored preference, handle not printed) always uses the default width.

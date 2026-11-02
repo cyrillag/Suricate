@@ -288,6 +288,7 @@ ${notice ? `
     <div class="gantt-mobile-note">📊 The planning timeline needs a wider screen — view this report on a desktop or tablet to see it.</div>
     <div class="gantt-outer">
       <div class="gantt-lcol" id="gantt-lcol"><div class="gantt-lhdr"></div></div>
+      ${splitterHandle('gantt-splitter', 'gantt-lcol')}
       <div class="gantt-rcol">
         <div class="gantt-months" id="gantt-months"></div>
         <div class="gantt-body" id="gantt-body"></div>
@@ -346,7 +347,7 @@ ${notice ? `
   }
   requestAnimationFrame(step);
 })();
-${planningTree !== null ? (visiblePlanningRows.length ? PLANNING_COLLAPSE_JS() : '') : (ganttEpics.length ? GANTT_JS(ganttEpics) : '')}
+${planningTree !== null ? (visiblePlanningRows.length ? PLANNING_COLLAPSE_JS() : '') : (ganttEpics.length ? GANTT_JS(ganttEpics) + SPLITTER_JS('gantt-lcol', 'gantt-splitter', 'suricate.ganttLabelWidth', 228) : '')}
 </script>
 </body>
 </html>`;
@@ -485,9 +486,7 @@ function renderPlanningSection({ visiblePlanningRows, hasPartialDatesPlanning, p
         <div class="gantt-lhdr planning-lhdr"><span class="pl-hdr-summary">Summary</span><span class="pl-hdr-status">Status</span></div>
         ${lrows}
       </div>
-      <div class="planning-splitter" id="planning-splitter" role="separator" aria-orientation="vertical" tabindex="0"
-           aria-controls="planning-lcol" aria-label="Largeur de la colonne des intitulés (glisser, flèches gauche/droite, double-clic pour réinitialiser)"
-           title="Glisser pour élargir ou réduire la colonne des intitulés — double-clic : largeur par défaut"></div>
+      ${splitterHandle('planning-splitter', 'planning-lcol')}
       <div class="planning-rscroll">
         <div class="gantt-rcol" style="width:${planningMonths.length * PLANNING_MONTH_PX}px">
           <div class="gantt-months">${monthsHtml}</div>
@@ -534,19 +533,27 @@ function PLANNING_COLLAPSE_JS() {
     });
   });
 })();
-${PLANNING_SPLITTER_JS}`;
+${SPLITTER_JS('planning-lcol', 'planning-splitter', 'suricate.planningLabelWidth', 340)}`;
 }
 
-// Draggable separator between the label column (Summary + Status) and the timeline — long summaries
-// get room on demand, the timeline gets it back just as easily (2026-11, PM request). Pointer drag,
-// arrow keys (accessibility), double-click resets. The width is a per-viewer reading preference,
-// kept in that browser's localStorage only — never in the report, which stays identical for everyone
-// (and the PDF export, which has no stored preference, always renders the default width).
-const PLANNING_SPLITTER_JS = `
+// Draggable separator between the label column and the timeline — long labels get room on demand,
+// the timeline gets it back just as easily (2026-11, PM request). On both plannings: Planning Light
+// (BigPicture box) and the classic Gantt — it first shipped on Planning Light only, so most projects
+// didn't have it although the announcement said so. Pointer drag, arrow keys (accessibility),
+// double-click resets. The width is a per-viewer reading preference, kept in that browser's
+// localStorage only (one key per planning, their defaults differ) — never in the report, which stays
+// identical for everyone; the PDF export, with no stored preference, always renders the default width.
+function splitterHandle(id, colId) {
+  return `<div class="planning-splitter" id="${id}" role="separator" aria-orientation="vertical" tabindex="0"
+           aria-controls="${colId}" aria-label="Largeur de la colonne des intitulés (glisser, flèches gauche/droite, double-clic pour réinitialiser)"
+           title="Glisser pour élargir ou réduire la colonne des intitulés — double-clic : largeur par défaut"></div>`;
+}
+function SPLITTER_JS(colId, handleId, storageKey, defaultWidth) {
+  return `
 (function(){
-  var col=document.getElementById('planning-lcol'), handle=document.getElementById('planning-splitter');
+  var col=document.getElementById('${colId}'), handle=document.getElementById('${handleId}');
   if(!col||!handle)return;
-  var KEY='suricate.planningLabelWidth', DEF=340, MIN=200, STEP=24;
+  var KEY='${storageKey}', DEF=${defaultWidth}, MIN=200, STEP=24;
   function max(){ var outer=col.parentNode.getBoundingClientRect().width; return Math.max(MIN, Math.round(outer-220)); }
   function apply(w, save){
     w=Math.round(Math.min(max(), Math.max(MIN, w)));
@@ -578,6 +585,7 @@ const PLANNING_SPLITTER_JS = `
   });
   window.addEventListener('resize', function(){ apply(col.getBoundingClientRect().width, false); });
 })();`;
+}
 
 function GANTT_JS(epics) {
   // The timeline's own start is always exactly 6 months before today — same rolling-window rule
