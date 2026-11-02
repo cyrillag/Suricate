@@ -556,15 +556,19 @@ const PLANNING_SPLITTER_JS = `
   }
   var stored=null; try{ stored=parseInt(localStorage.getItem(KEY),10); }catch(e){}
   apply(stored>0?stored:DEF, false);
+  // Moves are followed on the whole window during a drag, not via pointer capture on the handle —
+  // capture didn't always engage, and the drag then died as soon as the pointer left the 10px strip.
   var startX=0, startW=0, dragging=false;
-  handle.addEventListener('pointerdown', function(e){
-    dragging=true; startX=e.clientX; startW=col.getBoundingClientRect().width;
-    handle.setPointerCapture(e.pointerId); handle.classList.add('dragging'); document.body.style.userSelect='none'; e.preventDefault();
-  });
-  handle.addEventListener('pointermove', function(e){ if(dragging) apply(startW+e.clientX-startX, false); });
-  function stop(e){ if(!dragging)return; dragging=false; handle.classList.remove('dragging'); document.body.style.userSelect='';
+  function move(e){ if(dragging) apply(startW+e.clientX-startX, false); }
+  function stop(){ if(!dragging)return; dragging=false; handle.classList.remove('dragging'); document.body.style.userSelect='';
+    window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', stop); window.removeEventListener('pointercancel', stop);
     apply(col.getBoundingClientRect().width, true); }
-  handle.addEventListener('pointerup', stop); handle.addEventListener('pointercancel', stop);
+  handle.addEventListener('pointerdown', function(e){
+    if(e.button!==0)return;
+    dragging=true; startX=e.clientX; startW=col.getBoundingClientRect().width;
+    handle.classList.add('dragging'); document.body.style.userSelect='none'; e.preventDefault();
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', stop); window.addEventListener('pointercancel', stop);
+  });
   handle.addEventListener('dblclick', function(){ apply(DEF, true); });
   handle.addEventListener('keydown', function(e){
     var w=col.getBoundingClientRect().width;
