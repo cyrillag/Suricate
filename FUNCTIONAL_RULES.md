@@ -372,6 +372,11 @@ path (`refreshFullEpicTree`).
   effective dates (own or rolled up): by end date, or by start when there's no end, then by start;
   undated items last. Jira's search order meant nothing here (BGP's GA phase appeared above
   ALPHA/BETA). Applies to every Planning Light box.
+- **The label column is resizable** — a draggable separator between Summary/Status and the timeline
+  (pointer drag, left/right arrows, double-click or Home resets to the default 340px; min 200px, and the
+  timeline always keeps at least ~220px). The width is a per-viewer reading preference stored in that
+  browser's localStorage only, never in the report: the report stays identical for everyone, and the PDF
+  export (no stored preference, handle not printed) always uses the default width.
 - **Collapse/expand is client-side only and deliberately not persisted** — it resets on reload;
   it's just a reading convenience for the person currently looking at the page.
 
