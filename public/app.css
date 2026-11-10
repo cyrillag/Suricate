@@ -274,8 +274,8 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 .history-table td.td-actions form{display:inline}
 /* What's new — nav badge (report creators only) and the /whats-new page. The badge reuses the
    brand's yellow CTA pairing (navy on yellow, 11:1), already reserved in this app for "look here". */
-.nav-whatsnew{display:inline-flex;align-items:center;gap:6px;color:#fff;text-decoration:none;font-size:13px;font-weight:600;padding:4px 8px;border-radius:var(--r)}
-.nav-whatsnew:hover,.nav-whatsnew:focus-visible{background:rgba(255,255,255,.12)}
+.nav-whatsnew,.nav-link{display:inline-flex;align-items:center;gap:6px;color:#fff;text-decoration:none;font-size:13px;font-weight:600;padding:4px 8px;border-radius:var(--r)}
+.nav-whatsnew:hover,.nav-whatsnew:focus-visible,.nav-link:hover,.nav-link:focus-visible{background:rgba(255,255,255,.12)}
 .nav-badge{background:var(--yellow);color:var(--db);font-size:11px;font-weight:700;min-width:18px;height:18px;padding:0 5px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center}
 .wn-entry{padding:20px 24px;margin-bottom:16px}
 .wn-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 16px}

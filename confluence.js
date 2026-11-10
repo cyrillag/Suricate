@@ -33,6 +33,16 @@ async function tokenIsRecognized(token) {
   }
 }
 
+// The account a PAT belongs to, or null when Confluence doesn't recognize it (401, or served as
+// anonymous) — used to check a PM's own token before storing it. Network failures still throw.
+async function getCurrentUser(token) {
+  const res = await rawFetch(`${BASE}/rest/api/user/current`, token);
+  if (res.status === 401 || res.status === 403) return null;
+  if (!res.ok) throw new AppError(httpErrorCode('confluence', res.status), `Confluence ${res.status} on /user/current`);
+  const me = await res.json();
+  return me.type === 'anonymous' || !me.username ? null : me;
+}
+
 async function confluenceFetch(url, token, context = {}) {
   let res = await rawFetch(url, token);
   // A genuinely transient authorized:false burst did happen once (2026-08-31, ~90s, resolved on
@@ -355,5 +365,6 @@ async function syncProjectFromConfluence(token, spaceKey, title, week) {
 
 module.exports = {
   fetchPageBody, fetchContentById, resolvePageUrl, validatePageFormat,
-  parseExecSummary, parseWeekSummary, parseDeliverables, parseRisks, syncProjectFromConfluence
+  parseExecSummary, parseWeekSummary, parseDeliverables, parseRisks, syncProjectFromConfluence,
+  getCurrentUser
 };

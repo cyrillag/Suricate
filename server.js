@@ -12,6 +12,7 @@ const { REPORTED_LEVEL_TYPES } = genReport;
 const { rollupStatus } = require('./status');
 const qualityCheck = require('./quality-check');
 const whatsNew   = require('./whats-new');
+const tokens     = require('./tokens');
 const { translate, pluralize } = require('./i18n');
 const { AppError } = require('./errors');
 
@@ -651,6 +652,89 @@ app.get('/whats-new', requireAuth, (req, res) => {
 app.get('/whats-new/img/:file', requireAuth, (req, res) => {
   if (!/^[a-z0-9-]+\.png$/.test(req.params.file)) return res.status(404).end();
   res.sendFile(path.join(whatsNew.IMG_DIR, req.params.file), err => { if (err) res.status(404).end(); });
+});
+
+// ── MY ACCESS (personal access tokens) ───────────────────────────
+// Each project owner stores their own Jira and Confluence PATs (FUNCTIONAL_RULES.md "Personal access
+// tokens"), so a project is read with its owner's rights instead of the single shared service
+// token. Step 1: stored and checked only, not used for any Jira/Confluence call yet. Readers never
+// need one. A PAT is only accepted if it belongs to the logged-in account itself — that check is
+// what makes a saved PAT a proof of identity (login by email alone proves nothing), so a session
+// that saved one is marked verified.
+const PAT_SERVICES = ['jira', 'confluence'];
+
+function accessState(userId) {
+  const u = db.prepare('SELECT jira_token, confluence_token, jira_username, jira_token_set_at, confluence_token_set_at FROM users WHERE id=?').get(userId) || {};
+  // A stored token this environment can't decrypt (SESSION_SECRET changed, or a preview seeded from
+  // prod's database) is shown as "to enter again", not as missing — the PM did set one.
+  const state = stored => !stored ? 'missing' : tokens.decrypt(stored) ? 'set' : 'unreadable';
+  return {
+    jira:       { state: state(u.jira_token), setAt: u.jira_token_set_at },
+    confluence: { state: state(u.confluence_token), setAt: u.confluence_token_set_at },
+    jiraUsername: u.jira_username || null
+  };
+}
+
+function renderAccess(req, res, { error = null, errorService = null, status = 200 } = {}) {
+  res.status(status).render('account', {
+    access: accessState(req.session.userId), error, errorService,
+    saved: PAT_SERVICES.includes(req.query.saved) ? req.query.saved : null,
+    removed: PAT_SERVICES.includes(req.query.removed) ? req.query.removed : null,
+    verified: !!req.session.patVerified,
+    userName: req.session.userName
+  });
+}
+
+app.get('/account', requireAuth, (req, res) => renderAccess(req, res));
+
+app.post('/account/tokens/:service', requireAuth, async (req, res) => {
+  const service = req.params.service;
+  if (!PAT_SERVICES.includes(service)) return res.status(404).send('Not found.');
+  const t = res.locals.t;
+  const fail = msg => renderAccess(req, res, { error: msg, errorService: service, status: 400 });
+  const pat = (req.body.token || '').trim();
+  if (!pat) return fail(t('account.err_empty'));
+  const user = db.prepare('SELECT jira_account_id, jira_username FROM users WHERE id=?').get(req.session.userId);
+  try {
+    if (service === 'jira') {
+      let me;
+      try { me = await jira.getMe(pat); }
+      catch (err) {
+        if (err instanceof AppError && err.code === 'jira_token_invalid') return fail(t('account.err_not_recognized', { service: 'Jira' }));
+        throw err;
+      }
+      // users.jira_account_id is what login stored (`key || name` of the Jira user found by email).
+      const owner = [me.key, me.name].filter(Boolean).map(s => s.toLowerCase());
+      if (!owner.includes(user.jira_account_id.toLowerCase())) return fail(t('account.err_other_account', { service: 'Jira', who: me.displayName || me.name }));
+      db.prepare('UPDATE users SET jira_token=?, jira_username=?, jira_token_set_at=unixepoch() WHERE id=?')
+        .run(tokens.encrypt(pat), me.name || me.key, req.session.userId);
+    } else {
+      // Confluence has no link to our users table other than the username, which on this instance is
+      // the Jira login (verified: both are the corp email) — hence the Jira PAT first.
+      if (!user.jira_username) return fail(t('account.err_jira_first'));
+      const me = await confluence.getCurrentUser(pat);
+      if (!me) return fail(t('account.err_not_recognized', { service: 'Confluence' }));
+      if (me.username.toLowerCase() !== user.jira_username.toLowerCase()) return fail(t('account.err_other_account', { service: 'Confluence', who: me.displayName || me.username }));
+      db.prepare('UPDATE users SET confluence_token=?, confluence_token_set_at=unixepoch() WHERE id=?')
+        .run(tokens.encrypt(pat), req.session.userId);
+    }
+  } catch (err) {
+    return fail(friendlyError(t, err));
+  }
+  req.session.patVerified = true;
+  req.session.save(() => res.redirect(`/account?saved=${service}`));
+});
+
+// Removing needs a verified session: otherwise anyone typing an owner's email could wipe their
+// tokens (and, once they're used for reports, break their projects).
+app.post('/account/tokens/:service/delete', requireAuth, (req, res) => {
+  const service = req.params.service;
+  if (!PAT_SERVICES.includes(service)) return res.status(404).send('Not found.');
+  if (!req.session.patVerified) return renderAccess(req, res, { error: res.locals.t('account.err_verify_to_remove'), errorService: service, status: 403 });
+  // users.jira_token is NOT NULL in the original schema — '' means "none", as it always has.
+  if (service === 'jira') db.prepare("UPDATE users SET jira_token='', jira_token_set_at=NULL WHERE id=?").run(req.session.userId);
+  else db.prepare('UPDATE users SET confluence_token=NULL, confluence_token_set_at=NULL WHERE id=?').run(req.session.userId);
+  res.redirect(`/account?removed=${service}`);
 });
 
 app.get('/', requireAuth, (req, res) => {

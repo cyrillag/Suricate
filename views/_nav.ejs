@@ -22,6 +22,11 @@
     <% if (typeof isCreator !== 'undefined' && isCreator) { %>
     <a href="/whats-new" class="nav-whatsnew"<% if (whatsNewCount > 0) { %> aria-label="<%= t('whatsNew.nav_aria', { count: whatsNewCount }) %>"<% } %>><%= t('whatsNew.nav') %><% if (whatsNewCount > 0) { %> <span class="nav-badge"><%= whatsNewCount %></span><% } %></a>
     <% } %>
+    <%# Only owners need PATs (readers sign in by email alone); /account stays reachable by URL for
+        someone about to create their first project. %>
+    <% if (typeof isCreator !== 'undefined' && isCreator) { %>
+    <a href="/account" class="nav-link"><%= t('account.nav') %></a>
+    <% } %>
     <span class="nav-username"><%= userName %></span>
     <form method="POST" action="/logout" style="display:inline">
       <button type="submit" class="btn-ghost btn-sm"><%= t('nav.logout') %></button>
