@@ -285,12 +285,17 @@ db.exec(`CREATE TABLE IF NOT EXISTS digest_sent (
 )`);
 
 // Personal access tokens (see FUNCTIONAL_RULES.md "Personal access tokens"), encrypted by
-// tokens.js. users.jira_token has existed since the start but was always written as '' — it now
-// holds the encrypted Jira PAT. jira_username is the Jira login the Jira PAT was checked against
-// (/myself `name`), which is also the Confluence username: a Confluence PAT must belong to it.
+// tokens.js. users.jira_token has existed since the start and was written as '' by every version in
+// this repo — it now holds the encrypted Jira PAT. jira_username is the Jira login the Jira PAT was
+// checked against (/myself `name`), which is also the Confluence username: a Confluence PAT must
+// belong to it.
 ensureColumn('users', 'confluence_token', 'confluence_token TEXT');
 ensureColumn('users', 'jira_username', 'jira_username TEXT');
 ensureColumn('users', 'jira_token_set_at', 'jira_token_set_at INTEGER');
 ensureColumn('users', 'confluence_token_set_at', 'confluence_token_set_at INTEGER');
+// The very first account (id 1, created by the prototype that predates this repo) still carried an
+// old `iv:data` encrypted token no code can read — it showed up on "My access" as a stored PAT to
+// enter again. Anything not in tokens.js's format is cleared; a real PAT is always `v1:…`.
+db.prepare("UPDATE users SET jira_token='' WHERE jira_token<>'' AND jira_token NOT LIKE 'v1:%'").run();
 
 module.exports = db;
