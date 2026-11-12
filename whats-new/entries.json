@@ -1,5 +1,22 @@
 [
   {
+    "id": "2026-11-co-editors",
+    "date": "2026-11-12",
+    "audience": "creators",
+    "title": {
+      "fr": "Plusieurs chefs de projet sur un même rapport",
+      "en": "Several project managers on one report"
+    },
+    "short": {
+      "fr": "Ajoute des co-éditeurs dans les paramètres du projet : ils peuvent générer les rapports et modifier la configuration.",
+      "en": "Add co-editors in the project settings: they can generate reports and change the configuration."
+    },
+    "body": {
+      "fr": "Dans les paramètres d’un projet (roue dentée), le nouveau champ « Co-éditeurs » accepte une ou plusieurs adresses email OVHcloud. Chaque adresse est vérifiée dans Jira à l’enregistrement. Les co-éditeurs génèrent et régénèrent les rapports et modifient les paramètres comme toi, et le projet apparaît avec son bouton Générer sur leur tableau de bord. Toi seul gères la liste et peux supprimer le projet. Retirer une adresse retire les droits.",
+      "en": "In a project’s settings (gear icon), the new “Co-editors” field takes one or more OVHcloud email addresses. Each one is checked in Jira when you save. Co-editors generate and regenerate reports and change the settings like you, and the project shows up with its Generate button on their dashboard. Only you manage the list and can delete the project. Removing an address removes the rights."
+    }
+  },
+  {
     "id": "2026-11-planning-splitter",
     "date": "2026-11-02",
     "audience": "all",

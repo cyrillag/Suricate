@@ -527,6 +527,30 @@ function requireAuth(req, res, next) {
   next();
 }
 
+// Who may change a project (FUNCTIONAL_RULES.md "Visibility & permissions"): its owner
+// (projects.user_id) and the co-editors the owner listed (project_editors). Co-editors generate,
+// regenerate and delete reports and edit the settings; only the owner deletes the project or
+// changes the co-editor list. Every mutation route checks this server-side — hiding a button is a
+// courtesy, not the guard.
+function projectRole(proj, userId) {
+  if (!proj || !userId) return null;
+  if (proj.user_id === userId) return 'owner';
+  const isEditor = db.prepare(`SELECT 1 FROM project_editors e JOIN users u ON u.jira_account_id = e.jira_account_id
+    WHERE e.project_id=? AND u.id=?`).get(proj.id, userId);
+  return isEditor ? 'editor' : null;
+}
+function projectEditors(projectId) {
+  return db.prepare('SELECT jira_account_id, email, name FROM project_editors WHERE project_id=? ORDER BY added_at, name').all(projectId);
+}
+// The project a mutation route acts on, or null when it doesn't exist or this user may not change
+// it — both answered with the same 404, as before, so a non-editor learns nothing either way.
+function editableProject(req, { ownerOnly = false } = {}) {
+  const proj = db.prepare('SELECT * FROM projects WHERE slug=?').get(req.params.slug);
+  const role = projectRole(proj, req.session.userId);
+  if (!role || (ownerOnly && role !== 'owner')) return null;
+  return proj;
+}
+
 // Never redirect to whatever a query/form param says verbatim — only ever an internal path.
 // Guards against an open redirect (returnTo=https://evil.example or the protocol-relative
 // returnTo=//evil.example, which browsers treat as a full external URL).
@@ -657,9 +681,13 @@ app.get('/', requireAuth, (req, res) => {
   const projects = db.prepare(`
     SELECT p.*, u.name as owner_name,
       (SELECT COUNT(*) FROM reports r WHERE r.project_id=p.id) as report_count,
-      (SELECT printf('%d-W%02d', year, week) FROM reports r WHERE r.project_id=p.id ORDER BY year DESC, week DESC LIMIT 1) as last_report
+      (SELECT printf('%d-W%02d', year, week) FROM reports r WHERE r.project_id=p.id ORDER BY year DESC, week DESC LIMIT 1) as last_report,
+      (SELECT GROUP_CONCAT(e.name, ', ') FROM project_editors e WHERE e.project_id=p.id) as editor_names
     FROM projects p JOIN users u ON u.id=p.user_id ORDER BY p.created_at DESC`).all();
-  res.render('dashboard', { projects, userName: req.session.userName, userId: req.session.userId, currentWeek: currentWeekStr() });
+  // Projects this user co-edits get the same Generate button as their own (not the delete one).
+  const editorOf = new Set(db.prepare(`SELECT e.project_id FROM project_editors e JOIN users u ON u.jira_account_id=e.jira_account_id
+    WHERE u.id=?`).all(req.session.userId).map(r => r.project_id));
+  res.render('dashboard', { projects, editorOf, userName: req.session.userName, userId: req.session.userId, currentWeek: currentWeekStr() });
 });
 
 // ── PROJECTS ──────────────────────────────────────────────────────
@@ -711,7 +739,7 @@ app.post('/projects', requireAuth, async (req, res) => {
 });
 
 app.post('/projects/:slug/delete', requireAuth, (req, res) => {
-  const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
+  const proj = editableProject(req, { ownerOnly: true });
   if (!proj) return res.status(404).send('Project not found.');
   // Cascades to workstreams, epics_cache and reports (all FK'd with ON DELETE CASCADE).
   db.prepare('DELETE FROM projects WHERE id=?').run(proj.id);
@@ -725,23 +753,66 @@ function confluenceUrlFor(space, page) {
 // Renaming a project never changes its slug — the slug is the stable identifier used in URLs
 // and by every other route, so keeping it fixed avoids breaking bookmarks/links on rename.
 app.get('/projects/:slug/edit', requireAuth, (req, res) => {
-  const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
+  const proj = editableProject(req);
   if (!proj) return res.status(404).send('Project not found.');
-  res.render('project-edit', { proj, milestones: projectMilestones(proj), confluenceUrl: confluenceUrlFor(proj.confluence_space, proj.confluence_page), error: null, userName: req.session.userName });
+  const editors = projectEditors(proj.id);
+  res.render('project-edit', {
+    proj, milestones: projectMilestones(proj), confluenceUrl: confluenceUrlFor(proj.confluence_space, proj.confluence_page),
+    isOwner: proj.user_id === req.session.userId, editors, editorsText: editors.map(e => e.email).join('\n'),
+    error: null, userName: req.session.userName
+  });
 });
 
+// The co-editor field: emails separated by commas, semicolons, spaces or new lines. Each one must
+// be a real Jira account (exact email match, same lookup as login) — a typo would otherwise be
+// stored and silently grant nothing. The owner's own address is dropped: they already have every
+// right. Returns { list } or { error } (the unknown addresses, named).
+const MAX_EDITORS = 20;
+async function parseEditorList(raw, ownerAccountId, t) {
+  const emails = [...new Set(String(raw || '').split(/[\s,;]+/).map(s => s.trim().toLowerCase()).filter(Boolean))];
+  if (emails.length > MAX_EDITORS) return { error: t('editProject.err_editors_max', { max: MAX_EDITORS }) };
+  const invalid = emails.filter(e => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e));
+  if (invalid.length) return { error: t('editProject.err_editors_invalid', { emails: invalid.join(', ') }) };
+  const list = [];
+  const unknown = [];
+  for (const email of emails) {
+    const u = await jira.findUserByEmail(JIRA_TOKEN, email);
+    if (!u) { unknown.push(email); continue; }
+    const accountId = u.key || u.name;
+    if (accountId === ownerAccountId) continue;
+    list.push({ accountId, email, name: u.displayName || u.name || email });
+  }
+  if (unknown.length) return { error: t('editProject.err_editors_unknown', { emails: unknown.join(', ') }) };
+  return { list };
+}
+
 app.post('/projects/:slug/edit', requireAuth, async (req, res) => {
-  const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
+  const proj = editableProject(req);
   if (!proj) return res.status(404).send('Project not found.');
+  const isOwner = proj.user_id === req.session.userId;
   const { name, jira_root_epic, confluence_url, bigpicture_box_id } = req.body;
   // A rejected save gives the form back exactly as typed, milestone rows included.
   const typedKeys = [].concat(req.body.milestone_key ?? []);
   const typedMilestones = [].concat(req.body.milestone_name ?? []).map((n, i) => ({ name: n, key: typedKeys[i] || '' }));
-  const rerender = error => res.render('project-edit', { proj: { ...proj, name, jira_root_epic, bigpicture_box_id }, milestones: typedMilestones, confluenceUrl: confluence_url, error, userName: req.session.userName });
+  const editors = projectEditors(proj.id);
+  const rerender = error => res.render('project-edit', {
+    proj: { ...proj, name, jira_root_epic, bigpicture_box_id }, milestones: typedMilestones, confluenceUrl: confluence_url,
+    isOwner, editors, editorsText: isOwner ? (req.body.co_editors ?? '') : '',
+    error, userName: req.session.userName
+  });
 
   if (!name?.trim() || !jira_root_epic?.trim()) return rerender(res.locals.t('editProject.err_required'));
   const milestones = parseMilestoneList(req.body, res.locals.t);
   if (milestones.error) return rerender(milestones.error);
+  // Only the owner changes who else can edit — a co-editor's form has no such field, and a crafted
+  // one is ignored rather than trusted.
+  let editorList = null;
+  if (isOwner) {
+    const owner = db.prepare('SELECT jira_account_id FROM users WHERE id=?').get(proj.user_id);
+    try { editorList = await parseEditorList(req.body.co_editors, owner && owner.jira_account_id, res.locals.t); }
+    catch (err) { return rerender(friendlyError(res.locals.t, err)); }
+    if (editorList.error) return rerender(editorList.error);
+  }
   const confPage = await confluence.resolvePageUrl(CONFLUENCE_TOKEN, confluence_url);
   if (!confPage) return rerender(res.locals.t('editProject.err_confluence_url'));
 
@@ -755,10 +826,21 @@ app.post('/projects/:slug/edit', requireAuth, async (req, res) => {
   // plain string, or null out an emptied field.
   const boxId = (bigpicture_box_id || '').trim() || null;
 
-  db.prepare(`UPDATE projects SET name=?,jira_root_epic=?,eta=?,confluence_space=?,confluence_page=?,
-      milestones_json=?,bigpicture_box_id=? WHERE id=?`)
-    .run(name.trim(), epic, eta, confPage.space, confPage.page,
-      JSON.stringify(milestones.list), boxId, proj.id);
+  db.transaction(() => {
+    db.prepare(`UPDATE projects SET name=?,jira_root_epic=?,eta=?,confluence_space=?,confluence_page=?,
+        milestones_json=?,bigpicture_box_id=? WHERE id=?`)
+      .run(name.trim(), epic, eta, confPage.space, confPage.page,
+        JSON.stringify(milestones.list), boxId, proj.id);
+    // The field holds the whole list, so saving replaces it (an address removed from it loses its
+    // rights). Someone kept in the list keeps their original added_at.
+    if (editorList) {
+      const keep = editorList.list.map(e => e.accountId);
+      db.prepare(`DELETE FROM project_editors WHERE project_id=? AND jira_account_id NOT IN (${keep.map(() => '?').join(',') || "''"})`).run(proj.id, ...keep);
+      const upsert = db.prepare(`INSERT INTO project_editors(project_id,jira_account_id,email,name) VALUES(?,?,?,?)
+        ON CONFLICT(project_id,jira_account_id) DO UPDATE SET email=excluded.email, name=excluded.name`);
+      editorList.list.forEach(e => upsert.run(proj.id, e.accountId, e.email, e.name));
+    }
+  })();
 
   res.redirect(`/projects/${proj.slug}`);
 });
@@ -793,13 +875,13 @@ function reportListWithGaps(projectId, limit) {
 app.get('/projects/:slug', requireAuth, (req, res) => {
   const proj = db.prepare('SELECT p.*, u.name as owner_name FROM projects p JOIN users u ON u.id=p.user_id WHERE p.slug=?').get(req.params.slug);
   if (!proj) return res.status(404).send('Project not found.');
-  const isOwner = proj.user_id === req.session.userId;
+  const canEdit = !!projectRole(proj, req.session.userId);
   const history  = reportHistory(proj, 10);
   const reports  = history.rows;
   const wsCount  = db.prepare('SELECT COUNT(*) as n FROM workstreams WHERE project_id=?').get(proj.id).n;
   const epicCount= db.prepare('SELECT COUNT(*) as n FROM epics_cache WHERE project_id=?').get(proj.id).n;
   const syncWarning = req.query.syncSource ? [{ source: req.query.syncSource, message: req.query.syncMessage || '' }] : [];
-  res.render('project-detail', { proj, reports, dateColumns: history.dateColumns, wsCount, epicCount, syncWarning, isOwner, userName: req.session.userName, currentWeek: currentWeekStr() });
+  res.render('project-detail', { proj, reports, dateColumns: history.dateColumns, wsCount, epicCount, syncWarning, canEdit, editors: projectEditors(proj.id), userName: req.session.userName, currentWeek: currentWeekStr() });
 });
 
 // ── CLEANUP (tracking-quality check) ─────────────────────────────
@@ -811,7 +893,7 @@ app.get('/projects/:slug', requireAuth, (req, res) => {
 app.get('/projects/:slug/cleanup', requireAuth, (req, res) => {
   const proj = db.prepare('SELECT p.*, u.name as owner_name FROM projects p JOIN users u ON u.id=p.user_id WHERE p.slug=?').get(req.params.slug);
   if (!proj) return res.status(404).send('Project not found.');
-  const isOwner = proj.user_id === req.session.userId;
+  const canEdit = !!projectRole(proj, req.session.userId);
   // issuetype='Epic' only — Confluence-sourced workstreams and Planning Light's BigPicture
   // scope can both cache a Task/Story/Bug alongside real epics in this same table (see
   // db.js's issuetype column comment); Cleanup only ever checks Epics. A row cached before
@@ -822,7 +904,7 @@ app.get('/projects/:slug/cleanup', requireAuth, (req, res) => {
   const syncWarning = req.query.syncSource ? { source: req.query.syncSource, message: req.query.syncMessage || '' } : null;
   const refreshed = req.query.refreshed != null ? parseInt(req.query.refreshed, 10) : null;
   res.render('cleanup', {
-    proj, isOwner, result, lastSynced, formatDate, syncWarning, refreshed,
+    proj, canEdit, result, lastSynced, formatDate, syncWarning, refreshed,
     issueUrl: qualityCheck.jiraIssueUrl,
     userName: req.session.userName, currentWeek: currentWeekStr()
   });
@@ -959,7 +1041,7 @@ async function generateReportRow(proj, year, week) {
 }
 
 app.post('/projects/:slug/reports/generate', requireAuth, async (req, res) => {
-  const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
+  const proj = editableProject(req);
   if (!proj) return res.status(404).send('Project not found.');
   const weekStr  = req.body.week || req.query.week || currentWeekStr();
   const [yr, wn] = weekStr.split('-W');
@@ -1030,7 +1112,7 @@ app.post('/projects/:slug/reports/generate', requireAuth, async (req, res) => {
 });
 
 app.post('/projects/:slug/reports/:yearweek(\\d{4}-W\\d{2})/delete', requireAuth, (req, res) => {
-  const proj = db.prepare('SELECT * FROM projects WHERE slug=? AND user_id=?').get(req.params.slug, req.session.userId);
+  const proj = editableProject(req);
   if (!proj) return res.status(404).send('Project not found.');
   const [yr, wn] = req.params.yearweek.split('-W');
   db.prepare('DELETE FROM reports WHERE project_id=? AND year=? AND week=?').run(proj.id, parseInt(yr), parseInt(wn));
@@ -1111,7 +1193,7 @@ function reportHistory(proj, limit) {
 // ── REPORT VIEW ───────────────────────────────────────────────────
 // Shared by the HTML report view and the PDF export route — a report row plus the project/owner/
 // locale context around it is everything genReport() needs, regardless of which one asked for it.
-function buildReportHtml(proj, report, year, week, isOwner, lang, userName, notice = null) {
+function buildReportHtml(proj, report, year, week, canEdit, lang, userName, notice = null) {
   // A report is a frozen snapshot from the moment it was generated — never recompute the
   // matrix/Planning from the live workstreams/epics_cache tables for a row that already has one
   // (that live-recompute was the actual bug: a workstream added or changing status *after* a past
@@ -1179,7 +1261,7 @@ function buildReportHtml(proj, report, year, week, isOwner, lang, userName, noti
     milestones: milestonesForView,
     epics: epicsForView,
     planningTree,
-    stats, health, isOwner,
+    stats, health, canEdit,
     backfilled: !!report.backfilled,
     generatedAt: formatDate(new Date(report.created_at * 1000).toISOString()),
     lang, userName, confluenceUrl, notice, isPreview: IS_PREVIEW,
@@ -1190,7 +1272,7 @@ function buildReportHtml(proj, report, year, week, isOwner, lang, userName, noti
 app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, res) => {
   const proj = db.prepare(`SELECT p.*,u.name as pm_name FROM projects p JOIN users u ON u.id=p.user_id WHERE p.slug=?`).get(req.params.slug);
   if (!proj) return res.status(404).send('Project not found.');
-  const isOwner = proj.user_id === req.session.userId;
+  const canEdit = !!projectRole(proj, req.session.userId);
   const [yr, wn] = req.params.yearweek.split('-W');
   const year = parseInt(yr), week = parseInt(wn);
   if (week < 1 || week > 53) return res.redirect(`/projects/${req.params.slug}`);
@@ -1227,7 +1309,7 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, re
   }
 
   const notice = req.query.syncSource ? { source: req.query.syncSource, message: req.query.syncMessage || '' } : null;
-  const html = buildReportHtml(proj, report, year, week, isOwner, req.lang, req.session.userName, notice);
+  const html = buildReportHtml(proj, report, year, week, canEdit, req.lang, req.session.userName, notice);
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(html);
 });

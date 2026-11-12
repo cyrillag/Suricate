@@ -31,6 +31,7 @@ const DICT = {
     empty_text:  { fr: 'Crée ton premier projet pour commencer à générer des rapports hebdomadaires.', en: 'Create your first project to start generating weekly reports.' },
     empty_cta:   { fr: 'Créer un projet',         en: 'Create a project' },
     owner:       { fr: 'Géré par {{name}}',       en: 'Managed by {{name}}' },
+    editors:     { fr: 'Co-édité par {{names}}',  en: 'Co-edited by {{names}}' },
     report_one:  { fr: 'rapport',                 en: 'report' },
     report_other:{ fr: 'rapports',                en: 'reports' },
     last:        { fr: 'Dernier :',               en: 'Last:' },
@@ -101,10 +102,19 @@ const DICT = {
     err_milestone_max: { fr: '{{max}} jalons maximum par projet.', en: 'At most {{max}} milestones per project.' },
     bigpicture_label: { fr: 'Box BigPicture', en: 'BigPicture box' },
     bigpicture_optional: { fr: '(optionnel)', en: '(optional)' },
-    bigpicture_hint: { fr: 'Identifiant de la box BigPicture du projet (ex : HYBR-95). Si renseigné, la section Planning du report utilise le scope configuré dans cette box au lieu de la liste plate des epics.', en: 'The project’s BigPicture box ID (e.g. HYBR-95). When set, the report’s Planning section uses that box’s configured scope instead of the flat epic list.' }
+    bigpicture_hint: { fr: 'Identifiant de la box BigPicture du projet (ex : HYBR-95). Si renseigné, la section Planning du report utilise le scope configuré dans cette box au lieu de la liste plate des epics.', en: 'The project’s BigPicture box ID (e.g. HYBR-95). When set, the report’s Planning section uses that box’s configured scope instead of the flat epic list.' },
+    editors_label:    { fr: 'Co-éditeurs',             en: 'Co-editors' },
+    editors_optional: { fr: '(facultatif)',            en: '(optional)' },
+    editors_hint:     { fr: 'Emails OVHcloud des personnes qui peuvent aussi générer les rapports et modifier ces paramètres, séparés par des virgules ou des retours à la ligne. Toi seul gères cette liste et peux supprimer le projet. Retirer une adresse lui retire ses droits.', en: 'OVHcloud emails of people who can also generate reports and change these settings, separated by commas or new lines. Only you manage this list and can delete the project. Removing an address removes their rights.' },
+    editors_none:     { fr: 'Aucun co-éditeur',        en: 'No co-editors' },
+    editors_owner_only: { fr: 'seul le propriétaire du projet gère cette liste.', en: 'only the project owner manages this list.' },
+    err_editors_max:  { fr: '{{max}} co-éditeurs au maximum.', en: '{{max}} co-editors at most.' },
+    err_editors_invalid: { fr: 'Adresse(s) email invalide(s) : {{emails}}.', en: 'Invalid email address(es): {{emails}}.' },
+    err_editors_unknown: { fr: 'Aucun compte Jira OVHcloud pour : {{emails}}. Vérifie l’orthographe (adresse exacte, en @ovhcloud.com).', en: 'No OVHcloud Jira account for: {{emails}}. Check the spelling (exact address, @ovhcloud.com).' }
   },
   detail: {
     owner:     { fr: 'Responsable : {{name}}',    en: 'Owner: {{name}}' },
+    editors:   { fr: 'Co-éditeurs : {{names}}', en: 'Co-editors: {{names}}' },
     cleanup_link: { fr: '🩺 Cleanup',             en: '🩺 Cleanup' },
     configure: { fr: 'Configurer',                en: 'Configure' },
     generate_report: { fr: 'Générer le rapport',  en: 'Generate report' },

@@ -22,11 +22,12 @@
         <span class="tag"><%= wsCount %> workstreams</span>
         <span class="tag"><%= epicCount %> epics</span>
         <span class="tag"><%= t('detail.owner', { name: proj.owner_name }) %></span>
+        <% if (editors.length) { %><span class="tag"><%= t('detail.editors', { names: editors.map(e => e.name).join(', ') }) %></span><% } %>
       </p>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end">
       <a href="/projects/<%= proj.slug %>/cleanup" class="btn-ghost btn-sm"><%= t('detail.cleanup_link') %></a>
-    <% if (isOwner) { %>
+    <% if (canEdit) { %>
       <a href="/projects/<%= proj.slug %>/edit" class="btn-ghost btn-sm btn-icon" title="<%= t('detail.configure') %>" aria-label="<%= t('detail.configure') %>"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></a>
       <form method="POST" action="/projects/<%= proj.slug %>/reports/generate" style="display:flex;gap:6px;align-items:center">
         <input class="field-input" type="text" name="week" value="<%= currentWeek %>" pattern="\d{4}-W\d{2}" style="width:110px" title="<%= t('detail.week_input_title') %>" aria-label="<%= t('detail.week_input_aria') %>">
@@ -53,7 +54,7 @@
   <div class="section-card">
     <div class="section-card-header"><%= t('detail.past_reports') %></div>
     <% if (reports.length === 0) { %>
-    <div class="empty-state-inline"><%= isOwner ? t('detail.no_reports', { week: currentWeek }) : t('detail.no_reports_viewer') %></div>
+    <div class="empty-state-inline"><%= canEdit ? t('detail.no_reports', { week: currentWeek }) : t('detail.no_reports_viewer') %></div>
     <% } else { %>
     <%# Weekly history, modelled on the PMs' Confluence "Flash reports history" page — every figure
         comes from that week's own frozen report (see reportHistory in server.js). %>
@@ -99,7 +100,7 @@
         <td class="num"><%= r.clarify %></td>
         <td class="td-actions">
           <a href="/projects/<%= proj.slug %>/<%= ws %>" class="hist-icon" title="<%= plain('detail.view') %>" aria-label="<%= plain('detail.view') %>"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></a>
-          <% if (isOwner) { %>
+          <% if (canEdit) { %>
           <% if (ws === currentWeek) { %>
           <form method="POST" action="/projects/<%= proj.slug %>/reports/generate" style="display:inline">
             <input type="hidden" name="week" value="<%= ws %>">
