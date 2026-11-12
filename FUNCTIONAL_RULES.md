@@ -1026,11 +1026,11 @@ whenever the maintainer's Confluence access to the CPO space dropped while he wa
 Agreed direction (2026-11-10), delivered in steps:
 
 1. **Owners store their own Jira and Confluence PATs** on "My access" (`/account`, nav link for
-   report creators only). *Shipped as step 1: stored and checked, not yet used.*
+   report creators only). *Shipped (step 1).*
 2. Every Jira/Confluence call for a project uses its **owner's** PATs, whoever is viewing (the
    current week is generated on first visit, possibly by a reader). The shared token stays as a
    fallback during the migration of the owners, then is cut. BigPicture keeps its shared token (it
-   only reads box configuration).
+   only reads box configuration). *Shipped (step 2) — see the rules below.*
 3. Modifying a project or generating a report needs a **PAT-verified session**: the login page
    offers "email only" (read) or "with my PAT" (read + modify, 30-day session like today).
 
@@ -1038,6 +1038,20 @@ Rules already in force:
 
 - **Readers never need a PAT.** 119 accounts, 7 project owners (2026-11): asking every person who
   opens a shared report link to create a token would be friction for nothing.
+- **A project is read with its owner's access, never the viewer's** (`tokensForProject` /
+  `tokensForUser` in `server.js`): generation, Cleanup refresh, project edit — and the current week
+  generated on a reader's first visit. Project creation uses the creator's, who becomes the owner.
+  The report is therefore the same whoever opens it, and a transferred project (`projects.user_id`
+  changed) is read with the new owner's PATs from the next action on.
+- **Per service, owner's PAT first, shared token as fallback** — an owner may have set Jira and not
+  yet Confluence. Fallback only when no PAT is stored (or it can't be decrypted here), **never when
+  the owner's PAT fails**: silently retrying with the shared token would hide an expired PAT and
+  bring back the very dependency this removes. Login (looking the email up in Jira, before anyone
+  is identified) still uses the shared token.
+- **Access errors name the account actually used.** Token not recognised → "the Jira PAT of
+  <owner>, the project owner, … <owner> needs to paste a new one in My access" instead of the
+  `.env` instructions meant for the maintainer; no access / CAPTCHA / space hint → "<owner>'s
+  account" instead of "Suricate's service account". With the fallback, the old wording stays.
 - **A PAT is only accepted if it belongs to the logged-in account.** Jira: `/myself` must return the
   account login stored (`users.jira_account_id`). Confluence: `/rest/api/user/current`'s `username`
   must equal the Jira login (`users.jira_username`, saved with the Jira PAT — on this instance both

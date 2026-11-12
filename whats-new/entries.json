@@ -1,5 +1,22 @@
 [
   {
+    "id": "2026-11-personal-tokens",
+    "date": "2026-11-12",
+    "audience": "creators",
+    "title": {
+      "fr": "Tes projets lus avec tes propres accès Jira et Confluence",
+      "en": "Your projects read with your own Jira and Confluence access"
+    },
+    "short": {
+      "fr": "Renseigne tes PAT Jira et Confluence dans « Mes accès » : Suricate lira tes projets avec tes droits, plus avec un compte commun.",
+      "en": "Set your Jira and Confluence PATs in “My access”: Suricate will read your projects with your rights, not a shared account."
+    },
+    "body": {
+      "fr": "Jusqu’ici, Suricate lisait Jira et Confluence avec un seul compte commun : un filtre Jira privé ou une page restreinte qu’il ne voyait pas cassait ton rapport. Dans « Mes accès » (barre du haut), colle ton jeton d’accès personnel (PAT) Jira, puis Confluence : chacun est vérifié, doit être le tien, et est stocké chiffré. Tes projets sont ensuite lus avec tes droits, quelle que soit la personne qui ouvre le rapport. Les lecteurs n’ont rien à faire. Sans PAT, Suricate utilise encore son accès commun pendant la transition, mais il sera coupé : pense à renseigner les tiens.",
+      "en": "Until now Suricate read Jira and Confluence with a single shared account: a private Jira filter or a restricted page it couldn’t see broke your report. In “My access” (top bar), paste your Jira personal access token (PAT), then your Confluence one: each is checked, must be yours, and is stored encrypted. Your projects are then read with your rights, whoever opens the report. Readers have nothing to do. Without PATs, Suricate still uses its shared access during the transition, but it will be cut: remember to set yours."
+    }
+  },
+  {
     "id": "2026-11-planning-splitter",
     "date": "2026-11-02",
     "audience": "all",
