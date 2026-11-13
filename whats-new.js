@@ -13,10 +13,12 @@ const IMG_DIR = path.join(DIR, 'img');
 const FILE_ORDER = require('./whats-new/entries.json');
 const ENTRIES = FILE_ORDER.slice().sort((a, b) => b.date.localeCompare(a.date));
 
-// Only people who own at least one project get the badge — the audience for functional news is
-// report creators; readers mostly don't care (the page itself stays viewable by anyone).
+// Only people who own or co-edit at least one project get the badge — the audience for functional
+// news is report creators; readers mostly don't care (the page itself stays viewable by anyone).
 function isCreator(userId) {
-  return !!db.prepare('SELECT 1 FROM projects WHERE user_id=? LIMIT 1').get(userId);
+  return !!db.prepare(`SELECT 1 FROM projects WHERE user_id=?
+    UNION ALL SELECT 1 FROM project_editors e JOIN users u ON u.jira_account_id=e.jira_account_id WHERE u.id=?
+    LIMIT 1`).get(userId, userId);
 }
 
 // Entries newer than the user's last visit of the page. A creator who never opened it only sees

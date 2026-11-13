@@ -298,4 +298,17 @@ ensureColumn('users', 'confluence_token_set_at', 'confluence_token_set_at INTEGE
 // enter again. Anything not in tokens.js's format is cleared; a real PAT is always `v1:…`.
 db.prepare("UPDATE users SET jira_token='' WHERE jira_token<>'' AND jira_token NOT LIKE 'v1:%'").run();
 
+// Co-editors (see FUNCTIONAL_RULES.md "Visibility & permissions"): people the owner lets generate
+// reports and edit the project's settings. Keyed by Jira account (the same `key || name` login
+// stores in users.jira_account_id), not by users.id, so someone who has never opened Suricate can
+// be added and has the rights from their first login. Email and name are kept for display only.
+db.exec(`CREATE TABLE IF NOT EXISTS project_editors (
+  project_id      INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  jira_account_id TEXT    NOT NULL,
+  email           TEXT    NOT NULL,
+  name            TEXT,
+  added_at        INTEGER DEFAULT (unixepoch()),
+  PRIMARY KEY (project_id, jira_account_id)
+)`);
+
 module.exports = db;

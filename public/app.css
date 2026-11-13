@@ -149,6 +149,18 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 /* The Edit page's milestone rows (name + New Feature + 3 actions) need more room than 560px. */
 .form-card.form-card-wide{max-width:780px}
 .form-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:24px}
+/* Co-editors (Edit project) — managed apart from the settings form, each add/remove applies at once */
+.editors-section{border-top:1px solid var(--bd2);margin-top:28px;padding-top:22px;display:flex;flex-direction:column;gap:10px}
+.editors-title{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tx2)}
+.editors-list{list-style:none;margin:0;padding:0;border:1px solid var(--bd2);border-radius:var(--r)}
+.editors-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 8px 6px 12px}
+.editors-row+.editors-row{border-top:1px solid var(--bd2)}
+.editors-who{min-width:0;overflow-wrap:anywhere}
+.editors-name{font-weight:600}
+.editors-email{font-size:13px;color:var(--tx2);margin-left:6px}
+.editors-add{display:flex;gap:8px}
+.editors-add .field-input{flex:1;min-width:0}
+.flash-ok{background:#EEF7E0;color:var(--done);border:1px solid #BDE475;padding:11px 14px;border-radius:var(--r);font-size:13px}
 
 /* HINT TOOLTIPS */
 .hint{position:relative;display:inline-flex;vertical-align:middle;margin-left:2px}

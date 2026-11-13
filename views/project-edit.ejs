@@ -22,7 +22,7 @@
     <form method="POST" action="/projects/<%= proj.slug %>/edit">
       <div class="field-group">
         <label class="field-label" for="name"><%= t('editProject.name_label') %></label>
-        <input class="field-input" type="text" id="name" name="name" value="<%= proj.name %>" required autofocus>
+        <input class="field-input" type="text" id="name" name="name" value="<%= proj.name %>" required<%= editorsFlash ? '' : ' autofocus' %>>
       </div>
       <div class="field-group">
         <label class="field-label" for="jira_root_epic"><%= t('editProject.epic_label') %></label>
@@ -108,6 +108,39 @@
         <button type="submit" class="btn-primary"><%= t('editProject.submit') %></button>
       </div>
     </form>
+    <%# Co-editors (FUNCTIONAL_RULES.md "Visibility & permissions"): kept out of the settings form -
+        each add/remove applies at once and says so. Only the owner manages the list; a co-editor
+        sees it read-only. %>
+    <section class="editors-section" id="co-editors">
+      <h2 class="editors-title"><%= t('editProject.editors_label') %></h2>
+      <% if (editorsFlash) { %><div class="<%= editorsFlash.type === 'error' ? 'auth-error' : 'flash-ok' %>" role="status"><%= editorsFlash.text %></div><% } %>
+      <% if (editors.length) { %>
+      <ul class="editors-list">
+        <% editors.forEach(function (e) { %>
+        <li class="editors-row">
+          <span class="editors-who"><span class="editors-name"><%= e.name || e.email %></span> <span class="editors-email"><%= e.email %></span></span>
+          <% if (isOwner) { %>
+          <form method="POST" action="/projects/<%= proj.slug %>/editors/<%= encodeURIComponent(e.jira_account_id) %>/delete"
+                onsubmit="return confirm(<%= JSON.stringify(t('editProject.editors_remove_confirm', { name: e.name || e.email })) %>);">
+            <button type="submit" class="ms-btn danger" aria-label="<%= t('editProject.editors_remove', { name: e.name || e.email }) %>" title="<%= t('editProject.editors_remove', { name: e.name || e.email }) %>"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+          </form>
+          <% } %>
+        </li>
+        <% }) %>
+      </ul>
+      <% } else { %>
+      <p class="field-hint editors-empty"><%= t('editProject.editors_none') %></p>
+      <% } %>
+      <% if (isOwner) { %>
+      <form method="POST" action="/projects/<%= proj.slug %>/editors" class="editors-add">
+        <input class="field-input" type="text" id="editor_emails" name="emails" value="<%= (editorsFlash && editorsFlash.typed) || '' %>" placeholder="prenom.nom@ovhcloud.com" spellcheck="false" autocomplete="off" aria-label="<%= t('editProject.editors_add_label') %>">
+        <button type="submit" class="btn-ghost"><%= t('editProject.editors_add') %></button>
+      </form>
+      <p class="field-hint"><%= t('editProject.editors_hint') %></p>
+      <% } else { %>
+      <p class="field-hint"><%= t('editProject.editors_owner_only') %></p>
+      <% } %>
+    </section>
     <div class="form-info">
       <%- t('editProject.note') %>
     </div>

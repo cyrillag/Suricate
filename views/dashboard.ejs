@@ -28,7 +28,7 @@
   </div>
   <% } else { %>
   <div class="project-grid">
-    <% projects.forEach(p => { const isOwner = p.user_id === userId; %>
+    <% projects.forEach(p => { const isOwner = p.user_id === userId; const canEdit = isOwner || editorOf.has(p.id); %>
     <div class="project-card">
       <div class="project-card-top">
         <div class="project-card-name"><%= p.name %></div>
@@ -44,12 +44,13 @@
       </div>
       <div class="project-card-meta">
         <%= t('dashboard.owner', { name: p.owner_name }) %>
+        <% if (p.editor_names) { %> · <%= t('dashboard.editors', { names: p.editor_names }) %><% } %>
         · <%= p.report_count %> <%= tPlural(p.report_count, 'dashboard.report_one', 'dashboard.report_other') %>
         <% if (p.last_report) { %> · <%= t('dashboard.last') %> <strong><%= p.last_report %></strong><% } %>
         <% if (p.eta) { %> · <%= t('dashboard.eta') %> <strong><%= p.eta %></strong><% } %>
       </div>
       <div class="project-card-actions">
-        <% if (isOwner) { %>
+        <% if (canEdit) { %>
         <form method="POST" action="/projects/<%= p.slug %>/reports/generate" style="display:inline">
           <input type="hidden" name="week" value="<%= currentWeek %>">
           <button type="submit" class="btn-primary btn-sm"><%= t('dashboard.generate', {week: currentWeek}) %></button>
