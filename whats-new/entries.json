@@ -1,5 +1,22 @@
 [
   {
+    "id": "2026-11-delivered",
+    "date": "2026-11-13",
+    "audience": "creators",
+    "title": {
+      "fr": "Nouveau badge « Delivered » quand le projet est livré",
+      "en": "New “Delivered” badge once the project ships"
+    },
+    "short": {
+      "fr": "Quand l’epic mère du projet est Done dans Jira, le rapport affiche « Delivered » au lieu de On Track / At Risk / Delayed.",
+      "en": "When the project’s root epic is Done in Jira, the report shows “Delivered” instead of On Track / At Risk / Delayed."
+    },
+    "body": {
+      "fr": "Dès que l’epic mère (LVL2) du projet passe à Done dans Jira, le rapport généré affiche un badge vert « Delivered », qui l’emporte sur At Risk et Delayed : un risque resté ouvert ou une epic de workstream pas encore fermée ne fait plus passer un projet livré pour « à risque ». Ces écarts restent visibles dans la matrice et le registre de risques. Dans l’historique du projet, la météo affiche ✅. Les rapports déjà générés gardent leur badge ; régénère la semaine en cours pour en profiter.",
+      "en": "As soon as the project’s root (LVL2) epic is Done in Jira, the generated report shows a green “Delivered” badge, which wins over At Risk and Delayed: a risk left open or a workstream epic not closed yet no longer makes a shipped project look at risk. Those gaps stay visible in the matrix and the risk register. In the project history, the health column shows ✅. Reports already generated keep their badge; regenerate the current week to get it."
+    }
+  },
+  {
     "id": "2026-11-co-editors",
     "date": "2026-11-12",
     "audience": "creators",

@@ -203,6 +203,10 @@ db.exec(`CREATE TABLE IF NOT EXISTS epic_key_aliases (
 // because a PM hides a node next week. NULL for a project not using Planning Light, and for any
 // report row generated before this column existed.
 ensureColumn('reports', 'planning_snapshot_json', 'planning_snapshot_json TEXT');
+// Whether the project's root epic was Done in Jira when the report was generated — drives the
+// "Delivered" health badge (FUNCTIONAL_RULES.md "Project health badge"), frozen like eta_snapshot.
+// 0 for reports generated before this column existed: they keep the badge they always had.
+ensureColumn('reports', 'root_done', 'root_done INTEGER DEFAULT 0');
 
 // A first version of "milestones" auto-discovered them from the Jira epic hierarchy / a Confluence
 // heading convention, grouping the Deliverable matrix by whichever ones it found. Retired: on a

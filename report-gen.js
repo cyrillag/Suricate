@@ -226,7 +226,7 @@ ${notice ? `
           ? `<div class="f-value-list">${milestones.map(m => `<div class="f-value">${esc(m.name)} — ${m.done ? 'DONE' : (m.end ? formatShortDate(m.end) : 'TBD')}</div>`).join('')}</div>`
           : `<div class="f-value">${esc(etaDisplay || 'TBD')}</div>`}
         ${etaDelayed ? `<div class="eta-delayed-note">${etaDelayedFrom ? `⚠ Previous date: ${esc(etaDelayedFrom)}` : '⚠ Delayed'}</div>` : ''}
-        <div class="health ${health} health-sub"><div class="health-dot"></div>${health === 'delayed' ? 'Delayed' : health === 'at-risk' ? 'At Risk' : 'On Track'}</div>
+        <div class="health ${health} health-sub"><div class="health-dot"></div>${health === 'delivered' ? '✓ Delivered' : health === 'delayed' ? 'Delayed' : health === 'at-risk' ? 'At Risk' : 'On Track'}</div>
       </div>
       <div class="identity-cell">
         <div class="f-label">Epic LVL2</div>
@@ -759,6 +759,10 @@ const CSS = `
      states use, without needing a brand-new color. */
   .health.delayed{background:var(--blk-bg);color:var(--blk-c);border:1px solid #F4A17D;padding:3px 9px;border-radius:2px}
   .health.delayed .health-dot{display:none}
+  /* Delivered (root epic Done): the end state, a filled green pill — same "definite fact" shape as
+     Delayed, in the Done colors. */
+  .health.delivered{background:var(--done-bg);color:var(--done-c);border:1px solid #BDE475;padding:3px 9px;border-radius:2px}
+  .health.delivered .health-dot{display:none}
   .health-sub{margin-top:8px}
   .abc-grid{display:grid;grid-template-columns:repeat(3,1fr)}
   .doc-section--abc{border-top:1px solid var(--bd)}

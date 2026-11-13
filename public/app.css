@@ -269,7 +269,7 @@ body{font-family:var(--f);font-size:15px;line-height:1.5;color:var(--tx);backgro
 .history-table .num{text-align:right}
 .hist-na{color:var(--tx2)}
 .hist-health{font-weight:600;font-size:14px}
-.hist-health.on-track{color:var(--done)}.hist-health.at-risk{color:var(--hist-red)}.hist-health.delayed{color:var(--hist-red)}
+.hist-health.on-track,.hist-health.delivered{color:var(--done)}.hist-health.at-risk{color:var(--hist-red)}.hist-health.delayed{color:var(--hist-red)}
 .hist-trend{font-size:18px;font-weight:700;cursor:help}
 .hist-trend.up{color:var(--done)}.hist-trend.flat{color:var(--tx2)}.hist-trend.down{color:var(--hist-red)}
 .hist-delta{font-size:12px;font-weight:700;cursor:help}

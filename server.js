@@ -1096,8 +1096,14 @@ async function generateReportRow(proj, year, week) {
   // otherwise it would only ever change when someone happens to re-save the project, and a
   // week-over-week delay comparison needs it to actually track the source on its own schedule,
   // same as workstreams/epics already do on every generate.
+  // Its status too: a Done root epic makes the report "Delivered".
   let etaIso = null;
-  try { etaIso = (await jira.getRootEpicMeta(tok.jira, proj.jira_root_epic)).eta; }
+  let rootDone = false;
+  try {
+    const meta = await jira.getRootEpicMeta(tok.jira, proj.jira_root_epic);
+    etaIso = meta.eta;
+    rootDone = jira.mapStatus(meta.status) === 'done';
+  }
   catch (err) { console.warn(`Could not read ETA from ${proj.jira_root_epic}: ${err.message}`); }
   db.prepare('UPDATE projects SET eta=? WHERE id=?').run(formatDate(etaIso), proj.id);
 
@@ -1156,8 +1162,8 @@ async function generateReportRow(proj, year, week) {
   // regenerated at all — but the intent is "set once at creation", not "recomputed every write").
   const backfilled = isPastWeek(year, week) ? 1 : 0;
 
-  db.prepare(`INSERT INTO reports(project_id,year,week,exec_summary,highlights_json,risks_json,workstream_statuses_json,workstreams_snapshot_json,epics_snapshot_json,planning_snapshot_json,eta_snapshot,eta_delayed,milestones_list_snapshot_json,backfilled,updated_at)
-    VALUES(?,?,?,?,?,?,'{}',?,?,?,?,?,?,?,unixepoch())
+  db.prepare(`INSERT INTO reports(project_id,year,week,exec_summary,highlights_json,risks_json,workstream_statuses_json,workstreams_snapshot_json,epics_snapshot_json,planning_snapshot_json,eta_snapshot,eta_delayed,milestones_list_snapshot_json,backfilled,root_done,updated_at)
+    VALUES(?,?,?,?,?,?,'{}',?,?,?,?,?,?,?,?,unixepoch())
     ON CONFLICT(project_id,year,week) DO UPDATE SET
       exec_summary=excluded.exec_summary,
       highlights_json=excluded.highlights_json,
@@ -1168,8 +1174,9 @@ async function generateReportRow(proj, year, week) {
       eta_snapshot=excluded.eta_snapshot,
       eta_delayed=excluded.eta_delayed,
       milestones_list_snapshot_json=excluded.milestones_list_snapshot_json,
+      root_done=excluded.root_done,
       updated_at=unixepoch()`).run(proj.id, year, week, execSummary, JSON.stringify(highlights), JSON.stringify(risks), JSON.stringify(resolvedWs), JSON.stringify(epics), planningTree ? JSON.stringify(planningTree) : null, etaIso, etaDelayed ? 1 : 0,
-      JSON.stringify(milestoneSnapshot), backfilled);
+      JSON.stringify(milestoneSnapshot), backfilled, rootDone ? 1 : 0);
   return { warnings, planningResolved: !!planningTree };
 }
 
@@ -1261,8 +1268,12 @@ app.post('/projects/:slug/reports/:yearweek(\\d{4}-W\\d{2})/delete', requireAuth
 // open HIGH (or EXTREME — it used to be left out, although it ranks above High) risk while every
 // workstream is nominally on schedule, so that flips the badge too. Delayed is a fact (the date
 // already moved), At Risk a projection (it might) — Delayed wins when both are true.
-const HEALTH_RANK = { 'on-track': 0, 'at-risk': 1, 'delayed': 2 };
-function computeHealth({ etaDelayed, blockedCount, risks }) {
+// Delivered (the root epic is Done in Jira) is the end state and wins over everything: once the
+// project is shipped, an unclosed risk or a workstream epic still open in Jira is leftover
+// bookkeeping, still visible in the matrix and the risk register, not a threat to the date.
+const HEALTH_RANK = { 'delivered': -1, 'on-track': 0, 'at-risk': 1, 'delayed': 2 };
+function computeHealth({ etaDelayed, blockedCount, risks, rootDone = false }) {
+  if (rootDone) return 'delivered';
   const hasHighRisk = risks.some(r => r.level === 'high' || r.level === 'extreme');
   return etaDelayed ? 'delayed' : (blockedCount > 0 || hasHighRisk) ? 'at-risk' : 'on-track';
 }
@@ -1275,7 +1286,7 @@ function computeHealth({ etaDelayed, blockedCount, risks }) {
 // degrades when health worsens or any date slips later, improves when health gets better, and is
 // stable otherwise.
 function reportHistory(proj, limit) {
-  const rows = db.prepare(`SELECT year, week, eta_snapshot, eta_delayed, risks_json, highlights_json,
+  const rows = db.prepare(`SELECT year, week, eta_snapshot, eta_delayed, root_done, risks_json, highlights_json,
     workstreams_snapshot_json, milestones_list_snapshot_json, milestone_alpha_end, milestone_beta_end, milestone_ga_end
     FROM reports WHERE project_id=?`).all(proj.id);
   const byKey = new Map(rows.map(r => [`${r.year}-${r.week}`, r]));
@@ -1304,7 +1315,7 @@ function reportHistory(proj, limit) {
     const blocked = ws ? count('blk') : null;
     const row = {
       ...w,
-      health: ws ? computeHealth({ etaDelayed: !!r.eta_delayed, blockedCount: blocked, risks }) : null,
+      health: ws ? computeHealth({ etaDelayed: !!r.eta_delayed, blockedCount: blocked, risks, rootDone: !!r.root_done }) : null,
       donePct: ws && ws.length ? Math.round(count('done') / ws.length * 100) : null,
       risks: risks.length,
       clarify: (highlights.clarify || []).length,
@@ -1365,7 +1376,7 @@ function buildReportHtml(proj, report, year, week, canEdit, lang, userName, noti
   resolvedWs.forEach(ws => stats[ws.status] = (stats[ws.status]||0)+1);
   const risks = JSON.parse(report.risks_json);
   const etaDelayed = !!report.eta_delayed;
-  const health = computeHealth({ etaDelayed, blockedCount: stats.blk, risks });
+  const health = computeHealth({ etaDelayed, blockedCount: stats.blk, risks, rootDone: !!report.root_done });
   let etaDelayedFrom = null;
   if (etaDelayed) {
     const prevEta = db.prepare(`

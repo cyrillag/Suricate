@@ -59,9 +59,9 @@
     <%# Weekly history, modelled on the PMs' Confluence "Flash reports history" page — every figure
         comes from that week's own frozen report (see reportHistory in server.js). %>
     <%
-      const WEATHER = { 'on-track': '☀️', 'at-risk': '⛅', 'delayed': '🌧️' };
+      const WEATHER = { 'delivered': '✅', 'on-track': '☀️', 'at-risk': '⛅', 'delayed': '🌧️' };
       // Same wording as the report's own health badge (report-gen.js), in both languages.
-      const HEALTH_LABEL = { 'on-track': 'On Track', 'at-risk': 'At Risk', 'delayed': 'Delayed' };
+      const HEALTH_LABEL = { 'delivered': 'Delivered', 'on-track': 'On Track', 'at-risk': 'At Risk', 'delayed': 'Delayed' };
       const TREND = { up: '↗', flat: '→', down: '↘' };
       // Button labels carry a leading emoji ("↻ Rafraîchir") — fine as text, noise in a tooltip or
       // an aria-label read aloud, so the icon-only actions use them without it.

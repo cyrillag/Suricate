@@ -426,7 +426,17 @@ path (`refreshFullEpicTree`).
   Delayed gets a filled badge instead of reusing At Risk's — a more severe/definite state should
   look more severe, not identical to the tier below it.
 
-## Project health badge (On Track / At Risk / Delayed)
+## Project health badge (Delivered / On Track / At Risk / Delayed)
+
+- **Delivered: the project's root epic is Done in Jira** (`jira.mapStatus` → done) when the report
+  is generated. It is the end state and **takes precedence over everything else**, Delayed and At
+  Risk included: once the project has shipped, a risk nobody closed or a workstream epic still
+  open in Jira is leftover bookkeeping, not a threat to the date — and it stays visible as such in
+  the matrix and the risk register. Asked for 2026-11-13 on Private boot M1 W46: root epic
+  LVL2-9365 Done, launch done, yet the report read "At Risk" (an open High risk, five workstream
+  epics still In Progress). The root epic's status is frozen with the report (`reports.root_done`,
+  like `eta_snapshot`); reports generated before that column existed keep the badge they had.
+  Shown as a filled green pill (same "definite fact" shape as Delayed), ✅ in the project history.
 
 - **At Risk and Delayed are not the same thing and must not be merged.** At Risk is a projection —
   any Blocked workstream, or the risk register carrying a risk at level `high` **or `extreme`**,
