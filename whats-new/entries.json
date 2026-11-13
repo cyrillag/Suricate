@@ -12,8 +12,8 @@
       "en": "Add co-editors in the project settings: they can generate reports and change the configuration."
     },
     "body": {
-      "fr": "Dans les paramètres d’un projet (roue dentée), le nouveau champ « Co-éditeurs » accepte une ou plusieurs adresses email OVHcloud. Chaque adresse est vérifiée dans Jira à l’enregistrement. Les co-éditeurs génèrent et régénèrent les rapports et modifient les paramètres comme toi, et le projet apparaît avec son bouton Générer sur leur tableau de bord. Toi seul gères la liste et peux supprimer le projet. Retirer une adresse retire les droits.",
-      "en": "In a project’s settings (gear icon), the new “Co-editors” field takes one or more OVHcloud email addresses. Each one is checked in Jira when you save. Co-editors generate and regenerate reports and change the settings like you, and the project shows up with its Generate button on their dashboard. Only you manage the list and can delete the project. Removing an address removes the rights."
+      "fr": "Dans les paramètres d’un projet (roue dentée), la nouvelle section « Co-éditeurs » permet d’ajouter une ou plusieurs adresses email OVHcloud, vérifiées dans Jira, et de les retirer d’un clic. Les co-éditeurs génèrent et régénèrent les rapports et modifient les paramètres comme toi, et le projet apparaît avec son bouton Générer sur leur tableau de bord. Toi seul gères la liste et peux supprimer le projet. Retirer une adresse retire les droits.",
+      "en": "In a project’s settings (gear icon), the new “Co-editors” section lets you add one or more OVHcloud email addresses, checked in Jira, and remove them in one click. Co-editors generate and regenerate reports and change the settings like you, and the project shows up with its Generate button on their dashboard. Only you manage the list and can delete the project. Removing an address removes the rights."
     }
   },
   {

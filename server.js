@@ -755,18 +755,20 @@ function confluenceUrlFor(space, page) {
 app.get('/projects/:slug/edit', requireAuth, (req, res) => {
   const proj = editableProject(req);
   if (!proj) return res.status(404).send('Project not found.');
-  const editors = projectEditors(proj.id);
+  // One-shot outcome of the last co-editor add/remove (shown once, then dropped).
+  const editorsFlash = req.session.editorsFlash || null;
+  delete req.session.editorsFlash;
   res.render('project-edit', {
     proj, milestones: projectMilestones(proj), confluenceUrl: confluenceUrlFor(proj.confluence_space, proj.confluence_page),
-    isOwner: proj.user_id === req.session.userId, editors, editorsText: editors.map(e => e.email).join('\n'),
+    isOwner: proj.user_id === req.session.userId, editors: projectEditors(proj.id), editorsFlash,
     error: null, userName: req.session.userName
   });
 });
 
-// The co-editor field: emails separated by commas, semicolons, spaces or new lines. Each one must
-// be a real Jira account (exact email match, same lookup as login) — a typo would otherwise be
-// stored and silently grant nothing. The owner's own address is dropped: they already have every
-// right. Returns { list } or { error } (the unknown addresses, named).
+// The co-editor "add" field: one or several emails separated by commas, semicolons, spaces or new
+// lines. Each one must be a real Jira account (exact email match, same lookup as login) — a typo
+// would otherwise be stored and silently grant nothing. The owner's own address is dropped: they
+// already have every right. Returns { list } or { error } (the unknown addresses, named).
 const MAX_EDITORS = 20;
 async function parseEditorList(raw, ownerAccountId, t) {
   const emails = [...new Set(String(raw || '').split(/[\s,;]+/).map(s => s.trim().toLowerCase()).filter(Boolean))];
@@ -786,6 +788,40 @@ async function parseEditorList(raw, ownerAccountId, t) {
   return { list };
 }
 
+// Co-editors are managed apart from the settings form (FUNCTIONAL_RULES.md "Visibility &
+// permissions"): each add/remove applies at once, owner only, and comes back to the edit page with
+// a confirmation (or the error, the typed addresses kept).
+app.post('/projects/:slug/editors', requireAuth, async (req, res) => {
+  const proj = editableProject(req, { ownerOnly: true });
+  if (!proj) return res.status(404).send('Project not found.');
+  const t = res.locals.t;
+  const back = flash => { req.session.editorsFlash = flash; res.redirect(`/projects/${proj.slug}/edit#co-editors`); };
+  const typed = String(req.body.emails || '');
+  if (!typed.trim()) return back({ type: 'error', text: t('editProject.err_editors_empty') });
+  const owner = db.prepare('SELECT jira_account_id FROM users WHERE id=?').get(proj.user_id);
+  let parsed;
+  try { parsed = await parseEditorList(typed, owner && owner.jira_account_id, t); }
+  catch (err) { return back({ type: 'error', text: friendlyError(t, err), typed }); }
+  if (parsed.error) return back({ type: 'error', text: parsed.error, typed });
+
+  const current = new Set(projectEditors(proj.id).map(e => e.jira_account_id));
+  const added = parsed.list.filter(e => !current.has(e.accountId));
+  if (!added.length) return back({ type: 'ok', text: t('editProject.editors_already') });
+  if (current.size + added.length > MAX_EDITORS) return back({ type: 'error', text: t('editProject.err_editors_max', { max: MAX_EDITORS }), typed });
+  const ins = db.prepare('INSERT OR IGNORE INTO project_editors(project_id,jira_account_id,email,name) VALUES(?,?,?,?)');
+  db.transaction(() => added.forEach(e => ins.run(proj.id, e.accountId, e.email, e.name)))();
+  back({ type: 'ok', text: t('editProject.editors_added', { names: added.map(e => e.name).join(', ') }) });
+});
+
+app.post('/projects/:slug/editors/:accountId/delete', requireAuth, (req, res) => {
+  const proj = editableProject(req, { ownerOnly: true });
+  if (!proj) return res.status(404).send('Project not found.');
+  const row = db.prepare('SELECT name, email FROM project_editors WHERE project_id=? AND jira_account_id=?').get(proj.id, req.params.accountId);
+  if (row) db.prepare('DELETE FROM project_editors WHERE project_id=? AND jira_account_id=?').run(proj.id, req.params.accountId);
+  req.session.editorsFlash = row ? { type: 'ok', text: res.locals.t('editProject.editors_removed', { name: row.name || row.email }) } : null;
+  res.redirect(`/projects/${proj.slug}/edit#co-editors`);
+});
+
 app.post('/projects/:slug/edit', requireAuth, async (req, res) => {
   const proj = editableProject(req);
   if (!proj) return res.status(404).send('Project not found.');
@@ -794,25 +830,15 @@ app.post('/projects/:slug/edit', requireAuth, async (req, res) => {
   // A rejected save gives the form back exactly as typed, milestone rows included.
   const typedKeys = [].concat(req.body.milestone_key ?? []);
   const typedMilestones = [].concat(req.body.milestone_name ?? []).map((n, i) => ({ name: n, key: typedKeys[i] || '' }));
-  const editors = projectEditors(proj.id);
   const rerender = error => res.render('project-edit', {
     proj: { ...proj, name, jira_root_epic, bigpicture_box_id }, milestones: typedMilestones, confluenceUrl: confluence_url,
-    isOwner, editors, editorsText: isOwner ? (req.body.co_editors ?? '') : '',
+    isOwner, editors: projectEditors(proj.id), editorsFlash: null,
     error, userName: req.session.userName
   });
 
   if (!name?.trim() || !jira_root_epic?.trim()) return rerender(res.locals.t('editProject.err_required'));
   const milestones = parseMilestoneList(req.body, res.locals.t);
   if (milestones.error) return rerender(milestones.error);
-  // Only the owner changes who else can edit — a co-editor's form has no such field, and a crafted
-  // one is ignored rather than trusted.
-  let editorList = null;
-  if (isOwner) {
-    const owner = db.prepare('SELECT jira_account_id FROM users WHERE id=?').get(proj.user_id);
-    try { editorList = await parseEditorList(req.body.co_editors, owner && owner.jira_account_id, res.locals.t); }
-    catch (err) { return rerender(friendlyError(res.locals.t, err)); }
-    if (editorList.error) return rerender(editorList.error);
-  }
   const confPage = await confluence.resolvePageUrl(CONFLUENCE_TOKEN, confluence_url);
   if (!confPage) return rerender(res.locals.t('editProject.err_confluence_url'));
 
@@ -826,21 +852,10 @@ app.post('/projects/:slug/edit', requireAuth, async (req, res) => {
   // plain string, or null out an emptied field.
   const boxId = (bigpicture_box_id || '').trim() || null;
 
-  db.transaction(() => {
-    db.prepare(`UPDATE projects SET name=?,jira_root_epic=?,eta=?,confluence_space=?,confluence_page=?,
-        milestones_json=?,bigpicture_box_id=? WHERE id=?`)
-      .run(name.trim(), epic, eta, confPage.space, confPage.page,
-        JSON.stringify(milestones.list), boxId, proj.id);
-    // The field holds the whole list, so saving replaces it (an address removed from it loses its
-    // rights). Someone kept in the list keeps their original added_at.
-    if (editorList) {
-      const keep = editorList.list.map(e => e.accountId);
-      db.prepare(`DELETE FROM project_editors WHERE project_id=? AND jira_account_id NOT IN (${keep.map(() => '?').join(',') || "''"})`).run(proj.id, ...keep);
-      const upsert = db.prepare(`INSERT INTO project_editors(project_id,jira_account_id,email,name) VALUES(?,?,?,?)
-        ON CONFLICT(project_id,jira_account_id) DO UPDATE SET email=excluded.email, name=excluded.name`);
-      editorList.list.forEach(e => upsert.run(proj.id, e.accountId, e.email, e.name));
-    }
-  })();
+  db.prepare(`UPDATE projects SET name=?,jira_root_epic=?,eta=?,confluence_space=?,confluence_page=?,
+      milestones_json=?,bigpicture_box_id=? WHERE id=?`)
+    .run(name.trim(), epic, eta, confPage.space, confPage.page,
+      JSON.stringify(milestones.list), boxId, proj.id);
 
   res.redirect(`/projects/${proj.slug}`);
 });

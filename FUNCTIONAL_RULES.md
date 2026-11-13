@@ -665,9 +665,13 @@ access model trivial to reason about. Per project there are three levels: **its 
 - **Co-editors** (asked for 2026-11 so several PMs can run one project's weekly report): listed by
   the owner on the project's settings page, as OVHcloud emails. They generate, regenerate and delete
   reports and edit the settings, exactly like the owner; **only the owner deletes the project and
-  manages the co-editor list** (a co-editor sees it read-only, and a crafted form field from them is
-  ignored). Each email must match a Jira account exactly when saved (same lookup as login) — a typo
-  is rejected by name instead of being stored and silently granting nothing. Stored by Jira account
+  manages the co-editor list** (a co-editor sees it read-only; the add/remove routes are owner-only
+  server-side). The list sits below the settings form, not in it: one row per co-editor with a
+  remove icon (confirmed), and an "Add" field taking one or several emails. Each add or removal
+  applies at once and shows a confirmation naming who was added/removed — a list typed into a form
+  field that only took effect on "Save" gave no feedback (2026-11 preview feedback). Each email must
+  match a Jira account exactly when added (same lookup as login) — a typo is rejected by name, the
+  typed text kept, instead of being stored and silently granting nothing. Stored by Jira account
   (`project_editors.jira_account_id`, the same id login writes to `users`), not by Suricate user,
   so someone who never opened Suricate can be added and has the rights from their first login.
   The field holds the whole list: saving replaces it, removing an address removes the rights. A
