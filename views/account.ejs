@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="<%= lang %>">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title><%= isPreview ? '[PREVIEW] ' : '' %><%= t('account.nav') %> — Suricate</title>
+<link rel="stylesheet" href="/app.css">
+<link rel="icon" type="image/png" href="/favicon-32.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<%# Personal access tokens (FUNCTIONAL_RULES.md "Personal access tokens"). A stored PAT is never sent
+    back to the page — only whether one is set and when. %>
+<style>
+  .acc{max-width:720px}
+  .acc-intro{font-size:14.5px;color:var(--tx2);margin:0 0 20px;max-width:64ch}
+  .acc-body{padding:18px 20px 20px}
+  .acc-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+  .acc-name{font-size:18px;font-weight:700;color:var(--db)}
+  .acc-state{font-size:13px;font-weight:700;padding:3px 9px;border-radius:var(--r);border:1px solid var(--bd)}
+  .acc-state.set{color:var(--done);border-color:#BDE475;background:#EEF7E0}
+  .acc-state.missing{color:var(--tx2);background:var(--gnd)}
+  .acc-state.unreadable{color:#9A4B12;border-color:#F4A17D;background:#FEF0EE}
+  .acc-how{font-size:14px;color:var(--tx2);margin:0 0 4px}
+  .acc-how a{color:var(--cobalt);font-weight:600}
+  .acc-form{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-top:14px}
+  .acc-form .field-group{flex:1 1 280px;margin:0}
+  .acc-remove{margin-top:12px}
+  .acc-security{font-size:13.5px}
+</style>
+</head>
+<body>
+<%- include('_nav', { userName }) %>
+<div class="app-body">
+  <div class="page-header">
+    <div>
+      <a href="/" class="back-link"><%= t('newProject.back') %></a>
+      <h1 class="page-title"><%= t('account.title') %></h1>
+      <p class="page-sub"><%= t('account.subtitle') %></p>
+    </div>
+  </div>
+
+  <div class="acc">
+    <p class="acc-intro"><%= t('account.intro') %></p>
+    <% const label = { jira: 'Jira', confluence: 'Confluence' }; %>
+    <% if (saved) { %><div class="cl-refreshed" role="status"><%= t('account.saved', { service: label[saved] }) %></div><% } %>
+    <% if (removed) { %><div class="cl-refreshed" role="status"><%= t('account.removed', { service: label[removed] }) %></div><% } %>
+
+    <% const fmt = s => new Date(s * 1000).toLocaleDateString(lang === 'fr' ? 'fr-FR' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+       const links = { jira: 'https://jira.ovhcloud.tools/secure/ViewProfile.jspa?selectedTab=com.atlassian.pats.pats-plugin:jira-user-personal-access-tokens',
+                       confluence: 'https://confluence.ovhcloud.tools/plugins/personalaccesstokens/usertokens.action' }; %>
+    <% ['jira', 'confluence'].forEach(svc => { const a = access[svc]; %>
+    <section class="section-card" aria-labelledby="acc-<%= svc %>">
+      <div class="acc-body">
+        <div class="acc-head">
+          <h2 class="acc-name" id="acc-<%= svc %>"><%= label[svc] %></h2>
+          <span class="acc-state <%= a.state %>"><%= a.state === 'set' ? t('account.state_set', { date: fmt(a.setAt) }) : t('account.state_' + a.state) %></span>
+        </div>
+        <% if (error && errorService === svc) { %><div class="auth-error" role="alert"><%= error %></div><% } %>
+        <% if (a.state === 'unreadable') { %><p class="acc-how"><%= t('account.unreadable_hint') %></p><% } %>
+        <p class="acc-how"><%= t('account.how_' + svc) %> <a href="<%= links[svc] %>" target="_blank" rel="noopener"><%= t('account.open_' + svc) %> ↗</a></p>
+        <form method="POST" action="/account/tokens/<%= svc %>" class="acc-form">
+          <div class="field-group">
+            <label class="field-label" for="tok-<%= svc %>"><%= a.state === 'set' ? t('account.token_replace_label', { service: label[svc] }) : t('account.token_label', { service: label[svc] }) %></label>
+            <%# type=password: a PAT is a secret, it shouldn't sit readable on screen while pasted. %>
+            <input class="field-input" type="password" id="tok-<%= svc %>" name="token" autocomplete="off" spellcheck="false"
+                   <%= svc === 'confluence' && !access.jiraUsername ? 'disabled' : '' %> required>
+          </div>
+          <button type="submit" class="btn-primary" <%= svc === 'confluence' && !access.jiraUsername ? 'disabled' : '' %>><%= t('account.save') %></button>
+        </form>
+        <% if (a.state !== 'missing') { %>
+        <form method="POST" action="/account/tokens/<%= svc %>/delete" class="acc-remove">
+          <button type="submit" class="btn-ghost btn-sm btn-danger"><%= t('account.remove') %></button>
+        </form>
+        <% } %>
+      </div>
+    </section>
+    <% }) %>
+    <p class="form-info acc-security"><%= t('account.security') %></p>
+  </div>
+</div>
+</body>
+</html>

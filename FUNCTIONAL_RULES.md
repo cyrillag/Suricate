@@ -1016,6 +1016,57 @@ browser tabs.
   login form and back out on success — `safeReturnTo()` only ever accepts an internal path (never
   an absolute or protocol-relative URL) so this can't become an open redirect.
 
+## Personal access tokens (PAT)
+
+Suricate reads Jira and Confluence with a single shared token (`JIRA_SERVICE_TOKEN`,
+`CONFLUENCE_SERVICE_TOKEN`) that is in fact the maintainer's own PAT — so it only sees what he
+sees. Two real consequences: the Backup Center project (box HSTAG-57) had no Planning Light from
+S39 on because its scope filter 70007 was private to its PM (2026-11); and every project broke
+whenever the maintainer's Confluence access to the CPO space dropped while he was away (2026-10).
+Agreed direction (2026-11-10), delivered in steps:
+
+1. **Owners store their own Jira and Confluence PATs** on "My access" (`/account`, nav link for
+   report creators only). *Shipped (step 1).*
+2. Every Jira/Confluence call for a project uses its **owner's** PATs, whoever is viewing (the
+   current week is generated on first visit, possibly by a reader). The shared token stays as a
+   fallback during the migration of the owners, then is cut. BigPicture keeps its shared token (it
+   only reads box configuration). *Shipped (step 2) — see the rules below.*
+3. Modifying a project or generating a report needs a **PAT-verified session**: the login page
+   offers "email only" (read) or "with my PAT" (read + modify, 30-day session like today).
+
+Rules already in force:
+
+- **Readers never need a PAT.** 119 accounts, 7 project owners (2026-11): asking every person who
+  opens a shared report link to create a token would be friction for nothing.
+- **A project is read with its owner's access, never the viewer's** (`tokensForProject` /
+  `tokensForUser` in `server.js`): generation, Cleanup refresh, project edit — and the current week
+  generated on a reader's first visit. Project creation uses the creator's, who becomes the owner.
+  The report is therefore the same whoever opens it, and a transferred project (`projects.user_id`
+  changed) is read with the new owner's PATs from the next action on.
+- **Per service, owner's PAT first, shared token as fallback** — an owner may have set Jira and not
+  yet Confluence. Fallback only when no PAT is stored (or it can't be decrypted here), **never when
+  the owner's PAT fails**: silently retrying with the shared token would hide an expired PAT and
+  bring back the very dependency this removes. Login (looking the email up in Jira, before anyone
+  is identified) still uses the shared token.
+- **Access errors name the account actually used.** Token not recognised → "the Jira PAT of
+  <owner>, the project owner, … <owner> needs to paste a new one in My access" instead of the
+  `.env` instructions meant for the maintainer; no access / CAPTCHA / space hint → "<owner>'s
+  account" instead of "Suricate's service account". With the fallback, the old wording stays.
+- **A PAT is only accepted if it belongs to the logged-in account.** Jira: `/myself` must return the
+  account login stored (`users.jira_account_id`). Confluence: `/rest/api/user/current`'s `username`
+  must equal the Jira login (`users.jira_username`, saved with the Jira PAT — on this instance both
+  are the corp email, verified), so the Jira PAT comes first. Otherwise a PM could store someone
+  else's token and read with their rights.
+- **Saving a valid PAT marks the session verified** (`req.session.patVerified`) — it's the only real
+  proof of identity Suricate has, since email login has no password. Removing a PAT requires a
+  verified session, or anyone typing an owner's email could wipe their tokens.
+- **Stored encrypted, never shown again, never logged.** AES-256-GCM (`tokens.js`), key derived from
+  `SESSION_SECRET` — no extra secret to manage, and each environment has its own: a preview seeded
+  with prod's database can't read prod's tokens (shown as "Enter it again"). Rotating
+  `SESSION_SECRET` on prod has the same effect: owners paste their PATs again, nothing else breaks.
+  Plain `users.jira_token` (in the schema since the start, always `''`) now holds the encrypted
+  Jira PAT; `''` still means none.
+
 ## Accessibility
 
 Target: WCAG 2.2 Level AA. Concrete, checkable thresholds — not "make it accessible" in the

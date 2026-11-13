@@ -12,6 +12,7 @@ const { REPORTED_LEVEL_TYPES } = genReport;
 const { rollupStatus } = require('./status');
 const qualityCheck = require('./quality-check');
 const whatsNew   = require('./whats-new');
+const tokens     = require('./tokens');
 const { translate, pluralize } = require('./i18n');
 const { AppError } = require('./errors');
 
@@ -170,37 +171,45 @@ function warningQuery({ source, message }) {
 // with the service and the object involved (see FUNCTIONAL_RULES.md "Error handling").
 const SERVICE_LABEL = { jira: 'Jira', confluence: 'Confluence', bigpicture: 'BigPicture' };
 const TOKEN_ENV = { jira: 'JIRA_SERVICE_TOKEN', confluence: 'CONFLUENCE_SERVICE_TOKEN', bigpicture: 'BIGPICTURE_API_TOKEN' };
-function userMessage(t, code, v = {}) {
+// `tok` (tokensForUser/tokensForProject) says whose access the failed call used: the project
+// owner's own PAT, or the shared service token. Access problems are worded for that account — "the
+// service account has no access" sent PMs to the maintainer even when it was their own PAT.
+function userMessage(t, code, v = {}, tok = null) {
   const [svc, ...rest] = code.split('_');
   const cause = rest.join('_');
   const service = SERVICE_LABEL[svc];
   const what = (key, vars) => t(`detail.what_${key}`, vars);
   const where = key => t(`detail.where_${key}`);
+  const ownPat = !!(tok && tok.own[svc]);
+  const account = ownPat ? t('detail.account_owner', { owner: tok.ownerName }) : t('detail.account_shared');
+  const accountIn = ownPat ? t('detail.account_owner_in', { owner: tok.ownerName }) : t('detail.account_shared_in');
   if (code === 'confluence_no_deliverables_table') return t('detail.msg_page_format', { table: 'Deliverables status', problem: t('detail.problem_missing') });
   if (code === 'confluence_empty_deliverables') return t('detail.msg_page_format', { table: 'Deliverables status', problem: t('detail.problem_empty') });
   if (code === 'confluence_no_week_summary_table') return t('detail.msg_page_format', { table: 'Week summary', problem: t('detail.problem_missing') });
   if (!service) return null;
   switch (cause) {
-    case 'token_invalid': return t('detail.msg_token_invalid', { service, envVar: TOKEN_ENV[svc] });
+    case 'token_invalid': return ownPat
+      ? t('detail.msg_pat_invalid', { service, owner: tok.ownerName })
+      : t('detail.msg_token_invalid', { service, envVar: TOKEN_ENV[svc] });
     case 'token_missing': return t('detail.msg_token_missing', v);
-    case 'captcha': return t('detail.msg_captcha');
-    case 'forbidden': return t('detail.msg_forbidden', { what: svc === 'jira' ? what('jira_tickets') : what('confluence_page', v) });
-    case 'space_forbidden': return t('detail.msg_forbidden', { what: what('confluence_space', v) });
+    case 'captcha': return t('detail.msg_captcha', { account: accountIn });
+    case 'forbidden': return t('detail.msg_forbidden', { account, what: svc === 'jira' ? what('jira_tickets') : what('confluence_page', v) });
+    case 'space_forbidden': return t('detail.msg_forbidden', { account, what: what('confluence_space', v) });
     case 'not_found': return t('detail.msg_not_found', { what: what('root_epic'), where: where('root_epic') });
     case 'issue_not_found': return t('detail.msg_not_found', { what: what('issue', v), where: where('issue') });
     case 'page_not_found': return t('detail.msg_not_found', { what: what('page', v), where: where('page') });
     case 'box_not_found': return t('detail.msg_not_found', { what: what('box', v), where: where('box') });
     case 'bad_query': return t('detail.msg_bad_query', v);
-    case 'temporarily_denied': return t('detail.msg_temporary', { service, hint: t('detail.msg_temporary_hint_space', v) });
+    case 'temporarily_denied': return t('detail.msg_temporary', { service, hint: t('detail.msg_temporary_hint_space', { ...v, account: accountIn }) });
     case 'rate_limited': case 'timeout': case 'unreachable': case 'unavailable':
       return t('detail.msg_temporary', { service, hint: t('detail.msg_temporary_hint_logs') });
     default: return t('detail.msg_unexpected', { service });
   }
 }
-function friendlyError(t, err) {
+function friendlyError(t, err, tok = null) {
   console.error(err);
   if (!(err instanceof AppError)) return t('detail.err_generic');
-  const msg = userMessage(t, err.code, err.vars);
+  const msg = userMessage(t, err.code, err.vars, tok);
   if (msg) return err.source === 'bigpicture' ? msg + t('detail.msg_planning_suffix') : msg;
   const own = t(`detail.err_${err.code}`, err.vars); // app-level codes keep their own message
   return own === `detail.err_${err.code}` ? t('detail.err_generic') : own;
@@ -208,8 +217,29 @@ function friendlyError(t, err) {
 
 // The warning banner's {source, message}: the source comes from the error's own code, so a Jira
 // or BigPicture failure is labelled as such (every banner used to say "Confluence sync failed").
-function errorWarning(t, err) {
-  return { source: err instanceof AppError ? err.source : 'app', message: friendlyError(t, err) };
+function errorWarning(t, err, tok = null) {
+  return { source: err instanceof AppError ? err.source : 'app', message: friendlyError(t, err, tok) };
+}
+
+// Whose access a project's Jira/Confluence calls use (FUNCTIONAL_RULES.md "Personal access
+// tokens"): its owner's own PAT when one is stored and readable here, otherwise the shared service
+// token — a fallback kept only while owners migrate. Resolved per service: an owner may have set
+// Jira and not Confluence yet. Looked up on every call rather than cached, so a PAT saved, replaced
+// or removed on "My access" (or a project transferred) applies to the very next action.
+function tokensForUser(userId) {
+  const u = db.prepare('SELECT name, jira_token, confluence_token FROM users WHERE id=?').get(userId) || {};
+  const jiraPat = tokens.decrypt(u.jira_token);
+  const confluencePat = tokens.decrypt(u.confluence_token);
+  return {
+    jira: jiraPat || JIRA_TOKEN,
+    confluence: confluencePat || CONFLUENCE_TOKEN,
+    own: { jira: !!jiraPat, confluence: !!confluencePat },
+    ownerName: u.name || null
+  };
+}
+function tokensForProject(projectId) {
+  const p = db.prepare('SELECT user_id FROM projects WHERE id=?').get(projectId);
+  return tokensForUser(p ? p.user_id : null);
 }
 
 function formatDate(iso) {
@@ -300,7 +330,7 @@ const insEpicCache = db.prepare('INSERT OR REPLACE INTO epics_cache(project_id,j
 // source of truth instead (otherwise the two sources produce different (deliverable,name)
 // groupings for the same tickets and end up duplicated side by side).
 async function seedWorkstreamsFromJiraTree(projectId, rootEpic) {
-  const epics = await jira.getChildEpics(JIRA_TOKEN, rootEpic);
+  const epics = await jira.getChildEpics(tokensForProject(projectId).jira, rootEpic);
   epics.forEach((e, i) => {
     insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter, null, e.type);
     upsertWorkstreamFromJira.run(projectId, e.deliverable, e.summary, e.team, e.key, i);
@@ -316,7 +346,7 @@ async function seedWorkstreamsFromJiraTree(projectId, rootEpic) {
 // aggregateEpicStatus) — flattened here into individual keys before hitting Jira.
 async function refreshEpicStatuses(projectId, jiraKeyFields) {
   const keys = [...new Set(jiraKeyFields.flatMap(splitJiraKeys))];
-  const epics = await jira.getEpicsByKeys(JIRA_TOKEN, keys);
+  const epics = await jira.getEpicsByKeys(tokensForProject(projectId).jira, keys);
   epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter, null, e.type));
   // Called with every workstream key of the project each time, so the alias list is rebuilt whole.
   db.prepare('DELETE FROM epic_key_aliases WHERE project_id=?').run(projectId);
@@ -333,7 +363,7 @@ async function refreshEpicStatuses(projectId, jiraKeyFields) {
 // with no bigpicture_box_id set — see resolvePlanningTree for the alternative, BigPicture-scoped
 // path (FUNCTIONAL_RULES.md "Planning Light").
 async function refreshFullEpicTree(projectId, rootEpic) {
-  const epics = await jira.getPortfolioEpics(JIRA_TOKEN, rootEpic);
+  const epics = await jira.getPortfolioEpics(tokensForProject(projectId).jira, rootEpic);
   epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter, null, e.type));
   return epics.length;
 }
@@ -355,7 +385,7 @@ function pruneEpicsCache(projectId, startedAt) {
 // the result into epics_cache like every other epic-fetching path here, then builds the tree.
 async function resolvePlanningTree(projectId, boxId, rootEpic) {
   const { queries, manualKeys } = await bigpicture.getScopeDefinition(BIGPICTURE_TOKEN, boxId);
-  const epics = await jira.searchByJql(JIRA_TOKEN, queries, manualKeys);
+  const epics = await jira.searchByJql(tokensForProject(projectId).jira, queries, manualKeys);
   epics.forEach(e => insEpicCache.run(projectId, e.key, e.summary, e.team, e.status, e.start, e.end, e.assignee, e.reporter, e.parentKey, e.type));
   return buildPlanningTree(epics, rootEpic);
 }
@@ -447,7 +477,7 @@ function reconcileWorkstreams(projectId, currentWorkstreams) {
 }
 
 async function syncConfluenceProject(projectId, spaceKey, page) {
-  const pageData = await confluence.fetchPageBody(CONFLUENCE_TOKEN, spaceKey, page);
+  const pageData = await confluence.fetchPageBody(tokensForProject(projectId).confluence, spaceKey, page);
   const format = confluence.validatePageFormat(pageData.html);
   if (!format.hasDeliverables) {
     throw new AppError('confluence_no_deliverables_table', 'Confluence page found, but no "Deliverables status" table could be parsed.');
@@ -653,6 +683,89 @@ app.get('/whats-new/img/:file', requireAuth, (req, res) => {
   res.sendFile(path.join(whatsNew.IMG_DIR, req.params.file), err => { if (err) res.status(404).end(); });
 });
 
+// ── MY ACCESS (personal access tokens) ───────────────────────────
+// Each project owner stores their own Jira and Confluence PATs (FUNCTIONAL_RULES.md "Personal access
+// tokens"), so a project is read with its owner's rights instead of the single shared service
+// token. Step 1: stored and checked only, not used for any Jira/Confluence call yet. Readers never
+// need one. A PAT is only accepted if it belongs to the logged-in account itself — that check is
+// what makes a saved PAT a proof of identity (login by email alone proves nothing), so a session
+// that saved one is marked verified.
+const PAT_SERVICES = ['jira', 'confluence'];
+
+function accessState(userId) {
+  const u = db.prepare('SELECT jira_token, confluence_token, jira_username, jira_token_set_at, confluence_token_set_at FROM users WHERE id=?').get(userId) || {};
+  // A stored token this environment can't decrypt (SESSION_SECRET changed, or a preview seeded from
+  // prod's database) is shown as "to enter again", not as missing — the PM did set one.
+  const state = stored => !stored ? 'missing' : tokens.decrypt(stored) ? 'set' : 'unreadable';
+  return {
+    jira:       { state: state(u.jira_token), setAt: u.jira_token_set_at },
+    confluence: { state: state(u.confluence_token), setAt: u.confluence_token_set_at },
+    jiraUsername: u.jira_username || null
+  };
+}
+
+function renderAccess(req, res, { error = null, errorService = null, status = 200 } = {}) {
+  res.status(status).render('account', {
+    access: accessState(req.session.userId), error, errorService,
+    saved: PAT_SERVICES.includes(req.query.saved) ? req.query.saved : null,
+    removed: PAT_SERVICES.includes(req.query.removed) ? req.query.removed : null,
+    verified: !!req.session.patVerified,
+    userName: req.session.userName
+  });
+}
+
+app.get('/account', requireAuth, (req, res) => renderAccess(req, res));
+
+app.post('/account/tokens/:service', requireAuth, async (req, res) => {
+  const service = req.params.service;
+  if (!PAT_SERVICES.includes(service)) return res.status(404).send('Not found.');
+  const t = res.locals.t;
+  const fail = msg => renderAccess(req, res, { error: msg, errorService: service, status: 400 });
+  const pat = (req.body.token || '').trim();
+  if (!pat) return fail(t('account.err_empty'));
+  const user = db.prepare('SELECT jira_account_id, jira_username FROM users WHERE id=?').get(req.session.userId);
+  try {
+    if (service === 'jira') {
+      let me;
+      try { me = await jira.getMe(pat); }
+      catch (err) {
+        if (err instanceof AppError && err.code === 'jira_token_invalid') return fail(t('account.err_not_recognized', { service: 'Jira' }));
+        throw err;
+      }
+      // users.jira_account_id is what login stored (`key || name` of the Jira user found by email).
+      const owner = [me.key, me.name].filter(Boolean).map(s => s.toLowerCase());
+      if (!owner.includes(user.jira_account_id.toLowerCase())) return fail(t('account.err_other_account', { service: 'Jira', who: me.displayName || me.name }));
+      db.prepare('UPDATE users SET jira_token=?, jira_username=?, jira_token_set_at=unixepoch() WHERE id=?')
+        .run(tokens.encrypt(pat), me.name || me.key, req.session.userId);
+    } else {
+      // Confluence has no link to our users table other than the username, which on this instance is
+      // the Jira login (verified: both are the corp email) — hence the Jira PAT first.
+      if (!user.jira_username) return fail(t('account.err_jira_first'));
+      const me = await confluence.getCurrentUser(pat);
+      if (!me) return fail(t('account.err_not_recognized', { service: 'Confluence' }));
+      if (me.username.toLowerCase() !== user.jira_username.toLowerCase()) return fail(t('account.err_other_account', { service: 'Confluence', who: me.displayName || me.username }));
+      db.prepare('UPDATE users SET confluence_token=?, confluence_token_set_at=unixepoch() WHERE id=?')
+        .run(tokens.encrypt(pat), req.session.userId);
+    }
+  } catch (err) {
+    return fail(friendlyError(t, err));
+  }
+  req.session.patVerified = true;
+  req.session.save(() => res.redirect(`/account?saved=${service}`));
+});
+
+// Removing needs a verified session: otherwise anyone typing an owner's email could wipe their
+// tokens (and, once they're used for reports, break their projects).
+app.post('/account/tokens/:service/delete', requireAuth, (req, res) => {
+  const service = req.params.service;
+  if (!PAT_SERVICES.includes(service)) return res.status(404).send('Not found.');
+  if (!req.session.patVerified) return renderAccess(req, res, { error: res.locals.t('account.err_verify_to_remove'), errorService: service, status: 403 });
+  // users.jira_token is NOT NULL in the original schema — '' means "none", as it always has.
+  if (service === 'jira') db.prepare("UPDATE users SET jira_token='', jira_token_set_at=NULL WHERE id=?").run(req.session.userId);
+  else db.prepare('UPDATE users SET confluence_token=NULL, confluence_token_set_at=NULL WHERE id=?').run(req.session.userId);
+  res.redirect(`/account?removed=${service}`);
+});
+
 app.get('/', requireAuth, (req, res) => {
   const projects = db.prepare(`
     SELECT p.*, u.name as owner_name,
@@ -672,9 +785,11 @@ app.post('/projects', requireAuth, async (req, res) => {
   if (!name?.trim() || !jira_root_epic?.trim())
     return res.render('project-new', { error: res.locals.t('newProject.err_required'), userName: req.session.userName });
 
+  // The creator becomes the owner: their own access from the very first read.
+  const tok = tokensForUser(req.session.userId);
   // Confluence is mandatory: the "Deliverables status", "Week summary" and "Risk matrix"
   // sections it supplies aren't derivable from Jira alone.
-  const confPage = await confluence.resolvePageUrl(CONFLUENCE_TOKEN, confluence_url);
+  const confPage = await confluence.resolvePageUrl(tok.confluence, confluence_url);
   if (!confPage)
     return res.render('project-new', { error: res.locals.t('newProject.err_confluence_url'), userName: req.session.userName });
 
@@ -683,7 +798,7 @@ app.post('/projects', requireAuth, async (req, res) => {
 
   // Target ETA is inherited from the root epic's "End date" — not user-entered.
   let eta = null;
-  try { eta = formatDate((await jira.getRootEpicMeta(JIRA_TOKEN, epic)).eta); }
+  try { eta = formatDate((await jira.getRootEpicMeta(tok.jira, epic)).eta); }
   catch (err) { console.warn(`Could not read ETA from ${epic}: ${err.message}`); }
 
   let projId;
@@ -699,7 +814,7 @@ app.post('/projects', requireAuth, async (req, res) => {
   // buttons on the project page, so we redirect either way instead of losing the created project.
   let warning = null;
   try { await syncConfluenceProject(projId, confPage.space, confPage.page); }
-  catch (err) { warning = errorWarning(res.locals.t, err); }
+  catch (err) { warning = errorWarning(res.locals.t, err, tok); }
 
   // Best-effort: the Planning/Gantt section is independent of the Confluence matrix, so a
   // Jira hiccup here shouldn't block creation or override the (more actionable) Confluence
@@ -742,12 +857,13 @@ app.post('/projects/:slug/edit', requireAuth, async (req, res) => {
   if (!name?.trim() || !jira_root_epic?.trim()) return rerender(res.locals.t('editProject.err_required'));
   const milestones = parseMilestoneList(req.body, res.locals.t);
   if (milestones.error) return rerender(milestones.error);
-  const confPage = await confluence.resolvePageUrl(CONFLUENCE_TOKEN, confluence_url);
+  const tok = tokensForUser(proj.user_id);
+  const confPage = await confluence.resolvePageUrl(tok.confluence, confluence_url);
   if (!confPage) return rerender(res.locals.t('editProject.err_confluence_url'));
 
   const epic = jira_root_epic.trim().toUpperCase();
   let eta = proj.eta;
-  try { eta = formatDate((await jira.getRootEpicMeta(JIRA_TOKEN, epic)).eta); }
+  try { eta = formatDate((await jira.getRootEpicMeta(tok.jira, epic)).eta); }
   catch (err) { console.warn(`Could not read ETA from ${epic}: ${err.message}`); }
 
   // Free-form (no key-shape validation like the milestone fields get): a BigPicture box ID isn't
@@ -848,7 +964,7 @@ app.post('/projects/:slug/cleanup/refresh', requireAuth, async (req, res) => {
     const n = db.prepare("SELECT COUNT(*) n FROM epics_cache WHERE project_id=? AND issuetype='Epic'").get(proj.id).n;
     res.redirect(`${back}?refreshed=${n}`);
   } catch (err) {
-    res.redirect(`${back}?${warningQuery(errorWarning(res.locals.t, err))}`);
+    res.redirect(`${back}?${warningQuery(errorWarning(res.locals.t, err, tokensForUser(proj.user_id)))}`);
   }
 });
 
@@ -861,8 +977,10 @@ async function generateReportRow(proj, year, week) {
   let execSummary = null;
   let highlights = { achievements: [], blockers: [], clarify: [] };
   let risks = [];
-  if (proj.confluence_space && proj.confluence_page && CONFLUENCE_TOKEN) {
-    const page = await confluence.fetchPageBody(CONFLUENCE_TOKEN, proj.confluence_space, proj.confluence_page);
+  // The owner's access, whoever triggered the generation (a reader opening the current week does).
+  const tok = tokensForUser(proj.user_id);
+  if (proj.confluence_space && proj.confluence_page && tok.confluence) {
+    const page = await confluence.fetchPageBody(tok.confluence, proj.confluence_space, proj.confluence_page);
     // Missing table entirely = format problem, worth failing loudly on. No row for THIS week yet
     // is normal/expected (e.g. before the PM has updated the page for the week) — stay silent.
     if (!confluence.validatePageFormat(page.html).hasWeekSummaryTable) {
@@ -882,7 +1000,7 @@ async function generateReportRow(proj, year, week) {
   // week-over-week delay comparison needs it to actually track the source on its own schedule,
   // same as workstreams/epics already do on every generate.
   let etaIso = null;
-  try { etaIso = (await jira.getRootEpicMeta(JIRA_TOKEN, proj.jira_root_epic)).eta; }
+  try { etaIso = (await jira.getRootEpicMeta(tok.jira, proj.jira_root_epic)).eta; }
   catch (err) { console.warn(`Could not read ETA from ${proj.jira_root_epic}: ${err.message}`); }
   db.prepare('UPDATE projects SET eta=? WHERE id=?').run(formatDate(etaIso), proj.id);
 
@@ -895,7 +1013,7 @@ async function generateReportRow(proj, year, week) {
     const line = { name: m.name, key: m.key || null, end: null, status: null };
     if (m.key) {
       try {
-        const meta = await jira.getRootEpicMeta(JIRA_TOKEN, m.key);
+        const meta = await jira.getRootEpicMeta(tok.jira, m.key);
         line.end = meta.eta;
         line.status = meta.status;
       }
@@ -990,6 +1108,9 @@ app.post('/projects/:slug/reports/generate', requireAuth, async (req, res) => {
   // sync itself succeeded — folding it into the one action people actually look for feedback
   // from fixes that.
   let syncFailure = null;
+  // Only to word an error for the right account — the helpers below resolve the owner's tokens
+  // themselves (tokensForProject).
+  const tok = tokensForUser(proj.user_id);
   // epics_cache is pruned only when every writer of this run succeeded (see pruneEpicsCache).
   const startedAt = epicsCacheClock();
   let cacheComplete = true;
@@ -1005,7 +1126,7 @@ app.post('/projects/:slug/reports/generate', requireAuth, async (req, res) => {
       await seedWorkstreamsFromJiraTree(proj.id, proj.jira_root_epic);
     }
   } catch (err) {
-    syncFailure = errorWarning(res.locals.t, err);
+    syncFailure = errorWarning(res.locals.t, err, tok);
     cacheComplete = false;
   }
   // Without a BigPicture box, every writer has run by now: prune before the report freezes its
@@ -1017,14 +1138,14 @@ app.post('/projects/:slug/reports/generate', requireAuth, async (req, res) => {
   try {
     generated = await generateReportRow(proj, year, week);
   } catch (err) {
-    return res.redirect(`/projects/${proj.slug}?${warningQuery(errorWarning(res.locals.t, err))}`);
+    return res.redirect(`/projects/${proj.slug}?${warningQuery(errorWarning(res.locals.t, err, tok))}`);
   }
   if (cacheComplete && proj.bigpicture_box_id && generated.planningResolved) pruneEpicsCache(proj.id, startedAt);
 
   // The report itself was generated — show it, with whatever went wrong on the way as a banner on
   // top (a failed pre-sync means some data may be stale; a Planning Light failure means the
   // classic Gantt stands in for it), rather than bouncing back to the project page.
-  const notices = [syncFailure, ...generated.warnings.map(err => errorWarning(res.locals.t, err))].filter(Boolean);
+  const notices = [syncFailure, ...generated.warnings.map(err => errorWarning(res.locals.t, err, tok))].filter(Boolean);
   const reportUrl = `/projects/${proj.slug}/${year}-W${String(week).padStart(2,'0')}`;
   res.redirect(notices.length ? `${reportUrl}?${warningQuery(notices[0])}` : reportUrl);
 });
@@ -1219,10 +1340,10 @@ app.get('/projects/:slug/:yearweek(\\d{4}-W\\d{2})', requireAuth, async (req, re
     try {
       const generated = await generateReportRow(proj, year, week);
       if (generated.warnings.length && !req.query.syncSource) {
-        return res.redirect(`/projects/${req.params.slug}/${req.params.yearweek}?${warningQuery(errorWarning(res.locals.t, generated.warnings[0]))}`);
+        return res.redirect(`/projects/${req.params.slug}/${req.params.yearweek}?${warningQuery(errorWarning(res.locals.t, generated.warnings[0], tokensForUser(proj.user_id)))}`);
       }
     }
-    catch (err) { return res.redirect(`/projects/${req.params.slug}?${warningQuery(errorWarning(res.locals.t, err))}`); }
+    catch (err) { return res.redirect(`/projects/${req.params.slug}?${warningQuery(errorWarning(res.locals.t, err, tokensForUser(proj.user_id)))}`); }
     report = db.prepare('SELECT * FROM reports WHERE project_id=? AND year=? AND week=?').get(proj.id, year, week);
   }
 
